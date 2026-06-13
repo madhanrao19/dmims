@@ -179,9 +179,16 @@ cd /var/www/dmims
 # Run migrations
 sudo -u appuser php artisan migrate --force
 
+# Seed the roles & permissions the access control depends on (no demo data)
+sudo -u appuser php artisan db:seed --class=RolesAndPermissionsSeeder --force
+
 # Create the first platform administrator (prompts for a password if omitted)
 sudo -u appuser php artisan dmims:create-admin admin@your-domain.com --name="Administrator"
 ```
+
+> The full `php artisan db:seed` also creates a demo customer and a default
+> `admin@example.com` / `password` login — use it only for evaluation, never on
+> a production install.
 
 > Database backups can be taken from the admin panel (Platform → Backups → "Run Database Backup")
 > or scheduled via the cron job in Part 13. For MySQL, ensure the `mysqldump` and `mysql`
