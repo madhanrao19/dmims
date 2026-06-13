@@ -30,7 +30,7 @@ class ProductResource extends BaseResource
     {
         return $form
             ->schema([
-                Forms\Components\BelongsToSelect::make('customer_id')
+                Forms\Components\Select::make('customer_id')
                     ->relationship('customer', 'company_name')
                     ->searchable()
                     ->required(),
@@ -38,15 +38,15 @@ class ProductResource extends BaseResource
                 Forms\Components\TextInput::make('barcode')->maxLength(150),
                 Forms\Components\TextInput::make('product_name')->required()->maxLength(255),
                 Forms\Components\Textarea::make('description')->rows(3),
-                Forms\Components\BelongsToSelect::make('category_id')
+                Forms\Components\Select::make('category_id')
                     ->relationship('category', 'category_name')
                     ->searchable(),
-                Forms\Components\BelongsToSelect::make('default_location_id')
+                Forms\Components\Select::make('default_location_id')
                     ->relationship('defaultLocation', 'location_name')
                     ->searchable(),
                 Forms\Components\TextInput::make('reorder_level')->numeric()->default(0),
-                Forms\Components\TextInput::make('unit_cost')->numeric()->numericStep('0.01')->default(0),
-                Forms\Components\TextInput::make('unit_price')->numeric()->numericStep('0.01')->default(0),
+                Forms\Components\TextInput::make('unit_cost')->numeric()->step('0.01')->default(0),
+                Forms\Components\TextInput::make('unit_price')->numeric()->step('0.01')->default(0),
                 Forms\Components\Select::make('status')
                     ->options([
                         'active' => 'Active',

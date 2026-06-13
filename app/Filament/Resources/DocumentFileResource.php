@@ -30,21 +30,21 @@ class DocumentFileResource extends BaseResource
     {
         return $form
             ->schema([
-                Forms\Components\BelongsToSelect::make('customer_id')
+                Forms\Components\Select::make('customer_id')
                     ->relationship('customer', 'company_name')
                     ->searchable()
                     ->required(),
                 Forms\Components\TextInput::make('file_barcode')->required()->maxLength(150),
                 Forms\Components\TextInput::make('file_reference_no')->maxLength(150),
                 Forms\Components\TextInput::make('title')->required()->maxLength(255),
-                Forms\Components\BelongsToSelect::make('document_type_id')
+                Forms\Components\Select::make('document_type_id')
                     ->relationship('documentType', 'type_name')
                     ->searchable(),
-                Forms\Components\BelongsToSelect::make('department_id')
+                Forms\Components\Select::make('department_id')
                     ->relationship('department', 'name')
                     ->searchable(),
                 Forms\Components\TextInput::make('owner_name')->maxLength(255),
-                Forms\Components\BelongsToSelect::make('current_box_id')
+                Forms\Components\Select::make('current_box_id')
                     ->relationship('currentBox', 'box_number')
                     ->searchable()
                     ->required(),

@@ -43,3 +43,7 @@ Thumbs.db
 
 # Local Claude Code settings (per-developer)
 /.claude/settings.local.json
+
+# Bundled Windows PHP runtime (dev convenience, not part of the app)
+/tools/php8.4/
+/tools/php-*.zip

@@ -27,7 +27,7 @@ class SettingResource extends BaseResource
     {
         return $form
             ->schema([
-                Forms\Components\BelongsToSelect::make('customer_id')
+                Forms\Components\Select::make('customer_id')
                     ->relationship('customer', 'company_name')
                     ->searchable()
                     ->required(),

@@ -30,15 +30,15 @@ class ProductLocationStockResource extends BaseResource
     {
         return $form
             ->schema([
-                Forms\Components\BelongsToSelect::make('customer_id')
+                Forms\Components\Select::make('customer_id')
                     ->relationship('customer', 'company_name')
                     ->searchable()
                     ->required(),
-                Forms\Components\BelongsToSelect::make('product_id')
+                Forms\Components\Select::make('product_id')
                     ->relationship('product', 'product_name')
                     ->searchable()
                     ->required(),
-                Forms\Components\BelongsToSelect::make('location_id')
+                Forms\Components\Select::make('location_id')
                     ->relationship('location', 'location_name')
                     ->searchable()
                     ->required(),

@@ -161,7 +161,17 @@ MAIL_FROM_ADDRESS=noreply@your-domain.com
 SESSION_DRIVER=file
 CACHE_DRIVER=file
 QUEUE_CONNECTION=database
+
+# Session cookie hardening (the site is served over HTTPS)
+SESSION_SECURE_COOKIE=true
+SESSION_SAME_SITE=lax
 ```
+
+> **Mail is required for password resets.** The admin panel exposes a
+> "Forgot password" flow. With `MAIL_MAILER=log` (the default), reset emails are
+> only written to `storage/logs` and never delivered. Configure a real `smtp`
+> mailer with valid credentials, then verify with
+> `php artisan tinker --execute="Mail::raw('test', fn(\$m) => \$m->to('you@example.com')->subject('test'));"`.
 
 ### Generate application key
 ```bash

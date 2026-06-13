@@ -27,11 +27,11 @@ class CustomerSubscriptionResource extends BaseResource
     {
         return $form
             ->schema([
-                Forms\Components\BelongsToSelect::make('customer_id')
+                Forms\Components\Select::make('customer_id')
                     ->relationship('customer', 'company_name')
                     ->searchable()
                     ->required(),
-                Forms\Components\BelongsToSelect::make('subscription_plan_id')
+                Forms\Components\Select::make('subscription_plan_id')
                     ->relationship('subscriptionPlan', 'plan_name')
                     ->searchable(),
                 Forms\Components\TextInput::make('subscription_no')->required()->maxLength(100),

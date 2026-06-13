@@ -32,10 +32,10 @@ class UserResource extends BaseResource
                 Forms\Components\TextInput::make('username')->maxLength(100),
                 Forms\Components\TextInput::make('employee_id')->maxLength(100),
                 Forms\Components\TextInput::make('phone')->maxLength(50),
-                Forms\Components\BelongsToSelect::make('customer_id')
+                Forms\Components\Select::make('customer_id')
                     ->relationship('customer', 'company_name')
                     ->searchable(),
-                Forms\Components\BelongsToSelect::make('department_id')
+                Forms\Components\Select::make('department_id')
                     ->relationship('department', 'name')
                     ->searchable(),
                 Forms\Components\TextInput::make('job_title')->maxLength(255),
@@ -52,7 +52,7 @@ class UserResource extends BaseResource
                     ->required(),
                 Forms\Components\Toggle::make('is_platform_user'),
                 Forms\Components\Toggle::make('two_factor_enabled'),
-                Forms\Components\MultiSelect::make('roles')
+                Forms\Components\Select::make('roles')->multiple()
                     ->relationship('roles', 'name'),
             ]);
     }

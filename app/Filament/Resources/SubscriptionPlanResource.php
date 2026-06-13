@@ -35,7 +35,7 @@ class SubscriptionPlanResource extends BaseResource
                 Forms\Components\Textarea::make('allowed_reports')->helperText('Enter JSON or leave blank for no restrictions.'),
                 Forms\Components\Textarea::make('enabled_modules')->helperText('Enter JSON array of enabled module codes or leave blank.'),
                 Forms\Components\TextInput::make('support_level')->maxLength(100),
-                Forms\Components\TextInput::make('price')->numeric()->numericStep('0.01'),
+                Forms\Components\TextInput::make('price')->numeric()->step('0.01'),
                 Forms\Components\Select::make('billing_cycle')
                     ->options([
                         'monthly' => 'Monthly',

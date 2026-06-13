@@ -27,11 +27,11 @@ class CustomerModuleResource extends BaseResource
     {
         return $form
             ->schema([
-                Forms\Components\BelongsToSelect::make('customer_id')
+                Forms\Components\Select::make('customer_id')
                     ->relationship('customer', 'company_name')
                     ->searchable()
                     ->required(),
-                Forms\Components\BelongsToSelect::make('module_id')
+                Forms\Components\Select::make('module_id')
                     ->relationship('module', 'module_name')
                     ->searchable()
                     ->required(),

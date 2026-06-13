@@ -30,14 +30,14 @@ class LocationResource extends BaseResource
     {
         return $form
             ->schema([
-                Forms\Components\BelongsToSelect::make('customer_id')
+                Forms\Components\Select::make('customer_id')
                     ->relationship('customer', 'company_name')
                     ->searchable()
                     ->required(),
-                Forms\Components\BelongsToSelect::make('parent_id')
+                Forms\Components\Select::make('parent_id')
                     ->relationship('parent', 'location_name')
                     ->searchable(),
-                Forms\Components\BelongsToSelect::make('location_type_id')
+                Forms\Components\Select::make('location_type_id')
                     ->relationship('locationType', 'type_name')
                     ->searchable(),
                 Forms\Components\TextInput::make('location_code')->required()->maxLength(100),

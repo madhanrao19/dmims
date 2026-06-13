@@ -30,18 +30,18 @@ class StockMovementResource extends BaseResource
     {
         return $form
             ->schema([
-                Forms\Components\BelongsToSelect::make('customer_id')
+                Forms\Components\Select::make('customer_id')
                     ->relationship('customer', 'company_name')
                     ->searchable()
                     ->required(),
                 Forms\Components\TextInput::make('movement_no')->required()->maxLength(100),
-                Forms\Components\BelongsToSelect::make('product_id')
+                Forms\Components\Select::make('product_id')
                     ->relationship('product', 'product_name')
                     ->searchable(),
-                Forms\Components\BelongsToSelect::make('from_location_id')
+                Forms\Components\Select::make('from_location_id')
                     ->relationship('fromLocation', 'location_name')
                     ->searchable(),
-                Forms\Components\BelongsToSelect::make('to_location_id')
+                Forms\Components\Select::make('to_location_id')
                     ->relationship('toLocation', 'location_name')
                     ->searchable(),
                 Forms\Components\TextInput::make('quantity')->numeric()->required(),

@@ -30,7 +30,7 @@ class DocumentMovementLogResource extends BaseResource
     {
         return $form
             ->schema([
-                Forms\Components\BelongsToSelect::make('customer_id')
+                Forms\Components\Select::make('customer_id')
                     ->relationship('customer', 'company_name')
                     ->searchable()
                     ->required(),
@@ -38,16 +38,16 @@ class DocumentMovementLogResource extends BaseResource
                 Forms\Components\TextInput::make('movable_type')->maxLength(150),
                 Forms\Components\TextInput::make('movable_id')->maxLength(100),
                 Forms\Components\TextInput::make('action_type')->maxLength(150),
-                Forms\Components\BelongsToSelect::make('from_location_id')
+                Forms\Components\Select::make('from_location_id')
                     ->relationship('fromLocation', 'location_name')
                     ->searchable(),
-                Forms\Components\BelongsToSelect::make('to_location_id')
+                Forms\Components\Select::make('to_location_id')
                     ->relationship('toLocation', 'location_name')
                     ->searchable(),
-                Forms\Components\BelongsToSelect::make('from_box_id')
+                Forms\Components\Select::make('from_box_id')
                     ->relationship('fromBox', 'box_number')
                     ->searchable(),
-                Forms\Components\BelongsToSelect::make('to_box_id')
+                Forms\Components\Select::make('to_box_id')
                     ->relationship('toBox', 'box_number')
                     ->searchable(),
                 Forms\Components\TextInput::make('source_origin')->maxLength(255),
