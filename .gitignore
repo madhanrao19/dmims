@@ -40,3 +40,6 @@ Thumbs.db
 /storage/app/backups
 /storage/app/exports
 /storage/app/imports
+
+# Local Claude Code settings (per-developer)
+/.claude/settings.local.json
