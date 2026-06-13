@@ -11,6 +11,10 @@ class BarcodeRegistry extends Model
 {
     use BelongsToCustomer, HasFactory, SoftDeletes;
 
+    // The migration creates a singular `barcode_registry` table, which does not
+    // match Laravel's default pluralisation (`barcode_registries`).
+    protected $table = 'barcode_registry';
+
     protected $fillable = [
         'customer_id',
         'barcode',

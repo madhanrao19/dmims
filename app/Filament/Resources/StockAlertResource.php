@@ -29,14 +29,20 @@ class StockAlertResource extends BaseResource
                     ->required(),
                 Forms\Components\TextInput::make('product_id')->numeric()->required(),
                 Forms\Components\TextInput::make('location_id')->numeric()->required(),
-                Forms\Components\TextInput::make('alert_type')->required()->maxLength(100),
+                Forms\Components\Select::make('alert_type')
+                    ->options([
+                        'low_stock' => 'Low Stock',
+                        'out_of_stock' => 'Out of Stock',
+                        'overstock' => 'Overstock',
+                    ])
+                    ->required(),
                 Forms\Components\TextInput::make('threshold_quantity')->numeric()->required(),
                 Forms\Components\TextInput::make('current_quantity')->numeric()->required(),
                 Forms\Components\Select::make('status')
                     ->options([
-                        'active' => 'Active',
-                        'resolved' => 'Resolved',
-                        'dismissed' => 'Dismissed',
+                        'open' => 'Open',
+                        'acknowledged' => 'Acknowledged',
+                        'closed' => 'Closed',
                     ])
                     ->required(),
             ]);
@@ -58,9 +64,9 @@ class StockAlertResource extends BaseResource
             ->filters([
                 Tables\Filters\SelectFilter::make('status')
                     ->options([
-                        'active' => 'Active',
-                        'resolved' => 'Resolved',
-                        'dismissed' => 'Dismissed',
+                        'open' => 'Open',
+                        'acknowledged' => 'Acknowledged',
+                        'closed' => 'Closed',
                     ]),
             ])
             ->defaultSort('created_at', 'desc');
