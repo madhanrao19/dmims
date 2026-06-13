@@ -1,0 +1,193 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Backup;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use RuntimeException;
+use Symfony\Component\Process\Process;
+
+class BackupService
+{
+    /**
+     * The storage disk and directory backups are written to.
+     */
+    protected string $disk = 'local';
+
+    protected string $directory = 'backups';
+
+    /**
+     * Create and execute a database backup, returning the persisted record.
+     * The backup is run synchronously so it works even without a queue worker;
+     * for very large databases run it from the queue (see DatabaseBackup job).
+     */
+    public function backupDatabase(array $data = []): Backup
+    {
+        $backup = Backup::create([
+            'backup_no' => $data['backup_no'] ?? $this->generateBackupNo(),
+            'backup_type' => 'database',
+            'storage_location' => $this->disk,
+            'status' => 'running',
+            'started_at' => now(),
+            'created_by' => $data['created_by'] ?? auth()->id(),
+            'remarks' => $data['remarks'] ?? null,
+        ]);
+
+        try {
+            $relativePath = $this->dumpDatabase($backup->backup_no);
+
+            $backup->update([
+                'status' => 'success',
+                'file_path' => $relativePath,
+                'file_size' => Storage::disk($this->disk)->size($relativePath),
+                'completed_at' => now(),
+            ]);
+        } catch (\Throwable $e) {
+            $backup->update([
+                'status' => 'failed',
+                'completed_at' => now(),
+                'remarks' => trim(($backup->remarks ? $backup->remarks."\n" : '').'Error: '.$e->getMessage()),
+            ]);
+
+            throw $e;
+        }
+
+        return $backup->refresh();
+    }
+
+    /**
+     * Restore a previously created database backup. Destructive: overwrites the
+     * current database with the backup's contents.
+     */
+    public function restoreDatabase(Backup $backup): void
+    {
+        if (! $backup->file_path || ! Storage::disk($this->disk)->exists($backup->file_path)) {
+            throw new RuntimeException('Backup file is missing; cannot restore.');
+        }
+
+        $absolutePath = Storage::disk($this->disk)->path($backup->file_path);
+        $connection = config('database.default');
+        $driver = config("database.connections.{$connection}.driver");
+
+        match ($driver) {
+            'sqlite' => $this->restoreSqlite($connection, $absolutePath),
+            'mysql', 'mariadb' => $this->restoreMysql($connection, $absolutePath),
+            default => throw new RuntimeException("Unsupported database driver for restore: {$driver}"),
+        };
+
+        $backup->update(['status' => 'restored']);
+    }
+
+    /**
+     * Dump the default database connection to a file on the backup disk and
+     * return the path relative to that disk.
+     */
+    protected function dumpDatabase(string $backupNo): string
+    {
+        $connection = config('database.default');
+        $driver = config("database.connections.{$connection}.driver");
+
+        Storage::disk($this->disk)->makeDirectory($this->directory);
+
+        return match ($driver) {
+            'sqlite' => $this->dumpSqlite($connection, $backupNo),
+            'mysql', 'mariadb' => $this->dumpMysql($connection, $backupNo),
+            default => throw new RuntimeException("Unsupported database driver for backup: {$driver}"),
+        };
+    }
+
+    protected function dumpSqlite(string $connection, string $backupNo): string
+    {
+        $source = config("database.connections.{$connection}.database");
+
+        if ($source === ':memory:' || ! is_file($source)) {
+            throw new RuntimeException('SQLite database file not found for backup.');
+        }
+
+        $relativePath = "{$this->directory}/{$backupNo}.sqlite";
+        Storage::disk($this->disk)->put($relativePath, file_get_contents($source));
+
+        return $relativePath;
+    }
+
+    protected function dumpMysql(string $connection, string $backupNo): string
+    {
+        $config = config("database.connections.{$connection}");
+        $relativePath = "{$this->directory}/{$backupNo}.sql";
+        $absolutePath = Storage::disk($this->disk)->path($relativePath);
+
+        Storage::disk($this->disk)->put($relativePath, '');
+
+        $binary = config('database.mysqldump_path', 'mysqldump');
+
+        $process = new Process([
+            $binary,
+            '--host='.$config['host'],
+            '--port='.$config['port'],
+            '--user='.$config['username'],
+            '--single-transaction',
+            '--routines',
+            '--triggers',
+            '--no-tablespaces',
+            $config['database'],
+        ], timeout: null, env: ['MYSQL_PWD' => (string) $config['password']]);
+
+        $output = fopen($absolutePath, 'w');
+
+        try {
+            $process->run(function ($type, $buffer) use ($output) {
+                if ($type === Process::OUT) {
+                    fwrite($output, $buffer);
+                }
+            });
+        } finally {
+            fclose($output);
+        }
+
+        if (! $process->isSuccessful()) {
+            throw new RuntimeException('mysqldump failed: '.$process->getErrorOutput());
+        }
+
+        return $relativePath;
+    }
+
+    protected function restoreSqlite(string $connection, string $absoluteBackupPath): void
+    {
+        $target = config("database.connections.{$connection}.database");
+
+        if ($target === ':memory:') {
+            throw new RuntimeException('Cannot restore into an in-memory SQLite database.');
+        }
+
+        DB::disconnect($connection);
+        copy($absoluteBackupPath, $target);
+    }
+
+    protected function restoreMysql(string $connection, string $absoluteBackupPath): void
+    {
+        $config = config("database.connections.{$connection}");
+        $binary = config('database.mysql_path', 'mysql');
+
+        $process = new Process([
+            $binary,
+            '--host='.$config['host'],
+            '--port='.$config['port'],
+            '--user='.$config['username'],
+            $config['database'],
+        ], timeout: null, env: ['MYSQL_PWD' => (string) $config['password']]);
+
+        $process->setInput(fopen($absoluteBackupPath, 'r'));
+        $process->run();
+
+        if (! $process->isSuccessful()) {
+            throw new RuntimeException('mysql restore failed: '.$process->getErrorOutput());
+        }
+    }
+
+    protected function generateBackupNo(): string
+    {
+        return 'BK-'.now()->format('Ymd-His').'-'.Str::upper(Str::random(4));
+    }
+}

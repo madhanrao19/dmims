@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php -v)",
+      "Bash(composer --version)",
+      "Bash(php artisan *)",
+      "Bash(xargs grep -l \"extends Resource\")",
+      "Bash(grep -rl \"Attributes\\\\\\\\\\\\\\\\Fillable\\\\|#\\\\[Fillable\" app/Models/*.php)",
+      "Bash(python -c ' *)",
+      "Bash(php -r ' *)",
+      "Bash(./vendor/bin/pint app/Models/Concerns/Auditable.php app/Http/Middleware/LogUserActivity.php app/Filament/Resources/BaseResource.php app/Models/User.php tests/Feature/AuditableTest.php)",
+      "Bash(xargs -n1 basename)"
+    ]
+  }
+}
