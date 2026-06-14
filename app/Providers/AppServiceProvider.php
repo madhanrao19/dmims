@@ -31,6 +31,7 @@ class AppServiceProvider extends ServiceProvider
                 Filament::registerNavigationGroups([
                     NavigationGroup::make('Platform')->label('Platform'),
                     NavigationGroup::make('Subscription')->label('Subscription'),
+                    NavigationGroup::make('Billing')->label('Billing'),
                     NavigationGroup::make('Locations')->label('Locations'),
                     NavigationGroup::make('Documents')->label('Documents'),
                     NavigationGroup::make('Document Tracking')->label('Document Tracking'),

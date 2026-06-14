@@ -15,9 +15,7 @@ Legend: ✅ implemented · WIP partial · ❌ missing
 | subscription_plans, customer_subscriptions | ✅ | |
 | **subscription_logs** | ❌ | Required by TDD §8/§10 (immutable history) |
 | licenses, license_logs | ✅ | but see License field gaps below |
-| **billing_records** | ❌ | Required — whole billing module absent |
-| **billing_payments** | ❌ | Required |
-| **billing_logs** | ❌ | Required |
+| billing_records, billing_payments, billing_logs | ✅ | Billing module implemented |
 | settings, audit_logs, notifications | ✅ | |
 | categories, products, product_location_stocks, stock_movements, stock_alerts | ✅ | |
 | location_types, locations, document_types, boxes, document_files, document_movement_logs | ✅ | |
@@ -35,8 +33,7 @@ disposal`. → values diverge (`stock_in` vs `receive_in`, `transfer` vs
 `internal_transfer`). Cosmetic but should be reconciled.
 
 ## 2. Models (TDD §10)
-Missing: **SubscriptionLog, BillingRecord, BillingPayment, BillingLog**. All
-others present.
+Missing: **SubscriptionLog**. BillingRecord/BillingPayment/BillingLog now present.
 
 ## 3. Services (TDD §11)
 | Required | Status |
@@ -44,7 +41,7 @@ others present.
 | CompanyContextService, UserSecurityService, ModuleAccessService | ✅ |
 | AccessControlService (TDD §12 — canLogin/canView/canExport/…) | ✅ |
 | SubscriptionService, LicenseService | ✅ |
-| **BillingService, PaymentService** | ❌ |
+| BillingService, PaymentService | ✅ |
 | LocationService, StockMovementService, DocumentMovementService | ✅ |
 | BarcodeService | ✅ · **ScannerService** ❌ |
 | AuditService, NotificationService, ImportService, BackupService | ✅ |
@@ -84,7 +81,7 @@ Current: `inventory, documents` only. → rename + add the missing four.
 | Barcode | WIP | registry/scan log exist; no `PRD-CODE-000001` generation, print, or scan-to-open flow (ScannerService) |
 | Subscription | ✅ | `subscription_logs` history missing |
 | License | ✅ | enforcement layer + view-only/blocked modes |
-| **Billing** | ❌ | **entire module missing** (records, invoices, payments, logs, reports) |
+| Billing | ✅ | records, invoices, manual payments, immutable logs; CSV report via Export |
 | Reporting & analytics | WIP | generic CSV export only; no named platform/inventory/document reports, no PDF/Excel |
 | Audit | ✅ | model-level `Auditable` trail + login activity |
 | Notifications | WIP | table + service exist; **no generation** (low stock, expiry, overdue) or scheduler |
