@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\HasBarcodeAction;
 use App\Filament\Resources\ProductResource\Pages;
 use App\Http\Middleware\EnsureModuleEnabled;
 use App\Models\Product;
@@ -12,6 +13,8 @@ use Filament\Tables\Table;
 
 class ProductResource extends BaseResource
 {
+    use HasBarcodeAction;
+
     protected static ?string $model = Product::class;
 
     protected static string|array $routeMiddleware = [EnsureModuleEnabled::class.':stock_inventory'];
@@ -68,6 +71,10 @@ class ProductResource extends BaseResource
                 Tables\Columns\TextColumn::make('category.category_name')->label('Category')->sortable(),
                 Tables\Columns\TextColumn::make('defaultLocation.location_name')->label('Default Location')->sortable(),
                 Tables\Columns\TextColumn::make('status')->sortable(),
+            ])
+            ->actions([
+                Tables\Actions\EditAction::make(),
+                static::barcodeAction(),
             ])
             ->defaultSort('product_name');
     }

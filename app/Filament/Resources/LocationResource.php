@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\HasBarcodeAction;
 use App\Filament\Resources\LocationResource\Pages;
 use App\Http\Middleware\EnsureModuleEnabled;
 use App\Models\Location;
@@ -12,6 +13,8 @@ use Filament\Tables\Table;
 
 class LocationResource extends BaseResource
 {
+    use HasBarcodeAction;
+
     protected static ?string $model = Location::class;
 
     protected static string|array $routeMiddleware = [EnsureModuleEnabled::class.':stock_inventory'];
@@ -63,6 +66,10 @@ class LocationResource extends BaseResource
                 Tables\Columns\TextColumn::make('locationType.type_name')->label('Type')->sortable(),
                 Tables\Columns\TextColumn::make('parent.location_name')->label('Parent')->sortable(),
                 Tables\Columns\TextColumn::make('status')->sortable(),
+            ])
+            ->actions([
+                Tables\Actions\EditAction::make(),
+                static::barcodeAction(),
             ])
             ->defaultSort('location_name');
     }

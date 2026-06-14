@@ -43,7 +43,7 @@ Missing: **SubscriptionLog**. BillingRecord/BillingPayment/BillingLog now presen
 | SubscriptionService, LicenseService | ✅ |
 | BillingService, PaymentService | ✅ |
 | LocationService, StockMovementService, DocumentMovementService | ✅ |
-| BarcodeService | ✅ · **ScannerService** ❌ |
+| BarcodeService, ScannerService | ✅ |
 | AuditService, NotificationService, ImportService, BackupService | ✅ |
 | **ReportExportService** | WIP `ExportService` exists (CSV); no PDF/Excel, no named reports |
 
@@ -78,7 +78,7 @@ Current: `inventory, documents` only. → rename + add the missing four.
 | Customer / User management | ✅ | suspend/reactivate/archive via `status` |
 | Inventory (categories, products, locations, movements, alerts) | ✅ data · WIP ops | dedicated Receive-In/Transfer/Out/Adjustment screens are generic CRUD |
 | Document tracking (boxes, files, movement logs) | ✅ data · WIP ops | dedicated file/box receive/transfer/move-out/return actions partial |
-| Barcode | WIP | registry/scan log exist; no `PRD-CODE-000001` generation, print, or scan-to-open flow (ScannerService) |
+| Barcode | ✅ | `PRD-CODE-000001` generation + registry, Generate/Print actions, Scanner page (scan-to-open + logging). Scannable image needs the barcode lib on PHP 8.4 |
 | Subscription | ✅ | `subscription_logs` history missing |
 | License | ✅ | enforcement layer + view-only/blocked modes |
 | Billing | ✅ | records, invoices, manual payments, immutable logs; CSV report via Export |

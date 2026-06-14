@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\HasBarcodeAction;
 use App\Filament\Resources\BoxResource\Pages;
 use App\Http\Middleware\EnsureModuleEnabled;
 use App\Models\Box;
@@ -12,6 +13,8 @@ use Filament\Tables\Table;
 
 class BoxResource extends BaseResource
 {
+    use HasBarcodeAction;
+
     protected static ?string $model = Box::class;
 
     protected static string|array $routeMiddleware = [EnsureModuleEnabled::class.':document_tracking'];
@@ -67,6 +70,10 @@ class BoxResource extends BaseResource
                 Tables\Columns\TextColumn::make('currentLocation.location_name')->label('Location')->sortable(),
                 Tables\Columns\TextColumn::make('status')->sortable(),
                 Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable(),
+            ])
+            ->actions([
+                Tables\Actions\EditAction::make(),
+                static::barcodeAction(),
             ])
             ->defaultSort('created_at', 'desc');
     }

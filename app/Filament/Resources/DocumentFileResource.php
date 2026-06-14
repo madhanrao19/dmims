@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\HasBarcodeAction;
 use App\Filament\Resources\DocumentFileResource\Pages;
 use App\Http\Middleware\EnsureModuleEnabled;
 use App\Models\DocumentFile;
@@ -12,6 +13,8 @@ use Filament\Tables\Table;
 
 class DocumentFileResource extends BaseResource
 {
+    use HasBarcodeAction;
+
     protected static ?string $model = DocumentFile::class;
 
     protected static string|array $routeMiddleware = [EnsureModuleEnabled::class.':document_tracking'];
@@ -76,6 +79,10 @@ class DocumentFileResource extends BaseResource
                 Tables\Columns\TextColumn::make('currentBox.box_number')->label('Box')->sortable(),
                 Tables\Columns\TextColumn::make('current_status')->sortable(),
                 Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable(),
+            ])
+            ->actions([
+                Tables\Actions\EditAction::make(),
+                static::barcodeAction(),
             ])
             ->defaultSort('created_at', 'desc');
     }
