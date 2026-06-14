@@ -42,7 +42,7 @@ others present.
 | Required | Status |
 |---|---|
 | CompanyContextService, UserSecurityService, ModuleAccessService | ✅ |
-| **AccessControlService** (TDD §12 — central canLogin/canView/canExport/…) | ❌ |
+| AccessControlService (TDD §12 — canLogin/canView/canExport/…) | ✅ |
 | SubscriptionService, LicenseService | ✅ |
 | **BillingService, PaymentService** | ❌ |
 | LocationService, StockMovementService, DocumentMovementService | ✅ |
@@ -57,7 +57,7 @@ others present.
 | 2 Role/permission validation | WIP coarse permissions, not the matrix granularity |
 | 3 Customer isolation | ✅ global scopes + Filament scope |
 | 4 Subscription validation | ✅ `EnsureSubscriptionActive` (TDD calls it `EnsureSubscriptionValid`) |
-| 5 **License validation** | ❌ `EnsureLicenseAllowsAccess` missing |
+| 5 License validation | ✅ `EnsureLicenseAllowsAccess` + `technical_access_mode` |
 | 6 Module validation | ✅ enforced in `can()` + nav |
 | 7 Operational permission | ✅ permission check in `can()` |
 
@@ -83,7 +83,7 @@ Current: `inventory, documents` only. → rename + add the missing four.
 | Document tracking (boxes, files, movement logs) | ✅ data · WIP ops | dedicated file/box receive/transfer/move-out/return actions partial |
 | Barcode | WIP | registry/scan log exist; no `PRD-CODE-000001` generation, print, or scan-to-open flow (ScannerService) |
 | Subscription | ✅ | `subscription_logs` history missing |
-| License | WIP | model exists; no enforcement layer; field gaps |
+| License | ✅ | enforcement layer + view-only/blocked modes |
 | **Billing** | ❌ | **entire module missing** (records, invoices, payments, logs, reports) |
 | Reporting & analytics | WIP | generic CSV export only; no named platform/inventory/document reports, no PDF/Excel |
 | Audit | ✅ | model-level `Auditable` trail + login activity |

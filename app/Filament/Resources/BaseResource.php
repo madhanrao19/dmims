@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Services\AccessControlService;
 use App\Services\ModuleAccessService;
 use Filament\Resources\Resource;
 use Illuminate\Database\Eloquent\Builder;
@@ -12,6 +13,13 @@ abstract class BaseResource extends Resource
     protected static bool $applyCustomerScope = false;
 
     protected static ?string $permission = null;
+
+    /** Actions that modify data; blocked when the license is view-only. */
+    protected const WRITE_ACTIONS = [
+        'create', 'update', 'delete', 'deleteAny',
+        'restore', 'restoreAny', 'forceDelete', 'forceDeleteAny',
+        'reorder', 'replicate',
+    ];
 
     public static function getEloquentQuery(): Builder
     {
@@ -56,11 +64,17 @@ abstract class BaseResource extends Resource
             return false;
         }
 
-        if (filled(static::$permission)) {
-            return $user->can(static::$permission);
+        if (! filled(static::$permission) || ! $user->can(static::$permission)) {
+            return false;
         }
 
-        return false;
+        // License view-only mode (SAD layer 5): permitted to read, not to write.
+        if (in_array($action, static::WRITE_ACTIONS, true)
+            && app(AccessControlService::class)->getEffectiveAccessMode($user->customer_id) === AccessControlService::MODE_VIEW_ONLY) {
+            return false;
+        }
+
+        return true;
     }
 
     /**

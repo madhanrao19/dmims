@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureCompanyActive;
 use App\Http\Middleware\EnsureCompanyAssigned;
+use App\Http\Middleware\EnsureLicenseAllowsAccess;
 use App\Http\Middleware\EnsureSubscriptionActive;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\InjectPwaScript;
@@ -33,6 +34,7 @@ return Application::configure(basePath: dirname(__DIR__))
             EnsureCompanyAssigned::class,
             EnsureCompanyActive::class,
             EnsureSubscriptionActive::class,
+            EnsureLicenseAllowsAccess::class,
             LogUserActivity::class,
             InjectPwaScript::class,
         ]);

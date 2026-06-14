@@ -27,6 +27,7 @@ class License extends Model
         'enabled_modules',
         'allowed_reports',
         'status',
+        'technical_access_mode',
         'signature',
         'created_by',
         'updated_by',
