@@ -6,8 +6,11 @@ use App\Filament\Concerns\HasBarcodeAction;
 use App\Filament\Resources\BoxResource\Pages;
 use App\Http\Middleware\EnsureModuleEnabled;
 use App\Models\Box;
+use App\Models\Location;
+use App\Services\DocumentMovementService;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Tables;
 use Filament\Tables\Table;
 
@@ -72,6 +75,46 @@ class BoxResource extends BaseResource
                 Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable(),
             ])
             ->actions([
+                Tables\Actions\Action::make('transferBox')
+                    ->label('Transfer')
+                    ->icon('heroicon-o-arrows-right-left')
+                    ->visible(fn (Box $record): bool => $record->status !== 'moved_out')
+                    ->form([
+                        Forms\Components\Select::make('to_location_id')->label('To location')
+                            ->options(fn () => Location::query()->pluck('location_name', 'id')->all())->searchable()->required(),
+                        Forms\Components\Textarea::make('remarks'),
+                    ])
+                    ->action(function (Box $record, array $data): void {
+                        app(DocumentMovementService::class)->transferBox($record, (int) $data['to_location_id'], $data);
+                        Notification::make()->title('Box transferred')->success()->send();
+                    }),
+                Tables\Actions\Action::make('moveOutBox')
+                    ->label('Move Out')
+                    ->icon('heroicon-o-arrow-up-tray')
+                    ->color('danger')
+                    ->visible(fn (Box $record): bool => $record->status !== 'moved_out')
+                    ->form([
+                        Forms\Components\TextInput::make('destination')->label('External destination')->required(),
+                        Forms\Components\Textarea::make('remarks'),
+                    ])
+                    ->action(function (Box $record, array $data): void {
+                        app(DocumentMovementService::class)->moveOutBox($record, $data['destination'], $data);
+                        Notification::make()->title('Box moved out')->success()->send();
+                    }),
+                Tables\Actions\Action::make('returnBox')
+                    ->label('Return')
+                    ->icon('heroicon-o-arrow-uturn-left')
+                    ->color('success')
+                    ->visible(fn (Box $record): bool => $record->status === 'moved_out')
+                    ->form([
+                        Forms\Components\Select::make('to_location_id')->label('Return to location')
+                            ->options(fn () => Location::query()->pluck('location_name', 'id')->all())->searchable()->required(),
+                        Forms\Components\Textarea::make('remarks'),
+                    ])
+                    ->action(function (Box $record, array $data): void {
+                        app(DocumentMovementService::class)->returnBox($record, (int) $data['to_location_id'], $data);
+                        Notification::make()->title('Box returned')->success()->send();
+                    }),
                 Tables\Actions\EditAction::make(),
                 static::barcodeAction(),
             ])

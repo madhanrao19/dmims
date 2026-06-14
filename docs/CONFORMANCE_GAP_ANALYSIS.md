@@ -77,7 +77,7 @@ Current: `inventory, documents` only. → rename + add the missing four.
 |---|---|---|
 | Customer / User management | ✅ | suspend/reactivate/archive via `status` |
 | Inventory (categories, products, locations, movements, alerts) | ✅ | guided Receive-In / Stock Out / Transfer / Adjust operations via StockMovementService |
-| Document tracking (boxes, files, movement logs) | ✅ data · WIP ops | dedicated file/box receive/transfer/move-out/return actions partial |
+| Document tracking (boxes, files, movement logs) | ✅ | guided file/box Receive-In / Transfer / Move-Out / Return via DocumentMovementService; placement FKs made nullable for move-out |
 | Barcode | ✅ | `PRD-CODE-000001` generation + registry, Generate/Print actions, Scanner page (scan-to-open + logging). Scannable image needs the barcode lib on PHP 8.4 |
 | Subscription | ✅ | `subscription_logs` history missing |
 | License | ✅ | enforcement layer + view-only/blocked modes |
