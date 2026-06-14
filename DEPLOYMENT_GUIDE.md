@@ -117,6 +117,11 @@ cd /var/www/dmims
 # Install PHP dependencies (as appuser)
 sudo -u appuser composer install --optimize-autoloader --no-dev
 
+# (Optional, recommended) Enable scannable Code128 barcode labels and PDF/Excel
+# report output. These require PHP 8.4 (the production target) and are detected
+# at runtime — without them the app falls back to barcode values and CSV.
+sudo -u appuser composer require picqer/php-barcode-generator barryvdh/laravel-dompdf
+
 # Install Node dependencies (optional, for frontend assets)
 sudo -u appuser npm install
 sudo -u appuser npm run build
