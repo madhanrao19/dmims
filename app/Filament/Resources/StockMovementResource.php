@@ -4,9 +4,13 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\StockMovementResource\Pages;
 use App\Http\Middleware\EnsureModuleEnabled;
+use App\Models\Location;
+use App\Models\Product;
 use App\Models\StockMovement;
+use App\Services\StockMovementService;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Tables;
 use Filament\Tables\Table;
 
@@ -45,7 +49,17 @@ class StockMovementResource extends BaseResource
                     ->relationship('toLocation', 'location_name')
                     ->searchable(),
                 Forms\Components\TextInput::make('quantity')->numeric()->required(),
-                Forms\Components\TextInput::make('movement_type')->required()->maxLength(100),
+                Forms\Components\Select::make('movement_type')
+                    ->options([
+                        'opening_balance' => 'Opening Balance',
+                        'stock_in' => 'Receive In',
+                        'stock_out' => 'Stock Out',
+                        'transfer' => 'Transfer',
+                        'adjustment' => 'Adjustment',
+                        'return' => 'Return',
+                        'disposal' => 'Disposal',
+                    ])
+                    ->required(),
                 Forms\Components\TextInput::make('reference_no')->maxLength(100),
                 Forms\Components\Textarea::make('reason')->rows(3),
             ]);
@@ -61,7 +75,87 @@ class StockMovementResource extends BaseResource
                 Tables\Columns\TextColumn::make('movement_type')->sortable(),
                 Tables\Columns\TextColumn::make('quantity')->sortable(),
                 Tables\Columns\TextColumn::make('performed_at')->dateTime()->sortable(),
-            ]);
+            ])
+            ->headerActions([
+                Tables\Actions\Action::make('receiveIn')
+                    ->label('Receive In')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->color('success')
+                    ->form([
+                        static::productSelect(),
+                        Forms\Components\Select::make('to_location_id')->label('To location')->options(static::locationOptions())->searchable()->required(),
+                        static::quantityInput(),
+                        Forms\Components\Textarea::make('remarks'),
+                    ])
+                    ->action(function (array $data): void {
+                        app(StockMovementService::class)->receiveIn((int) $data['product_id'], (int) $data['to_location_id'], (float) $data['quantity'], $data);
+                        Notification::make()->title('Stock received')->success()->send();
+                    }),
+                Tables\Actions\Action::make('stockOut')
+                    ->label('Stock Out')
+                    ->icon('heroicon-o-arrow-up-tray')
+                    ->color('danger')
+                    ->form([
+                        static::productSelect(),
+                        Forms\Components\Select::make('from_location_id')->label('From location')->options(static::locationOptions())->searchable()->required(),
+                        static::quantityInput(),
+                        Forms\Components\Textarea::make('remarks'),
+                    ])
+                    ->action(function (array $data): void {
+                        app(StockMovementService::class)->stockOut((int) $data['product_id'], (int) $data['from_location_id'], (float) $data['quantity'], $data);
+                        Notification::make()->title('Stock removed')->success()->send();
+                    }),
+                Tables\Actions\Action::make('transfer')
+                    ->label('Transfer')
+                    ->icon('heroicon-o-arrows-right-left')
+                    ->form([
+                        static::productSelect(),
+                        Forms\Components\Select::make('from_location_id')->label('From location')->options(static::locationOptions())->searchable()->required(),
+                        Forms\Components\Select::make('to_location_id')->label('To location')->options(static::locationOptions())->searchable()->required()->different('from_location_id'),
+                        static::quantityInput(),
+                        Forms\Components\Textarea::make('remarks'),
+                    ])
+                    ->action(function (array $data): void {
+                        app(StockMovementService::class)->transfer((int) $data['product_id'], (int) $data['from_location_id'], (int) $data['to_location_id'], (float) $data['quantity'], $data);
+                        Notification::make()->title('Stock transferred')->success()->send();
+                    }),
+                Tables\Actions\Action::make('adjust')
+                    ->label('Adjust')
+                    ->icon('heroicon-o-adjustments-horizontal')
+                    ->color('warning')
+                    ->form([
+                        static::productSelect(),
+                        Forms\Components\Select::make('location_id')->label('Location')->options(static::locationOptions())->searchable()->required(),
+                        Forms\Components\TextInput::make('delta')->label('Adjustment (+/-)')->numeric()->required()
+                            ->helperText('Positive adds stock, negative removes it.'),
+                        Forms\Components\Textarea::make('reason')->required(),
+                    ])
+                    ->action(function (array $data): void {
+                        app(StockMovementService::class)->adjust((int) $data['product_id'], (int) $data['location_id'], (float) $data['delta'], $data);
+                        Notification::make()->title('Stock adjusted')->success()->send();
+                    }),
+            ])
+            ->defaultSort('performed_at', 'desc');
+    }
+
+    protected static function productSelect(): Forms\Components\Select
+    {
+        return Forms\Components\Select::make('product_id')
+            ->label('Product')
+            ->options(fn () => Product::query()->pluck('product_name', 'id')->all())
+            ->searchable()
+            ->required();
+    }
+
+    /** @return array<int, string> */
+    protected static function locationOptions(): array
+    {
+        return Location::query()->pluck('location_name', 'id')->all();
+    }
+
+    protected static function quantityInput(): Forms\Components\TextInput
+    {
+        return Forms\Components\TextInput::make('quantity')->numeric()->minValue(0.0001)->required();
     }
 
     public static function getPages(): array

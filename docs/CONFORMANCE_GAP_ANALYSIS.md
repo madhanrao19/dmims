@@ -76,7 +76,7 @@ Current: `inventory, documents` only. → rename + add the missing four.
 | Module | Status | Gap |
 |---|---|---|
 | Customer / User management | ✅ | suspend/reactivate/archive via `status` |
-| Inventory (categories, products, locations, movements, alerts) | ✅ data · WIP ops | dedicated Receive-In/Transfer/Out/Adjustment screens are generic CRUD |
+| Inventory (categories, products, locations, movements, alerts) | ✅ | guided Receive-In / Stock Out / Transfer / Adjust operations via StockMovementService |
 | Document tracking (boxes, files, movement logs) | ✅ data · WIP ops | dedicated file/box receive/transfer/move-out/return actions partial |
 | Barcode | ✅ | `PRD-CODE-000001` generation + registry, Generate/Print actions, Scanner page (scan-to-open + logging). Scannable image needs the barcode lib on PHP 8.4 |
 | Subscription | ✅ | `subscription_logs` history missing |
