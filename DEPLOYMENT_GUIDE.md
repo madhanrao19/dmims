@@ -1,6 +1,6 @@
 # Production Deployment Guide — Ubuntu 24 Server
 
-Complete step-by-step instructions to deploy your Laravel 11 IMS application.
+Complete step-by-step instructions to deploy the DMIMS Laravel 12 application.
 
 ---
 
