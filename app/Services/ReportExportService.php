@@ -14,7 +14,11 @@ use App\Models\License;
 use App\Models\Product;
 use App\Models\ProductLocationStock;
 use App\Models\StockMovement;
+use Barryvdh\DomPDF\Facade\Pdf;
 use InvalidArgumentException;
+use OpenSpout\Common\Entity\Row;
+use OpenSpout\Writer\XLSX\Writer as XlsxWriter;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -66,15 +70,28 @@ class ReportExportService
         );
     }
 
-    public function generate(string $key): StreamedResponse
+    /**
+     * @param  'csv'|'xlsx'|'pdf'  $format
+     */
+    public function generate(string $key, string $format = 'csv'): Response|StreamedResponse
     {
         if (! isset(static::definitions()[$key])) {
             throw new InvalidArgumentException("Unknown report: {$key}");
         }
 
         [$headers, $rows] = $this->build($key);
-        $fileName = $key.'-'.now()->format('Ymd-His').'.csv';
+        $label = static::definitions()[$key]['label'];
+        $base = $key.'-'.now()->format('Ymd-His');
 
+        return match ($format) {
+            'pdf' => $this->pdf($label, "{$base}.pdf", $headers, $rows),
+            'xlsx' => $this->xlsx("{$base}.xlsx", $headers, $rows),
+            default => $this->csv("{$base}.csv", $headers, $rows),
+        };
+    }
+
+    private function csv(string $fileName, array $headers, iterable $rows): StreamedResponse
+    {
         return response()->streamDownload(function () use ($headers, $rows) {
             $out = fopen('php://output', 'w');
             fputcsv($out, $headers);
@@ -83,6 +100,35 @@ class ReportExportService
             }
             fclose($out);
         }, $fileName, ['Content-Type' => 'text/csv']);
+    }
+
+    private function xlsx(string $fileName, array $headers, iterable $rows): Response
+    {
+        $temp = tempnam(sys_get_temp_dir(), 'rpt').'.xlsx';
+
+        $writer = new XlsxWriter;
+        $writer->openToFile($temp);
+        $writer->addRow(Row::fromValues($headers));
+        foreach ($rows as $row) {
+            $writer->addRow(Row::fromValues(array_map(fn ($v) => (string) $v, $row)));
+        }
+        $writer->close();
+
+        return response()->download($temp, $fileName, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ])->deleteFileAfterSend(true);
+    }
+
+    private function pdf(string $title, string $fileName, array $headers, iterable $rows): Response
+    {
+        $html = view('reports.pdf', [
+            'title' => $title,
+            'headers' => $headers,
+            'rows' => collect($rows),
+            'generatedAt' => now(),
+        ])->render();
+
+        return Pdf::loadHTML($html)->setPaper('a4', 'landscape')->download($fileName);
     }
 
     /**

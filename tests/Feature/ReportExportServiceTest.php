@@ -59,6 +59,19 @@ class ReportExportServiceTest extends TestCase
         $this->assertStringContainsString('text/csv', $response->headers->get('Content-Type'));
     }
 
+    public function test_generate_supports_xlsx_and_pdf(): void
+    {
+        $this->seedInventory();
+
+        $xlsx = app(ReportExportService::class)->generate('inventory_summary', 'xlsx');
+        $this->assertSame(200, $xlsx->getStatusCode());
+        $this->assertStringContainsString('spreadsheetml', $xlsx->headers->get('Content-Type'));
+
+        $pdf = app(ReportExportService::class)->generate('inventory_summary', 'pdf');
+        $this->assertSame(200, $pdf->getStatusCode());
+        $this->assertStringContainsString('application/pdf', $pdf->headers->get('Content-Type'));
+    }
+
     public function test_platform_reports_are_hidden_from_customer_users(): void
     {
         $customerUser = User::factory()->create(['is_platform_user' => false, 'status' => 'active']);

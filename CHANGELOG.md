@@ -4,6 +4,21 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] - 2026-06-14
+
+### Added
+- **PDF and Excel report output.** `ReportExportService` now renders every named
+  report as CSV, **XLSX** (openspout) or **PDF** (dompdf); the Reports page has a
+  format selector.
+- **Scannable Code128 barcode label images** (picqer) now render in the barcode
+  label modal (previously the value-only fallback).
+
+### Changed
+- Added `barryvdh/laravel-dompdf`, `openspout/openspout` and
+  `picqer/php-barcode-generator`. These resolve to PHP 8.3-compatible versions,
+  so PDF/Excel/barcode images now work on the development box too (no longer
+  gated to PHP 8.4 production only).
+
 ## [1.0.0] - 2026-06-14
 
 First consolidated release. The codebase was audited against the requirements

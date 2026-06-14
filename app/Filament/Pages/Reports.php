@@ -9,6 +9,7 @@ use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Forms\Form;
 use Filament\Pages\Page;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class Reports extends Page implements HasForms
@@ -60,17 +61,24 @@ class Reports extends Page implements HasForms
                     ->options($options)
                     ->searchable()
                     ->required(),
+                Select::make('format')
+                    ->label('Format')
+                    ->options(['csv' => 'CSV', 'xlsx' => 'Excel (XLSX)', 'pdf' => 'PDF'])
+                    ->default('csv')
+                    ->required(),
             ])
             ->statePath('data');
     }
 
-    public function download(): StreamedResponse
+    public function download(): Response|StreamedResponse
     {
-        $key = $this->form->getState()['report'];
+        $state = $this->form->getState();
+        $key = $state['report'];
+        $format = $state['format'] ?? 'csv';
 
         // Guard against requesting a report the user is not entitled to.
         abort_unless(array_key_exists($key, ReportExportService::availableTo(auth()->user())), 403);
 
-        return app(ReportExportService::class)->generate($key);
+        return app(ReportExportService::class)->generate($key, $format);
     }
 }
