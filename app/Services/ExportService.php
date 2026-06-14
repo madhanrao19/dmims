@@ -70,6 +70,14 @@ class ExportService
                 'file_path' => $relativePath,
                 'completed_at' => now(),
             ]);
+
+            app(NotificationService::class)->notify(
+                'export_completed',
+                "Export {$export->export_no} completed",
+                "Your {$type} export is ready to download.",
+                $customerId,
+                $export->requested_by,
+            );
         } catch (\Throwable $e) {
             $export->update(['status' => 'failed']);
 

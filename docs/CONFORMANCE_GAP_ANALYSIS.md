@@ -84,7 +84,7 @@ Current: `inventory, documents` only. → rename + add the missing four.
 | Billing | ✅ | records, invoices, manual payments, immutable logs; CSV report via Export |
 | Reporting & analytics | WIP | generic CSV export only; no named platform/inventory/document reports, no PDF/Excel |
 | Audit | ✅ | model-level `Auditable` trail + login activity |
-| Notifications | WIP | table + service exist; **no generation** (low stock, expiry, overdue) or scheduler |
+| Notifications | ✅ | hourly generator (low stock, subscription/license expiry, billing overdue) + export-completed/import-failed alerts |
 | Import/Export | WIP | CSV import w/ per-row validation ✅; no preview-before-import, duplicate detection, or error-file download |
 | Backup/Restore | ✅ manual · WIP | scheduled backup cron not configured |
 | PWA | ✅ | manifest, service worker, offline page present |

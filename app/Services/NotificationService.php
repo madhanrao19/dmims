@@ -6,16 +6,39 @@ use App\Models\Notification;
 
 class NotificationService
 {
-    public function sendNotification(array $data): void
+    /**
+     * Create a notification. customer_id null = platform-wide; user_id null =
+     * visible to the whole company.
+     */
+    public function notify(string $type, string $title, string $message, ?int $customerId = null, ?int $userId = null): Notification
     {
-        Notification::create([
-            'customer_id' => $data['customer_id'],
-            'user_id' => $data['user_id'] ?? auth()->id(),
-            'title' => $data['title'] ?? 'Notification',
-            'message' => $data['message'] ?? null,
-            'channel' => $data['channel'] ?? 'system',
-            'is_read' => $data['is_read'] ?? false,
-            'sent_at' => $data['sent_at'] ?? now(),
+        return Notification::create([
+            'customer_id' => $customerId,
+            'user_id' => $userId,
+            'notification_type' => $type,
+            'title' => $title,
+            'message' => $message,
+            'is_read' => false,
         ]);
+    }
+
+    /**
+     * Create a notification only if an identical unread one does not already
+     * exist, so repeated generator runs don't flood the inbox.
+     */
+    public function notifyOnce(string $type, string $title, string $message, ?int $customerId = null, ?int $userId = null): ?Notification
+    {
+        $exists = Notification::withoutGlobalScopes()
+            ->where('notification_type', $type)
+            ->where('title', $title)
+            ->where('customer_id', $customerId)
+            ->where('is_read', false)
+            ->exists();
+
+        if ($exists) {
+            return null;
+        }
+
+        return $this->notify($type, $title, $message, $customerId, $userId);
     }
 }

@@ -109,6 +109,16 @@ class ImportService
             'failed_rows' => $failed,
         ]);
 
+        if ($failed > 0) {
+            app(NotificationService::class)->notify(
+                'import_failed',
+                "Import {$import->import_no} had errors",
+                "{$failed} of {$total} rows failed to import.",
+                $import->customer_id,
+                $import->uploaded_by,
+            );
+        }
+
         return $import->refresh();
     }
 
