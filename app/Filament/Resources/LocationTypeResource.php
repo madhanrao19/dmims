@@ -14,7 +14,7 @@ class LocationTypeResource extends BaseResource
 {
     protected static ?string $model = LocationType::class;
 
-    protected static string|array $routeMiddleware = [EnsureModuleEnabled::class.':inventory'];
+    protected static string|array $routeMiddleware = [EnsureModuleEnabled::class.':stock_inventory'];
 
     protected static ?string $permission = 'manage inventory';
 

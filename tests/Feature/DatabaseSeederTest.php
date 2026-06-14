@@ -20,22 +20,36 @@ class DatabaseSeederTest extends TestCase
     {
         $this->seed(DatabaseSeeder::class);
 
-        $this->assertSame(9, Permission::count());
-        $this->assertEqualsCanonicalizing(['admin', 'manager', 'user'], Role::pluck('name')->all());
+        $this->assertSame(10, Permission::count());
+        $this->assertEqualsCanonicalizing([
+            'Datamation Super Admin',
+            'Datamation Management',
+            'Company Admin',
+            'Company Supervisor',
+            'Stock Inventory User',
+            'Document Tracking User',
+            'Viewer',
+        ], Role::pluck('name')->all());
 
-        // Non-platform access depends on these being populated.
+        // Non-platform access depends on these being populated. The dictionary
+        // defines six modules (stock_inventory, document_tracking, barcode_*,
+        // reports, billing_view).
         $this->assertGreaterThanOrEqual(1, Customer::count());
-        $this->assertSame(2, Module::count());
+        $this->assertSame(6, Module::count());
         $this->assertGreaterThanOrEqual(1, CustomerSubscription::count());
 
         $admin = User::where('email', 'admin@example.com')->first();
         $this->assertNotNull($admin);
-        $this->assertTrue($admin->hasRole('admin'));
+        $this->assertTrue($admin->hasRole('Datamation Super Admin'));
         $this->assertTrue($admin->can('manage inventory'));
 
-        // Manager has operational permissions but not platform administration.
-        $this->assertTrue(Role::findByName('manager')->hasPermissionTo('manage inventory'));
-        $this->assertFalse(Role::findByName('manager')->hasPermissionTo('manage customers'));
+        // Stock Inventory User has inventory access only; not customer admin.
+        $this->assertTrue(Role::findByName('Stock Inventory User')->hasPermissionTo('manage inventory'));
+        $this->assertFalse(Role::findByName('Stock Inventory User')->hasPermissionTo('manage customers'));
+
+        // Management is read-only (reporting access, no management permissions).
+        $this->assertTrue(Role::findByName('Datamation Management')->hasPermissionTo('view reports'));
+        $this->assertFalse(Role::findByName('Datamation Management')->hasPermissionTo('manage inventory'));
     }
 
     public function test_seeder_is_idempotent(): void
@@ -45,6 +59,6 @@ class DatabaseSeederTest extends TestCase
 
         $this->assertSame(1, Customer::where('company_code', 'DEMO')->count());
         $this->assertSame(1, User::where('email', 'admin@example.com')->count());
-        $this->assertSame(9, Permission::count());
+        $this->assertSame(10, Permission::count());
     }
 }

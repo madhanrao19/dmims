@@ -25,7 +25,7 @@ class DatabaseSeeder extends Seeder
         // Kept in a separate seeder so production can run it without demo data.
         $this->call(RolesAndPermissionsSeeder::class);
 
-        $adminRole = Role::findByName('admin');
+        $adminRole = Role::findByName('Datamation Super Admin');
 
         // --- Demo customer, plan, modules and subscription ---
         $customer = Customer::firstOrCreate(
@@ -51,25 +51,31 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        $inventoryModule = Module::firstOrCreate(
-            ['module_code' => 'inventory'],
-            ['module_name' => 'Inventory', 'description' => 'Inventory management', 'status' => 'active']
-        );
+        // Module catalogue per the Database Dictionary (§3).
+        $modules = [
+            'stock_inventory' => 'Stock Inventory',
+            'document_tracking' => 'Document Tracking',
+            'barcode_scanning' => 'Barcode Scanning',
+            'barcode_printing' => 'Barcode Printing',
+            'reports' => 'Reports',
+            'billing_view' => 'Billing View',
+        ];
 
-        $documentsModule = Module::firstOrCreate(
-            ['module_code' => 'documents'],
-            ['module_name' => 'Documents', 'description' => 'Document management', 'status' => 'active']
-        );
+        $moduleModels = [];
+        foreach ($modules as $code => $name) {
+            $moduleModels[$code] = Module::firstOrCreate(
+                ['module_code' => $code],
+                ['module_name' => $name, 'description' => $name, 'status' => 'active']
+            );
+        }
 
-        CustomerModule::firstOrCreate(
-            ['customer_id' => $customer->id, 'module_id' => $inventoryModule->id],
-            ['is_enabled' => true, 'enabled_at' => now()]
-        );
-
-        CustomerModule::firstOrCreate(
-            ['customer_id' => $customer->id, 'module_id' => $documentsModule->id],
-            ['is_enabled' => true, 'enabled_at' => now()]
-        );
+        // Enable the demo customer's modules.
+        foreach (['stock_inventory', 'document_tracking', 'barcode_scanning', 'reports'] as $code) {
+            CustomerModule::firstOrCreate(
+                ['customer_id' => $customer->id, 'module_id' => $moduleModels[$code]->id],
+                ['is_enabled' => true, 'enabled_at' => now()]
+            );
+        }
 
         CustomerSubscription::firstOrCreate(
             ['customer_id' => $customer->id, 'subscription_plan_id' => $plan->id],
@@ -83,7 +89,7 @@ class DatabaseSeeder extends Seeder
                 'max_document_files' => 1000,
                 'max_boxes' => 200,
                 'allowed_reports' => ['inventory', 'usage', 'audit'],
-                'enabled_modules' => ['inventory', 'documents'],
+                'enabled_modules' => ['stock_inventory', 'document_tracking', 'barcode_scanning', 'reports'],
                 'support_level' => 'standard',
                 'status' => 'active',
             ]

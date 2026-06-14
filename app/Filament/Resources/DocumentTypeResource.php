@@ -14,7 +14,7 @@ class DocumentTypeResource extends BaseResource
 {
     protected static ?string $model = DocumentType::class;
 
-    protected static string|array $routeMiddleware = [EnsureModuleEnabled::class.':documents'];
+    protected static string|array $routeMiddleware = [EnsureModuleEnabled::class.':document_tracking'];
 
     protected static bool $applyCustomerScope = true;
 

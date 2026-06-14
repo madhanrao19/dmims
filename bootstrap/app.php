@@ -18,6 +18,15 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Behind Cloudflare/Nginx the real client IP arrives via forwarded
+        // headers; trust them so auth, rate limiting and audit logs see it.
+        $proxies = (string) env('TRUSTED_PROXIES', '');
+        if ($proxies !== '') {
+            $middleware->trustProxies(
+                at: $proxies === '*' ? '*' : array_map('trim', explode(',', $proxies)),
+            );
+        }
+
         $middleware->append([
             SetCompanyContext::class,
             EnsureUserIsActive::class,

@@ -14,7 +14,7 @@ class DocumentFileResource extends BaseResource
 {
     protected static ?string $model = DocumentFile::class;
 
-    protected static string|array $routeMiddleware = [EnsureModuleEnabled::class.':documents'];
+    protected static string|array $routeMiddleware = [EnsureModuleEnabled::class.':document_tracking'];
 
     protected static bool $applyCustomerScope = true;
 
