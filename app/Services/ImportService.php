@@ -7,8 +7,10 @@ use App\Models\DocumentFile;
 use App\Models\Import;
 use App\Models\ImportRow;
 use App\Models\Product;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ImportService
 {
@@ -27,16 +29,19 @@ class ImportService
                 'model' => Product::class,
                 'columns' => ['sku', 'barcode', 'product_name', 'description', 'reorder_level', 'unit_cost', 'unit_price', 'status'],
                 'required' => ['sku', 'product_name'],
+                'unique' => 'sku',
             ],
             'boxes' => [
                 'model' => Box::class,
                 'columns' => ['box_number', 'box_barcode', 'source_origin', 'capacity_limit', 'status', 'remarks'],
                 'required' => ['box_number'],
+                'unique' => 'box_number',
             ],
             'document_files' => [
                 'model' => DocumentFile::class,
                 'columns' => ['file_reference_no', 'title', 'owner_name', 'source_origin', 'destination', 'current_status', 'remarks'],
                 'required' => ['title'],
+                'unique' => 'file_reference_no',
             ],
         ];
     }
@@ -66,6 +71,8 @@ class ImportService
         $total = 0;
         $success = 0;
         $failed = 0;
+        $uniqueField = $definition['unique'] ?? null;
+        $seen = [];
 
         try {
             while (($row = fgetcsv($handle)) !== false) {
@@ -78,6 +85,19 @@ class ImportService
                 $data = $this->mapRow($header, $row, $definition['columns']);
 
                 $errors = $this->validateRow($data, $definition['required']);
+
+                // Duplicate detection: within the file and against existing data.
+                if (! $errors && $uniqueField && ! empty($data[$uniqueField])) {
+                    $value = $data[$uniqueField];
+
+                    if (isset($seen[$value])) {
+                        $errors[$uniqueField] = "Duplicate {$uniqueField} '{$value}' within the file (row {$seen[$value]}).";
+                    } elseif ($this->existsInDatabase($definition['model'], $uniqueField, $value, $import->customer_id)) {
+                        $errors[$uniqueField] = "A record with {$uniqueField} '{$value}' already exists.";
+                    } else {
+                        $seen[$value] = $rowNumber;
+                    }
+                }
 
                 if ($errors) {
                     $failed++;
@@ -172,6 +192,46 @@ class ImportService
     protected function isBlank(array $row): bool
     {
         return count(array_filter($row, fn ($v) => trim((string) $v) !== '')) === 0;
+    }
+
+    /**
+     * Whether a record with the given unique value already exists for the
+     * customer (duplicate detection against existing data).
+     */
+    protected function existsInDatabase(string $model, string $field, mixed $value, ?int $customerId): bool
+    {
+        return $model::withoutGlobalScopes()
+            ->where('customer_id', $customerId)
+            ->where($field, $value)
+            ->exists();
+    }
+
+    /**
+     * Stream a CSV of the failed/invalid rows for this import (TDD §25 error
+     * file download).
+     */
+    public function errorFileResponse(Import $import): StreamedResponse
+    {
+        $rows = $import->rows()
+            ->whereIn('validation_status', ['invalid', 'failed'])
+            ->orderBy('row_number')
+            ->get();
+
+        return response()->streamDownload(function () use ($rows) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, ['row_number', 'validation_status', 'errors', 'data']);
+
+            foreach ($rows as $row) {
+                fputcsv($out, [
+                    $row->row_number,
+                    $row->validation_status,
+                    $row->error_messages ? implode('; ', Arr::flatten($row->error_messages)) : '',
+                    json_encode($row->row_data),
+                ]);
+            }
+
+            fclose($out);
+        }, "{$import->import_no}-errors.csv", ['Content-Type' => 'text/csv']);
     }
 
     protected function recordRow(Import $import, int $rowNumber, array $data, string $status, ?array $errors = null): void

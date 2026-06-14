@@ -13,7 +13,7 @@ Legend: ✅ implemented · WIP partial · ❌ missing
 |---|---|---|
 | customers, users, modules, customer_modules | ✅ | `users.last_login_at` exists in schema |
 | subscription_plans, customer_subscriptions | ✅ | |
-| **subscription_logs** | ❌ | Required by TDD §8/§10 (immutable history) |
+| subscription_logs | ✅ | append-only history via observer |
 | licenses, license_logs | ✅ | but see License field gaps below |
 | billing_records, billing_payments, billing_logs | ✅ | Billing module implemented |
 | settings, audit_logs, notifications | ✅ | |
@@ -33,7 +33,7 @@ disposal`. → values diverge (`stock_in` vs `receive_in`, `transfer` vs
 `internal_transfer`). Cosmetic but should be reconciled.
 
 ## 2. Models (TDD §10)
-Missing: **SubscriptionLog**. BillingRecord/BillingPayment/BillingLog now present.
+All required models present (SubscriptionLog, BillingRecord/Payment/Log added).
 
 ## 3. Services (TDD §11)
 | Required | Status |
@@ -85,8 +85,8 @@ Current: `inventory, documents` only. → rename + add the missing four.
 | Reporting & analytics | WIP | generic CSV export only; no named platform/inventory/document reports, no PDF/Excel |
 | Audit | ✅ | model-level `Auditable` trail + login activity |
 | Notifications | ✅ | hourly generator (low stock, subscription/license expiry, billing overdue) + export-completed/import-failed alerts |
-| Import/Export | WIP | CSV import w/ per-row validation ✅; no preview-before-import, duplicate detection, or error-file download |
-| Backup/Restore | ✅ manual · WIP | scheduled backup cron not configured |
+| Import/Export | ✅ | CSV import with per-row validation, duplicate detection (in-file + DB), error-file download; CSV export |
+| Backup/Restore | ✅ | manual + nightly scheduled backup (dmims:backup-database) + restore |
 | PWA | ✅ | manifest, service worker, offline page present |
 
 ## 8. Configuration (TDD §29) & security (§30)

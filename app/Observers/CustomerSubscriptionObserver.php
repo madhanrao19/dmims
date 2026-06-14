@@ -5,6 +5,7 @@ namespace App\Observers;
 use App\Models\CustomerModule;
 use App\Models\CustomerSubscription;
 use App\Models\Module;
+use App\Models\SubscriptionLog;
 use Illuminate\Support\Facades\Cache;
 
 class CustomerSubscriptionObserver
@@ -13,17 +14,44 @@ class CustomerSubscriptionObserver
     {
         $this->syncEnabledModules($subscription);
         $this->forgetSubscriptionCache($subscription);
+        $this->log($subscription, 'created', null, $subscription->only(['subscription_no', 'status', 'valid_to']));
     }
 
     public function updated(CustomerSubscription $subscription): void
     {
         $this->syncEnabledModules($subscription);
         $this->forgetSubscriptionCache($subscription);
+
+        $changes = $subscription->getChanges();
+        unset($changes['updated_at']);
+
+        if ($changes) {
+            $this->log(
+                $subscription,
+                'updated',
+                array_intersect_key($subscription->getOriginal(), $changes),
+                $changes,
+            );
+        }
     }
 
     public function deleted(CustomerSubscription $subscription): void
     {
         $this->forgetSubscriptionCache($subscription);
+        $this->log($subscription, 'deleted');
+    }
+
+    protected function log(CustomerSubscription $subscription, string $action, ?array $old = null, ?array $new = null): void
+    {
+        SubscriptionLog::create([
+            'customer_id' => $subscription->customer_id,
+            'customer_subscription_id' => $subscription->id,
+            'action' => $action,
+            'old_values' => $old,
+            'new_values' => $new,
+            'performed_by' => auth()->id(),
+            'created_at' => now(),
+        ]);
     }
 
     protected function forgetSubscriptionCache(CustomerSubscription $subscription): void

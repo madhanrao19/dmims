@@ -11,3 +11,6 @@ Artisan::command('inspire', function () {
 // Proactive operational alerts (PRD §16 / TDD §24). Requires the scheduler
 // cron entry from the Deployment Guide: `* * * * * php artisan schedule:run`.
 Schedule::command('dmims:generate-notifications')->hourly()->withoutOverlapping();
+
+// Nightly database backup (TDD §27).
+Schedule::command('dmims:backup-database')->dailyAt('02:30')->withoutOverlapping();

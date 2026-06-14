@@ -72,4 +72,35 @@ class ImportExportServiceTest extends TestCase
         // The invalid row was recorded with an error and not imported.
         $this->assertDatabaseHas('import_rows', ['import_id' => $import->id, 'validation_status' => 'invalid']);
     }
+
+    public function test_it_detects_duplicate_rows_in_file_and_in_database(): void
+    {
+        Storage::fake('local');
+        $customer = $this->customer();
+
+        // Pre-existing product to collide with.
+        Product::create(['customer_id' => $customer->id, 'sku' => 'EXISTING', 'product_name' => 'Already here', 'status' => 'active']);
+
+        $csv = "sku,product_name,status\n"
+            ."NEW1,New product,active\n"
+            ."NEW1,Duplicate in file,active\n"   // duplicate within the file
+            ."EXISTING,Clashes with DB,active\n"; // duplicate of existing record
+        Storage::disk('local')->put('imports/dupes.csv', $csv);
+
+        $import = Import::create([
+            'customer_id' => $customer->id,
+            'import_no' => 'IMP-DUP',
+            'import_type' => 'products',
+            'file_name' => 'dupes.csv',
+            'file_path' => 'imports/dupes.csv',
+            'status' => 'uploaded',
+        ]);
+
+        $import = app(ImportService::class)->process($import);
+
+        $this->assertSame(3, $import->total_rows);
+        $this->assertSame(1, $import->success_rows);   // only NEW1 (first occurrence)
+        $this->assertSame(2, $import->failed_rows);    // in-file dup + DB dup
+        $this->assertSame(1, Product::where('sku', 'NEW1')->count());
+    }
 }

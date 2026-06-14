@@ -116,6 +116,12 @@ class ImportResource extends BaseResource
                     ->modalContent(fn (Import $record) => view('filament.import-rows', ['rows' => $record->rows()->orderBy('row_number')->limit(500)->get()]))
                     ->modalSubmitAction(false)
                     ->visible(fn (Import $record): bool => $record->rows()->exists()),
+                Tables\Actions\Action::make('downloadErrors')
+                    ->label('Errors')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->color('danger')
+                    ->visible(fn (Import $record): bool => $record->failed_rows > 0)
+                    ->action(fn (Import $record) => app(ImportService::class)->errorFileResponse($record)),
                 Tables\Actions\DeleteAction::make(),
             ])
             ->defaultSort('created_at', 'desc');
