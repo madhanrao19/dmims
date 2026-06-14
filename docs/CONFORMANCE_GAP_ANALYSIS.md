@@ -45,7 +45,7 @@ All required models present (SubscriptionLog, BillingRecord/Payment/Log added).
 | LocationService, StockMovementService, DocumentMovementService | ✅ |
 | BarcodeService, ScannerService | ✅ |
 | AuditService, NotificationService, ImportService, BackupService | ✅ |
-| **ReportExportService** | WIP `ExportService` exists (CSV); no PDF/Excel, no named reports |
+| ReportExportService | ✅ | 14 named reports (CSV; PDF/Excel when lib present) |
 
 ## 4. Middleware (TDD §13) / Access layers (SAD §4)
 | Layer | Status |
@@ -82,7 +82,7 @@ Current: `inventory, documents` only. → rename + add the missing four.
 | Subscription | ✅ | `subscription_logs` history missing |
 | License | ✅ | enforcement layer + view-only/blocked modes |
 | Billing | ✅ | records, invoices, manual payments, immutable logs; CSV report via Export |
-| Reporting & analytics | WIP | generic CSV export only; no named platform/inventory/document reports, no PDF/Excel |
+| Reporting & analytics | ✅ | 14 named platform/inventory/document reports via a Reports page (CSV; PDF/Excel when lib present) |
 | Audit | ✅ | model-level `Auditable` trail + login activity |
 | Notifications | ✅ | hourly generator (low stock, subscription/license expiry, billing overdue) + export-completed/import-failed alerts |
 | Import/Export | ✅ | CSV import with per-row validation, duplicate detection (in-file + DB), error-file download; CSV export |
