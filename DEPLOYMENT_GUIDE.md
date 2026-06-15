@@ -9,12 +9,21 @@ Complete step-by-step instructions to deploy the DMIMS (Laravel 13 + Filament 5)
 ### 1. Update system and install dependencies
 ```bash
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y curl wget git nano vim htop
+sudo apt install -y curl wget git nano vim htop software-properties-common
 
-# Install PHP 8.4 + extensions
+# Ubuntu 24.04 ships PHP 8.3; this app requires PHP 8.4 (Laravel 13 + Filament 5).
+# Add the ondrej/php PPA, which provides php8.4 packages.
+sudo add-apt-repository -y ppa:ondrej/php
+sudo apt update
+
+# Install PHP 8.4 + extensions (sqlite3 for local/testing; fileinfo is bundled)
 sudo apt install -y php8.4-cli php8.4-fpm php8.4-mysql php8.4-pgsql php8.4-mbstring \
   php8.4-xml php8.4-bcmath php8.4-curl php8.4-zip php8.4-gd php8.4-intl \
-  php8.4-redis php8.4-memcached
+  php8.4-sqlite3 php8.4-redis php8.4-memcached
+
+# Make 8.4 the default `php` (so `php artisan` and Composer's post-scripts use it)
+sudo update-alternatives --set php /usr/bin/php8.4
+php -v   # must report 8.4.x
 
 # Install Composer
 curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
@@ -29,8 +38,8 @@ sudo apt install -y postgresql postgresql-contrib
 # Option B: MySQL
 # sudo apt install -y mysql-server
 
-# Install Node.js & npm (for Vite build)
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+# Install Node.js & npm (Vite 8 requires Node 20.19+/22+; use the 22 LTS line)
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt install -y nodejs
 
 # Install Supervisor (for queue/cron)
@@ -114,13 +123,11 @@ sudo chmod -R 775 /var/www/dmims/bootstrap/cache
 ```bash
 cd /var/www/dmims
 
-# Install PHP dependencies (as appuser)
+# Install PHP dependencies (as appuser). This installs everything from
+# composer.lock, including the barcode (picqer), PDF (dompdf) and Excel
+# (openspout) libraries that power scannable labels and PDF/Excel reports —
+# no extra `composer require` is needed.
 sudo -u appuser composer install --optimize-autoloader --no-dev
-
-# (Optional, recommended) Enable scannable Code128 barcode labels and PDF/Excel
-# report output. These require PHP 8.4 (the production target) and are detected
-# at runtime — without them the app falls back to barcode values and CSV.
-sudo -u appuser composer require picqer/php-barcode-generator barryvdh/laravel-dompdf
 
 # Install Node dependencies (for frontend assets)
 sudo -u appuser npm install
@@ -173,6 +180,10 @@ QUEUE_CONNECTION=database
 # Session cookie hardening (the site is served over HTTPS)
 SESSION_SECURE_COOKIE=true
 SESSION_SAME_SITE=lax
+
+# Trust Cloudflare/Nginx forwarded headers so HTTPS and the real client IP are
+# detected correctly (required for secure cookies and accurate audit logs)
+TRUSTED_PROXIES=*
 ```
 
 > **Mail is required for password resets.** The admin panel exposes a
