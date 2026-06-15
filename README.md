@@ -13,8 +13,8 @@ companies operate in a single system with complete data isolation.
 
 | Layer | Technology |
 |---|---|
-| Backend | PHP 8.3+ · Laravel 12 |
-| Admin UI | Filament 3 (Livewire + Blade + Tailwind) |
+| Backend | PHP 8.4+ · Laravel 13 |
+| Admin UI | Filament 5 (Livewire + Blade + Tailwind) |
 | Database | MySQL 8 / MariaDB (SQLite for local/testing) |
 | Auth / RBAC | Laravel Auth · Spatie Laravel Permission |
 | Queue / Cache / Session | Database driver |
@@ -51,7 +51,7 @@ Supervisor, Stock Inventory User, Document Tracking User, Viewer.
 
 ## Local development
 
-Requirements: PHP 8.3+, Composer, Node.js 20+, and a database (SQLite is fine
+Requirements: PHP 8.4+, Composer, Node.js 20+, and a database (SQLite is fine
 locally).
 
 ```bash
@@ -87,7 +87,7 @@ The seeded demo login (development only) is `admin@example.com` / `password`.
 php artisan test
 ```
 
-The suite (52 tests) covers tenant isolation, the access-control/license layer,
+The suite (59 tests) covers tenant isolation, the access-control/license layer,
 billing, notifications, barcode/scanner, reporting, import/export, stock and
 document operations, the seeder, and that every resource page renders.
 

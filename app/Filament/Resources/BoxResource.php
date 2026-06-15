@@ -8,9 +8,11 @@ use App\Http\Middleware\EnsureModuleEnabled;
 use App\Models\Box;
 use App\Models\Location;
 use App\Services\DocumentMovementService;
+use Filament\Actions\Action;
+use Filament\Actions\EditAction;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
 
@@ -26,16 +28,16 @@ class BoxResource extends BaseResource
 
     protected static ?string $permission = 'manage inventory';
 
-    protected static ?string $navigationIcon = null;
+    protected static string|\BackedEnum|null $navigationIcon = null;
 
-    protected static ?string $navigationGroup = 'Document Tracking';
+    protected static string|\UnitEnum|null $navigationGroup = 'Document Tracking';
 
     protected static ?int $navigationSort = 1;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
+        return $schema
+            ->components([
                 Forms\Components\Select::make('customer_id')
                     ->relationship('customer', 'company_name')
                     ->searchable()
@@ -74,12 +76,12 @@ class BoxResource extends BaseResource
                 Tables\Columns\TextColumn::make('status')->sortable(),
                 Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable(),
             ])
-            ->actions([
-                Tables\Actions\Action::make('transferBox')
+            ->recordActions([
+                Action::make('transferBox')
                     ->label('Transfer')
                     ->icon('heroicon-o-arrows-right-left')
                     ->visible(fn (Box $record): bool => $record->status !== 'moved_out')
-                    ->form([
+                    ->schema([
                         Forms\Components\Select::make('to_location_id')->label('To location')
                             ->options(fn () => Location::query()->pluck('location_name', 'id')->all())->searchable()->required(),
                         Forms\Components\Textarea::make('remarks'),
@@ -88,12 +90,12 @@ class BoxResource extends BaseResource
                         app(DocumentMovementService::class)->transferBox($record, (int) $data['to_location_id'], $data);
                         Notification::make()->title('Box transferred')->success()->send();
                     }),
-                Tables\Actions\Action::make('moveOutBox')
+                Action::make('moveOutBox')
                     ->label('Move Out')
                     ->icon('heroicon-o-arrow-up-tray')
                     ->color('danger')
                     ->visible(fn (Box $record): bool => $record->status !== 'moved_out')
-                    ->form([
+                    ->schema([
                         Forms\Components\TextInput::make('destination')->label('External destination')->required(),
                         Forms\Components\Textarea::make('remarks'),
                     ])
@@ -101,12 +103,12 @@ class BoxResource extends BaseResource
                         app(DocumentMovementService::class)->moveOutBox($record, $data['destination'], $data);
                         Notification::make()->title('Box moved out')->success()->send();
                     }),
-                Tables\Actions\Action::make('returnBox')
+                Action::make('returnBox')
                     ->label('Return')
                     ->icon('heroicon-o-arrow-uturn-left')
                     ->color('success')
                     ->visible(fn (Box $record): bool => $record->status === 'moved_out')
-                    ->form([
+                    ->schema([
                         Forms\Components\Select::make('to_location_id')->label('Return to location')
                             ->options(fn () => Location::query()->pluck('location_name', 'id')->all())->searchable()->required(),
                         Forms\Components\Textarea::make('remarks'),
@@ -115,7 +117,7 @@ class BoxResource extends BaseResource
                         app(DocumentMovementService::class)->returnBox($record, (int) $data['to_location_id'], $data);
                         Notification::make()->title('Box returned')->success()->send();
                     }),
-                Tables\Actions\EditAction::make(),
+                EditAction::make(),
                 static::barcodeAction(),
             ])
             ->defaultSort('created_at', 'desc');

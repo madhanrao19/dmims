@@ -1,6 +1,6 @@
 # Production Deployment Guide — Ubuntu 24 Server
 
-Complete step-by-step instructions to deploy the DMIMS Laravel 12 application.
+Complete step-by-step instructions to deploy the DMIMS (Laravel 13 + Filament 5) application.
 
 ---
 

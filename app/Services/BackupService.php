@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Throwable;
 
 class BackupService
 {
@@ -44,7 +45,7 @@ class BackupService
                 'file_size' => Storage::disk($this->disk)->size($relativePath),
                 'completed_at' => now(),
             ]);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $backup->update([
                 'status' => 'failed',
                 'completed_at' => now(),

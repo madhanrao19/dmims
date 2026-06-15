@@ -9,11 +9,13 @@ use App\Models\Export;
 use App\Models\Location;
 use App\Models\Product;
 use App\Models\StockMovement;
+use DateTimeInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use Throwable;
 
 class ExportService
 {
@@ -78,7 +80,7 @@ class ExportService
                 $customerId,
                 $export->requested_by,
             );
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $export->update(['status' => 'failed']);
 
             throw $e;
@@ -122,7 +124,7 @@ class ExportService
 
     protected function stringify($value): string
     {
-        if ($value instanceof \DateTimeInterface) {
+        if ($value instanceof DateTimeInterface) {
             return $value->format('Y-m-d H:i:s');
         }
 

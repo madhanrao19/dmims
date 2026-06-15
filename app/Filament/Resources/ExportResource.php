@@ -5,6 +5,8 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\ExportResource\Pages;
 use App\Models\Export;
 use App\Services\ExportService;
+use Filament\Actions\Action;
+use Filament\Actions\DeleteAction;
 use Filament\Forms;
 use Filament\Notifications\Notification;
 use Filament\Tables;
@@ -20,9 +22,9 @@ class ExportResource extends BaseResource
 
     protected static ?string $permission = 'manage settings';
 
-    protected static ?string $navigationGroup = 'Platform';
+    protected static string|\UnitEnum|null $navigationGroup = 'Platform';
 
-    protected static ?string $navigationIcon = 'heroicon-o-arrow-up-tray';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-arrow-up-tray';
 
     public static function table(Table $table): Table
     {
@@ -53,10 +55,10 @@ class ExportResource extends BaseResource
                     ]),
             ])
             ->headerActions([
-                Tables\Actions\Action::make('newExport')
+                Action::make('newExport')
                     ->label('New Export')
                     ->icon('heroicon-o-plus')
-                    ->form([
+                    ->schema([
                         Forms\Components\Select::make('export_type')
                             ->label('Data to export')
                             ->options(collect(array_keys(ExportService::exportableTypes()))
@@ -80,12 +82,12 @@ class ExportResource extends BaseResource
                         }
                     }),
             ])
-            ->actions([
-                Tables\Actions\Action::make('download')
+            ->recordActions([
+                Action::make('download')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->visible(fn (Export $record): bool => $record->status === 'completed' && filled($record->file_path))
                     ->action(fn (Export $record): StreamedResponse => Storage::disk('local')->download($record->file_path, $record->file_name)),
-                Tables\Actions\DeleteAction::make(),
+                DeleteAction::make(),
             ])
             ->defaultSort('created_at', 'desc');
     }

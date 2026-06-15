@@ -5,7 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\CustomerModuleResource\Pages;
 use App\Models\CustomerModule;
 use Filament\Forms;
-use Filament\Forms\Form;
+use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
 
@@ -17,16 +17,16 @@ class CustomerModuleResource extends BaseResource
 
     protected static ?string $permission = 'manage subscriptions';
 
-    protected static ?string $navigationIcon = null;
+    protected static string|\BackedEnum|null $navigationIcon = null;
 
-    protected static ?string $navigationGroup = 'Platform';
+    protected static string|\UnitEnum|null $navigationGroup = 'Platform';
 
     protected static ?int $navigationSort = 4;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
+        return $schema
+            ->components([
                 Forms\Components\Select::make('customer_id')
                     ->relationship('customer', 'company_name')
                     ->searchable()

@@ -6,8 +6,9 @@ use App\Filament\Concerns\HasBarcodeAction;
 use App\Filament\Resources\LocationResource\Pages;
 use App\Http\Middleware\EnsureModuleEnabled;
 use App\Models\Location;
+use Filament\Actions\EditAction;
 use Filament\Forms;
-use Filament\Forms\Form;
+use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
 
@@ -23,16 +24,16 @@ class LocationResource extends BaseResource
 
     protected static ?string $permission = 'manage inventory';
 
-    protected static ?string $navigationIcon = null;
+    protected static string|\BackedEnum|null $navigationIcon = null;
 
-    protected static ?string $navigationGroup = 'Locations';
+    protected static string|\UnitEnum|null $navigationGroup = 'Locations';
 
     protected static ?int $navigationSort = 1;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
+        return $schema
+            ->components([
                 Forms\Components\Select::make('customer_id')
                     ->relationship('customer', 'company_name')
                     ->searchable()
@@ -67,8 +68,8 @@ class LocationResource extends BaseResource
                 Tables\Columns\TextColumn::make('parent.location_name')->label('Parent')->sortable(),
                 Tables\Columns\TextColumn::make('status')->sortable(),
             ])
-            ->actions([
-                Tables\Actions\EditAction::make(),
+            ->recordActions([
+                EditAction::make(),
                 static::barcodeAction(),
             ])
             ->defaultSort('location_name');

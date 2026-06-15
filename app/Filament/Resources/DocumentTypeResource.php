@@ -6,7 +6,7 @@ use App\Filament\Resources\DocumentTypeResource\Pages;
 use App\Http\Middleware\EnsureModuleEnabled;
 use App\Models\DocumentType;
 use Filament\Forms;
-use Filament\Forms\Form;
+use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
 
@@ -20,16 +20,16 @@ class DocumentTypeResource extends BaseResource
 
     protected static ?string $permission = 'manage documents';
 
-    protected static ?string $navigationIcon = null;
+    protected static string|\BackedEnum|null $navigationIcon = null;
 
-    protected static ?string $navigationGroup = 'Document Tracking';
+    protected static string|\UnitEnum|null $navigationGroup = 'Document Tracking';
 
     protected static ?int $navigationSort = 3;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
+        return $schema
+            ->components([
                 Forms\Components\TextInput::make('type_code')->required()->maxLength(100),
                 Forms\Components\TextInput::make('type_name')->required()->maxLength(255),
                 Forms\Components\Textarea::make('description')->rows(3),

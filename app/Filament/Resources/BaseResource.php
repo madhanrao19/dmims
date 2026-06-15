@@ -7,6 +7,7 @@ use App\Services\ModuleAccessService;
 use Filament\Resources\Resource;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use UnitEnum;
 
 abstract class BaseResource extends Resource
 {
@@ -41,7 +42,7 @@ abstract class BaseResource extends Resource
         return $query;
     }
 
-    public static function can(string $action, ?Model $record = null): bool
+    public static function can(string|UnitEnum $action, ?Model $record = null): bool
     {
         if (static::shouldSkipAuthorization()) {
             return true;

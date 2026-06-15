@@ -7,21 +7,21 @@ use App\Services\ScannerService;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Schemas\Schema;
 
 class BarcodeScanner extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static ?string $navigationIcon = 'heroicon-o-qr-code';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-qr-code';
 
-    protected static ?string $navigationGroup = 'Shared Services';
+    protected static string|\UnitEnum|null $navigationGroup = 'Shared Services';
 
     protected static ?string $title = 'Barcode Scanner';
 
-    protected static string $view = 'filament.pages.barcode-scanner';
+    protected string $view = 'filament.pages.barcode-scanner';
 
     public ?array $data = [];
 
@@ -46,10 +46,10 @@ class BarcodeScanner extends Page implements HasForms
         $this->form->fill();
     }
 
-    public function form(Form $form): Form
+    public function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
+        return $schema
+            ->components([
                 TextInput::make('barcode')
                     ->label('Scan or enter a barcode')
                     ->placeholder('e.g. PRD-ACME-000001')

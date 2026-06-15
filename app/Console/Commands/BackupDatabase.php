@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Services\BackupService;
 use Illuminate\Console\Command;
+use Throwable;
 
 /**
  * Scheduled database backup (TDD §27). Runs the same BackupService used by the
@@ -22,7 +23,7 @@ class BackupDatabase extends Command
             $this->info("Backup {$backup->backup_no} completed ({$backup->file_size} bytes).");
 
             return self::SUCCESS;
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->error('Backup failed: '.$e->getMessage());
 
             return self::FAILURE;

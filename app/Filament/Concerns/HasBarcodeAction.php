@@ -3,8 +3,8 @@
 namespace App\Filament\Concerns;
 
 use App\Services\BarcodeService;
+use Filament\Actions\Action;
 use Filament\Notifications\Notification;
-use Filament\Tables\Actions\Action;
 use Illuminate\Database\Eloquent\Model;
 
 /**

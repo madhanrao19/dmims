@@ -8,9 +8,10 @@ use App\Models\Location;
 use App\Models\Product;
 use App\Models\StockMovement;
 use App\Services\StockMovementService;
+use Filament\Actions\Action;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
 
@@ -24,16 +25,16 @@ class StockMovementResource extends BaseResource
 
     protected static ?string $permission = 'manage inventory';
 
-    protected static ?string $navigationIcon = null;
+    protected static string|\BackedEnum|null $navigationIcon = null;
 
-    protected static ?string $navigationGroup = 'Stock Inventory';
+    protected static string|\UnitEnum|null $navigationGroup = 'Stock Inventory';
 
     protected static ?int $navigationSort = 7;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
+        return $schema
+            ->components([
                 Forms\Components\Select::make('customer_id')
                     ->relationship('customer', 'company_name')
                     ->searchable()
@@ -77,11 +78,11 @@ class StockMovementResource extends BaseResource
                 Tables\Columns\TextColumn::make('performed_at')->dateTime()->sortable(),
             ])
             ->headerActions([
-                Tables\Actions\Action::make('receiveIn')
+                Action::make('receiveIn')
                     ->label('Receive In')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->color('success')
-                    ->form([
+                    ->schema([
                         static::productSelect(),
                         Forms\Components\Select::make('to_location_id')->label('To location')->options(static::locationOptions())->searchable()->required(),
                         static::quantityInput(),
@@ -91,11 +92,11 @@ class StockMovementResource extends BaseResource
                         app(StockMovementService::class)->receiveIn((int) $data['product_id'], (int) $data['to_location_id'], (float) $data['quantity'], $data);
                         Notification::make()->title('Stock received')->success()->send();
                     }),
-                Tables\Actions\Action::make('stockOut')
+                Action::make('stockOut')
                     ->label('Stock Out')
                     ->icon('heroicon-o-arrow-up-tray')
                     ->color('danger')
-                    ->form([
+                    ->schema([
                         static::productSelect(),
                         Forms\Components\Select::make('from_location_id')->label('From location')->options(static::locationOptions())->searchable()->required(),
                         static::quantityInput(),
@@ -105,10 +106,10 @@ class StockMovementResource extends BaseResource
                         app(StockMovementService::class)->stockOut((int) $data['product_id'], (int) $data['from_location_id'], (float) $data['quantity'], $data);
                         Notification::make()->title('Stock removed')->success()->send();
                     }),
-                Tables\Actions\Action::make('transfer')
+                Action::make('transfer')
                     ->label('Transfer')
                     ->icon('heroicon-o-arrows-right-left')
-                    ->form([
+                    ->schema([
                         static::productSelect(),
                         Forms\Components\Select::make('from_location_id')->label('From location')->options(static::locationOptions())->searchable()->required(),
                         Forms\Components\Select::make('to_location_id')->label('To location')->options(static::locationOptions())->searchable()->required()->different('from_location_id'),
@@ -119,11 +120,11 @@ class StockMovementResource extends BaseResource
                         app(StockMovementService::class)->transfer((int) $data['product_id'], (int) $data['from_location_id'], (int) $data['to_location_id'], (float) $data['quantity'], $data);
                         Notification::make()->title('Stock transferred')->success()->send();
                     }),
-                Tables\Actions\Action::make('adjust')
+                Action::make('adjust')
                     ->label('Adjust')
                     ->icon('heroicon-o-adjustments-horizontal')
                     ->color('warning')
-                    ->form([
+                    ->schema([
                         static::productSelect(),
                         Forms\Components\Select::make('location_id')->label('Location')->options(static::locationOptions())->searchable()->required(),
                         Forms\Components\TextInput::make('delta')->label('Adjustment (+/-)')->numeric()->required()
