@@ -4,6 +4,21 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.0.0] - 2026-06-15
+
+### Changed
+- **Upgraded Filament 3 → 5 and Laravel 12 → 13; now requires PHP 8.4.**
+  Performed in two stages using Filament's official automated upgrade tools
+  (v3→v4 then v4→v5): every resource/page/widget migrated to the Schema-based
+  forms, the unified `Filament\Actions` namespace, `recordActions()`, and the v5
+  APIs. Also bumped Spatie Permission → 8, Tinker → 3; pinned
+  `config.platform.php` to 8.4.22. All 59 tests pass on Filament 5.6 /
+  Laravel 13.15 / PHP 8.4; 0 composer advisories.
+- Raised the PHPUnit `memory_limit` to 512M (Filament 4/5 are heavier at boot).
+
+> **Note:** PHP 8.4 is now the minimum. Production already targets 8.4; ensure
+> the runtime is 8.4+ before deploying this release.
+
 ## [1.1.0] - 2026-06-14
 
 ### Added
