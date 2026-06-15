@@ -2,6 +2,8 @@
 
 Audited the implementation against the authoritative documents (PRD, SAD,
 Security & Access Control Matrix, Database Dictionary, TDD) on 2026-06-14.
+**Status: all identified gaps remediated** (see CHANGELOG.md). Remaining
+divergences are cosmetic (enum naming) or operational config.
 
 Legend: ✅ implemented · WIP partial · ❌ missing
 
@@ -21,10 +23,10 @@ Legend: ✅ implemented · WIP partial · ❌ missing
 | location_types, locations, document_types, boxes, document_files, document_movement_logs | ✅ | |
 | barcode_registry, barcode_scan_logs | ✅ | `barcode_registry` table-name bug fixed |
 
-**License fields (Dictionary §7):** dictionary specifies `license_status` and
-`technical_access_mode` (Full / View Only / Blocked). Actual table uses a single
-`status` enum without `revoked` and has no `technical_access_mode`. → schema
-change needed for faithful license enforcement.
+**License fields (Dictionary §7):** ✅ `technical_access_mode`
+(full / view_only / blocked) added and enforced. The `status` enum has no
+literal `revoked` value; revocation is handled via `cancelled` +
+`technical_access_mode = blocked` (cosmetic divergence).
 
 **Movement-type enum:** dictionary lists `receive_in, stock_out,
 internal_transfer, adjustment`; TDD §18 adds `return, disposal, opening_balance`.
@@ -51,26 +53,26 @@ All required models present (SubscriptionLog, BillingRecord/Payment/Log added).
 | Layer | Status |
 |---|---|
 | 1 Authentication | ✅ |
-| 2 Role/permission validation | WIP coarse permissions, not the matrix granularity |
+| 2 Role/permission validation | ✅ `manage X` / `view X` permissions; reads on either, writes on `manage` |
 | 3 Customer isolation | ✅ global scopes + Filament scope |
 | 4 Subscription validation | ✅ `EnsureSubscriptionActive` (TDD calls it `EnsureSubscriptionValid`) |
 | 5 License validation | ✅ `EnsureLicenseAllowsAccess` + `technical_access_mode` |
 | 6 Module validation | ✅ enforced in `can()` + nav |
 | 7 Operational permission | ✅ permission check in `can()` |
 
-## 5. RBAC — roles & permissions (Security Matrix, TDD §5)
-Required roles: **Datamation Super Admin, Datamation Management (read-only),
-Company Admin, Company Supervisor, Stock Inventory User, Document Tracking User,
-Viewer**.
-Current seeder roles: `admin, manager, user`. → **mismatch**.
-- Management & Viewer "view-only" not enforced (current permission model grants
-  full CRUD once a `manage *` permission is held).
-- Permissions are coarse (`manage inventory`) vs the matrix's per-module CRUD.
+## 5. RBAC — roles & permissions (Security Matrix, TDD §5) — ✅
+The seven documented roles are seeded (Datamation Super Admin, Datamation
+Management, Company Admin, Company Supervisor, Stock Inventory User, Document
+Tracking User, Viewer). Each functional area has a `manage X` (full CRUD) and a
+`view X` (read-only) permission; `BaseResource::can()` allows read actions on
+either and write actions only on `manage X`, so the matrix's view-only roles
+(Management, Viewer) get genuine read access. License `view_only` mode adds a
+second, orthogonal read-only tier.
 
-## 6. Module codes (Dictionary §3)
-Required: `stock_inventory, document_tracking, barcode_scanning,
-barcode_printing, reports, billing_view`.
-Current: `inventory, documents` only. → rename + add the missing four.
+## 6. Module codes (Dictionary §3) — ✅
+All six dictionary module codes are present (`stock_inventory`,
+`document_tracking`, `barcode_scanning`, `barcode_printing`, `reports`,
+`billing_view`) and drive the resources' module gating.
 
 ## 7. Functional modules (PRD / SAD / TDD)
 | Module | Status | Gap |
@@ -92,32 +94,33 @@ Current: `inventory, documents` only. → rename + add the missing four.
 ## 8. Configuration (TDD §29) & security (§30)
 ✅ `APP_ENV=production`, `APP_DEBUG=false`, `SESSION_SECURE_COOKIE=true`,
 `SESSION_DRIVER=database`, `QUEUE_CONNECTION=database`, HTTPS, isolation, audit,
-direct-URL protection, secure cookies.
-❌ `TRUSTED_PROXIES=*` not set (required behind Cloudflare).
+direct-URL protection, secure cookies, ✅ `TRUSTED_PROXIES=*` (Cloudflare).
+Operational values still set on the server: real `DB_*` credentials,
+`php artisan key:generate`, and SMTP mail (password reset).
 
 ---
 
-## Prioritised remediation roadmap
+## Remediation status — all phases complete
 
-**P1 — Security backbone (TDD §5, §12–16; Security Matrix)**
-1. RBAC: create the 7 documented roles with matrix-aligned permissions.
-2. Align module codes to the dictionary; add the four missing modules.
-3. `AccessControlService` + `EnsureLicenseAllowsAccess`; license field/enum fixes.
-4. `TRUSTED_PROXIES=*`.
+| Phase | Scope | Status |
+|---|---|---|
+| P1 | Security backbone: 7 roles + `manage`/`view` permissions, dictionary module codes, `AccessControlService`, `EnsureLicenseAllowsAccess` + `technical_access_mode`, `TRUSTED_PROXIES` | ✅ |
+| P2 | Billing module (records, payments, logs, services, gated resource) | ✅ |
+| P3 | Reporting — 14 named reports, CSV/XLSX/PDF | ✅ |
+| P4 | Notifications generation + scheduler | ✅ |
+| P5 | Barcode generation/registry/scanner + label images | ✅ |
+| P6 | `subscription_logs`, scheduled backup, import dedupe/error-file | ✅ |
 
-**P2 — Billing module (PRD §13, SAD §11, Dictionary §8, TDD §8/§10/§11)**
-`billing_records`, `billing_payments`, `billing_logs` tables + models +
-`BillingService`/`PaymentService` + Filament resources + `billing_view` gating.
+Also remediated: User mass-assignment, module gating on access, model-level
+audit, tenant global scopes, real Backup/Import/Export, the database seeder,
+schema/enum/table-name bugs, deprecated Filament components, branding, guided
+stock/document operations, the PWA installability fix, and role-based view-only
+access. Dependencies updated to Laravel 12 + current packages (CVE-2026-48019
+patched).
 
-**P3 — Reporting (TDD §22)**
-Named platform/inventory/document reports with CSV/Excel/PDF (`ReportExportService`).
-
-**P4 — Notifications generation (TDD §24)** + scheduler (low stock, expiry, overdue).
-
-**P5 — Barcode generation/printing/scanner (TDD §21)** + `ScannerService`.
-
-**P6 — History/logs**: `subscription_logs`, `billing_logs`; import preview/dedupe/error-file; scheduled backups.
-
-Items already remediated in prior work: mass-assignment, module gating on
-access, model-level audit, tenant global scopes, real Backup/Import/Export,
-seeder, schema/enum form bugs, deprecated components, branding.
+### Remaining (non-code / cosmetic)
+- Movement-type enum naming (`stock_in` vs `receive_in`) and the missing literal
+  `revoked` license status — cosmetic.
+- Operational `.env` values on the server: DB credentials, `key:generate`, SMTP.
+- Optional: Filament 5 / Laravel 13 upgrade (prepared on the
+  `upgrade/filament5-laravel13` branch; not a documented requirement).

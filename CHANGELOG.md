@@ -7,6 +7,10 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 ## [1.1.0] - 2026-06-14
 
 ### Added
+- **Role-based view-only access** (Security & Access Control Matrix). Each area
+  now has a `manage X` and a `view X` permission; reads are allowed on either,
+  writes only on `manage X`. The Management and Viewer roles get genuine
+  read-only access instead of no access. Adds `RbacViewOnlyTest`.
 - **PDF and Excel report output.** `ReportExportService` now renders every named
   report as CSV, **XLSX** (openspout) or **PDF** (dompdf); the Reports page has a
   format selector.

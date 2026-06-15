@@ -20,7 +20,7 @@ class DatabaseSeederTest extends TestCase
     {
         $this->seed(DatabaseSeeder::class);
 
-        $this->assertSame(10, Permission::count());
+        $this->assertSame(19, Permission::count());
         $this->assertEqualsCanonicalizing([
             'Datamation Super Admin',
             'Datamation Management',
@@ -59,6 +59,6 @@ class DatabaseSeederTest extends TestCase
 
         $this->assertSame(1, Customer::where('company_code', 'DEMO')->count());
         $this->assertSame(1, User::where('email', 'admin@example.com')->count());
-        $this->assertSame(10, Permission::count());
+        $this->assertSame(19, Permission::count());
     }
 }

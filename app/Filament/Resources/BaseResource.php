@@ -64,17 +64,37 @@ abstract class BaseResource extends Resource
             return false;
         }
 
-        if (! filled(static::$permission) || ! $user->can(static::$permission)) {
+        if (! filled(static::$permission)) {
             return false;
         }
 
-        // License view-only mode (SAD layer 5): permitted to read, not to write.
-        if (in_array($action, static::WRITE_ACTIONS, true)
-            && app(AccessControlService::class)->getEffectiveAccessMode($user->customer_id) === AccessControlService::MODE_VIEW_ONLY) {
-            return false;
+        $isWrite = in_array($action, static::WRITE_ACTIONS, true);
+
+        if ($isWrite) {
+            // Writes require the manage permission and a non-view-only license.
+            if (! $user->can(static::$permission)) {
+                return false;
+            }
+
+            return app(AccessControlService::class)->getEffectiveAccessMode($user->customer_id)
+                !== AccessControlService::MODE_VIEW_ONLY;
         }
 
-        return true;
+        // Reads are allowed with either the manage or the view permission
+        // (role-based view-only access per the Security & Access Control Matrix).
+        return $user->can(static::$permission) || $user->can(static::viewPermission());
+    }
+
+    /**
+     * The read-only permission corresponding to this resource's `$permission`
+     * (e.g. "manage inventory" -> "view inventory"). Resources already gated on
+     * a "view *" permission map to themselves.
+     */
+    protected static function viewPermission(): string
+    {
+        return str_starts_with((string) static::$permission, 'manage ')
+            ? 'view '.substr(static::$permission, strlen('manage '))
+            : (string) static::$permission;
     }
 
     /**
@@ -117,8 +137,10 @@ abstract class BaseResource extends Resource
             return true;
         }
 
-        // check permission if defined
-        if (filled(static::$permission) && ! $user->can(static::$permission)) {
+        // show nav when the user can either manage or view the resource
+        if (filled(static::$permission)
+            && ! $user->can(static::$permission)
+            && ! $user->can(static::viewPermission())) {
             return false;
         }
 
