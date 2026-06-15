@@ -6,21 +6,21 @@
     "keywords": ["laravel", "framework"],
     "license": "MIT",
     "require": {
-        "php": "^8.3",
+        "php": "^8.4",
         "barryvdh/laravel-dompdf": "^3.1",
-        "filament/filament": "^4.0",
-        "laravel/framework": "^12.0",
-        "laravel/tinker": "^2.9",
+        "filament/filament": "^5.0",
+        "laravel/framework": "^13.0",
+        "laravel/tinker": "^3.0",
         "openspout/openspout": "^4.32",
         "picqer/php-barcode-generator": "^3.2",
-        "spatie/laravel-permission": "^6.25"
+        "spatie/laravel-permission": "^8.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
         "laravel/pint": "^1.13",
         "mockery/mockery": "^1.6",
-        "nunomaduro/collision": "^8.1",
-        "phpunit/phpunit": "^11.0"
+        "nunomaduro/collision": "^8.6",
+        "phpunit/phpunit": "^11.5.3"
     },
     "autoload": {
         "psr-4": {
@@ -80,7 +80,7 @@
         "preferred-install": "dist",
         "sort-packages": true,
         "platform": {
-            "php": "8.3.31"
+            "php": "8.4.22"
         },
         "allow-plugins": {
             "pestphp/pest-plugin": true,
