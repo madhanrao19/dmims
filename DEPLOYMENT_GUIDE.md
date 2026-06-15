@@ -122,9 +122,12 @@ sudo -u appuser composer install --optimize-autoloader --no-dev
 # at runtime — without them the app falls back to barcode values and CSV.
 sudo -u appuser composer require picqer/php-barcode-generator barryvdh/laravel-dompdf
 
-# Install Node dependencies (optional, for frontend assets)
+# Install Node dependencies (for frontend assets)
 sudo -u appuser npm install
 sudo -u appuser npm run build
+
+# Publish Filament's admin-panel assets (CSS/JS/fonts) — required for the UI
+sudo -u appuser php artisan filament:assets
 ```
 
 ---
