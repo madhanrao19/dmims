@@ -29,8 +29,9 @@ php -v   # must report 8.4.x
 curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 composer --version
 
-# Install Nginx
-sudo apt install -y nginx
+# Install a web server — choose ONE (configured in Part 7):
+sudo apt install -y nginx          # Option A (default in this guide)
+# sudo apt install -y apache2      # Option B (see Part 7, Option B)
 
 # Install PostgreSQL (if using PostgreSQL) OR MySQL
 # Option A: PostgreSQL
@@ -225,9 +226,14 @@ sudo -u appuser php artisan dmims:create-admin admin@your-domain.com --name="Adm
 
 ---
 
-## **PART 7: CONFIGURE NGINX**
+## **PART 7: CONFIGURE WEB SERVER**
 
-### 7.1 Create Nginx server block
+Use **either** Nginx (Option A) or Apache (Option B) — not both. Both serve the
+app's `public/` directory and proxy PHP to PHP-FPM 8.4.
+
+### Option A — Nginx
+
+#### 7.1 Create Nginx server block
 ```bash
 sudo nano /etc/nginx/sites-available/dmims
 ```
@@ -296,12 +302,84 @@ server {
 }
 ```
 
-### 7.2 Enable the site
+#### 7.2 Enable the site
 ```bash
 sudo ln -s /etc/nginx/sites-available/dmims /etc/nginx/sites-enabled/
 sudo nginx -t  # Test configuration
 sudo systemctl restart nginx
 ```
+
+### Option B — Apache
+
+Laravel ships a `public/.htaccess` with the rewrite rules, so Apache only needs
+`mod_rewrite` plus the PHP-FPM proxy.
+
+#### 7.3 Install Apache and enable modules
+```bash
+sudo apt install -y apache2
+sudo a2enmod rewrite proxy proxy_fcgi setenvif ssl headers expires http2
+# Free port 80/443 if Nginx was installed earlier:
+sudo systemctl disable --now nginx 2>/dev/null || true
+```
+
+#### 7.4 Create the virtual host
+```bash
+sudo nano /etc/apache2/sites-available/dmims.conf
+```
+
+**Paste this configuration:**
+```apache
+<VirtualHost *:80>
+    ServerName your-domain.com
+    ServerAlias www.your-domain.com
+    # Redirect HTTP to HTTPS
+    Redirect permanent / https://your-domain.com/
+</VirtualHost>
+
+<VirtualHost *:443>
+    ServerName your-domain.com
+    ServerAlias www.your-domain.com
+    DocumentRoot /var/www/dmims/public
+
+    SSLEngine on
+    SSLCertificateFile /etc/letsencrypt/live/your-domain.com/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/your-domain.com/privkey.pem
+
+    <Directory /var/www/dmims/public>
+        AllowOverride All           # required so public/.htaccess handles routing
+        Require all granted
+        Options -Indexes +FollowSymLinks
+    </Directory>
+
+    # Send PHP to PHP-FPM 8.4 via the Unix socket
+    <FilesMatch \.php$>
+        SetHandler "proxy:unix:/run/php/php8.4-fpm.sock|fcgi://localhost"
+    </FilesMatch>
+
+    # Static asset caching
+    <IfModule mod_expires.c>
+        ExpiresActive On
+        <FilesMatch "\.(jpg|jpeg|png|gif|ico|css|js|svg|woff2?|ttf|eot)$">
+            ExpiresDefault "access plus 30 days"
+            Header set Cache-Control "public, immutable"
+        </FilesMatch>
+    </IfModule>
+
+    ErrorLog ${APACHE_LOG_DIR}/dmims_error.log
+    CustomLog ${APACHE_LOG_DIR}/dmims_access.log combined
+</VirtualHost>
+```
+
+#### 7.5 Enable the site
+```bash
+sudo a2dissite 000-default.conf
+sudo a2ensite dmims.conf
+sudo apache2ctl configtest   # Test configuration
+sudo systemctl restart apache2
+```
+
+> Upload size for Apache + PHP-FPM is governed by PHP's `upload_max_filesize` /
+> `post_max_size` (set in Part 8) — no Apache-specific limit is required.
 
 ---
 
@@ -328,20 +406,25 @@ sudo systemctl restart php8.4-fpm
 
 ## **PART 9: SETUP SSL CERTIFICATE (Let's Encrypt)**
 
+**If using Nginx (Option A):**
 ```bash
-# Install Certbot
 sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d your-domain.com -d www.your-domain.com
+sudo nginx -t && sudo systemctl reload nginx
+```
 
-# Generate SSL certificate
-sudo certbot certonly --nginx -d your-domain.com -d www.your-domain.com
+**If using Apache (Option B):**
+```bash
+sudo apt install -y certbot python3-certbot-apache
+sudo certbot --apache -d your-domain.com -d www.your-domain.com
+sudo apache2ctl configtest && sudo systemctl reload apache2
+```
 
-# Verify paths in nginx config and reload
-sudo nginx -t
-sudo systemctl reload nginx
-
-# Auto-renew setup
+**Auto-renewal (both):**
+```bash
 sudo systemctl enable certbot.timer
 sudo systemctl start certbot.timer
+sudo certbot renew --dry-run   # verify renewal works
 ```
 
 ---
@@ -516,13 +599,17 @@ scp "d:\Dev\IMS\Source Code\dmims-code\package.json" appuser@YOUR_SERVER_IP:/var
 
 **Check error logs:**
 ```bash
-tail -f /var/log/nginx/dmims_error.log
+tail -f /var/log/nginx/dmims_error.log      # Nginx (Option A)
+tail -f /var/log/apache2/dmims_error.log    # Apache (Option B)
 tail -f /var/www/dmims/storage/logs/laravel.log
 ```
 
 **Restart services:**
 ```bash
-sudo systemctl restart nginx php8.4-fpm postgresql
+# Web server — whichever you installed:
+sudo systemctl restart nginx        # Option A
+sudo systemctl restart apache2      # Option B
+sudo systemctl restart php8.4-fpm postgresql
 ```
 
 **SSH as appuser:**
