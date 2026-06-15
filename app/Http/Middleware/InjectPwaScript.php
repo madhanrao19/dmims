@@ -24,25 +24,25 @@ class InjectPwaScript
 
             // inject theme-color meta tag
             if (! str_contains($content, 'name="theme-color"')) {
-                $meta = "<meta name=\"theme-color\" content=\"#1b1b18\">\n";
+                $meta = "<meta name=\"theme-color\" content=\"#4f46e5\">\n";
                 $content = preg_replace('/<\/head>/i', $meta.'</head>', $content, 1);
             }
 
             // inject apple touch icon
             if (! str_contains($content, 'apple-touch-icon')) {
-                $apple = "<link rel=\"apple-touch-icon\" sizes=\"180x180\" href=\"/build/icons/apple-touch-icon.png\">\n";
+                $apple = "<link rel=\"apple-touch-icon\" sizes=\"180x180\" href=\"/icons/apple-touch-icon.png\">\n";
                 $content = preg_replace('/<\/head>/i', $apple.'</head>', $content, 1);
             }
 
             // inject mask-icon and Windows tile (msapplication)
             if (! str_contains($content, 'mask-icon')) {
-                $mask = "<link rel=\"mask-icon\" href=\"/build/icons/mask-icon.svg\" color=\"#1b1b18\">\n";
+                $mask = "<link rel=\"mask-icon\" href=\"/icons/mask-icon.svg\" color=\"#4f46e5\">\n";
                 $content = preg_replace('/<\/head>/i', $mask.'</head>', $content, 1);
             }
 
             if (! str_contains($content, 'msapplication-TileImage')) {
-                $ms = "<meta name=\"msapplication-TileColor\" content=\"#1b1b18\">\n";
-                $ms .= "<meta name=\"msapplication-TileImage\" content=\"/build/icons/icon-512.png\">\n";
+                $ms = "<meta name=\"msapplication-TileColor\" content=\"#4f46e5\">\n";
+                $ms .= "<meta name=\"msapplication-TileImage\" content=\"/icons/icon-512.png\">\n";
                 $content = preg_replace('/<\/head>/i', $ms.'</head>', $content, 1);
             }
 

@@ -1,0 +1,12 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="96" fill="#4f46e5"/>
+  <g fill="none" stroke="#ffffff" stroke-width="22" stroke-linejoin="round" stroke-linecap="round">
+    <!-- archive box: lid + body representing inventory/documents -->
+    <path d="M120 168 L256 120 L392 168 L256 216 Z" fill="#ffffff" fill-opacity="0.12"/>
+    <path d="M120 168 L256 216 L256 392 L120 344 Z" fill="#ffffff" fill-opacity="0.06"/>
+    <path d="M392 168 L256 216 L256 392 L392 344 Z" fill="#ffffff" fill-opacity="0.18"/>
+    <path d="M256 264 L296 250"/>
+  </g>
+  <text x="256" y="468" font-family="Inter, Arial, sans-serif" font-size="64" font-weight="700"
+        fill="#ffffff" text-anchor="middle" letter-spacing="4">DMIMS</text>
+</svg>

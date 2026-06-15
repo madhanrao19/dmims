@@ -22,6 +22,7 @@ class FilamentPanelProvider extends PanelProvider
             ->profile()
             // --- Branding & visual language ---
             ->brandName('DMIMS')
+            ->favicon(asset('icons/icon-192.png'))
             ->colors([
                 'primary' => Color::Indigo,
                 'gray' => Color::Slate,

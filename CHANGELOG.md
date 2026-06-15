@@ -19,6 +19,16 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
   so PDF/Excel/barcode images now work on the development box too (no longer
   gated to PHP 8.4 production only).
 
+### Fixed
+- **PWA was not installable** — the manifest referenced icons under
+  `/build/icons/` that did not exist (the directory is git-ignored and the
+  source SVGs were missing), and `favicon.ico` was empty. Added a tracked brand
+  icon set under `public/icons/` (192/512 PNG + SVG, apple-touch, mask),
+  repointed the manifest and `InjectPwaScript` middleware at `/icons/`, set the
+  Filament panel favicon, refreshed the service-worker precache (v3), and added
+  `PwaTest` asserting installability and that the PWA tags are injected.
+  Verified live: manifest, service worker, offline page and icons all serve 200.
+
 ## [1.0.0] - 2026-06-14
 
 First consolidated release. The codebase was audited against the requirements

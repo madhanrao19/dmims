@@ -1,11 +1,10 @@
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const CACHE_PREFIX = 'dmims-core-';
 const CACHE_NAME = CACHE_PREFIX + CACHE_VERSION;
 const OFFLINE_URL = '/offline.html';
 const PRECACHE_URLS = [
-  '/',
   OFFLINE_URL,
-  '/favicon.ico',
+  '/icons/icon-192.png',
   '/manifest.webmanifest'
 ];
 
