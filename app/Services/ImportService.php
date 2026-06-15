@@ -11,6 +11,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 class ImportService
 {
@@ -113,7 +114,7 @@ class ImportService
                     ]));
                     $success++;
                     $this->recordRow($import, $rowNumber, $data, 'imported');
-                } catch (\Throwable $e) {
+                } catch (Throwable $e) {
                     $failed++;
                     $this->recordRow($import, $rowNumber, $data, 'failed', ['exception' => $e->getMessage()]);
                 }

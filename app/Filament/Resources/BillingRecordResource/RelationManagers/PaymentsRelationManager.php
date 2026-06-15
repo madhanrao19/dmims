@@ -3,7 +3,7 @@
 namespace App\Filament\Resources\BillingRecordResource\RelationManagers;
 
 use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Tables;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
 class PaymentsRelationManager extends RelationManager
@@ -16,13 +16,13 @@ class PaymentsRelationManager extends RelationManager
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('payment_no')->searchable(),
-                Tables\Columns\TextColumn::make('amount')->money('myr')->sortable(),
-                Tables\Columns\TextColumn::make('payment_method')->badge(),
-                Tables\Columns\TextColumn::make('payment_date')->date()->sortable(),
-                Tables\Columns\TextColumn::make('reference_no')->searchable(),
-                Tables\Columns\TextColumn::make('recorded_by')->label('Recorded by'),
-                Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable(),
+                TextColumn::make('payment_no')->searchable(),
+                TextColumn::make('amount')->money('myr')->sortable(),
+                TextColumn::make('payment_method')->badge(),
+                TextColumn::make('payment_date')->date()->sortable(),
+                TextColumn::make('reference_no')->searchable(),
+                TextColumn::make('recorded_by')->label('Recorded by'),
+                TextColumn::make('created_at')->dateTime()->sortable(),
             ])
             // Payments are recorded via the invoice "Record Payment" action so
             // invoice payment status stays in sync; this view is read-only.

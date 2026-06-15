@@ -5,7 +5,7 @@ namespace App\Providers;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
-use Filament\Support\Enums\MaxWidth;
+use Filament\Support\Enums\Width;
 
 class FilamentPanelProvider extends PanelProvider
 {
@@ -34,7 +34,7 @@ class FilamentPanelProvider extends PanelProvider
             ->font('Inter')
             ->darkMode(true)
             ->sidebarCollapsibleOnDesktop()
-            ->maxContentWidth(MaxWidth::Full)
+            ->maxContentWidth(Width::Full)
             ->discoverResources(app_path('Filament/Resources'), 'App\\Filament\\Resources')
             ->discoverPages(app_path('Filament/Pages'), 'App\\Filament\\Pages');
     }

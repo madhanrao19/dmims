@@ -5,7 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\LicenseLogResource\Pages;
 use App\Models\LicenseLog;
 use Filament\Forms;
-use Filament\Forms\Form;
+use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
 
@@ -17,12 +17,12 @@ class LicenseLogResource extends BaseResource
 
     protected static ?string $permission = 'manage licensing';
 
-    protected static ?string $navigationGroup = 'Platform';
+    protected static string|\UnitEnum|null $navigationGroup = 'Platform';
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
+        return $schema
+            ->components([
                 Forms\Components\Select::make('customer_id')
                     ->relationship('customer', 'company_name')
                     ->searchable()

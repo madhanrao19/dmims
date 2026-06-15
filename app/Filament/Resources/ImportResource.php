@@ -5,8 +5,11 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\ImportResource\Pages;
 use App\Models\Import;
 use App\Services\ImportService;
+use Filament\Actions\Action;
+use Filament\Actions\DeleteAction;
 use Filament\Forms;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Support\Str;
@@ -19,9 +22,9 @@ class ImportResource extends BaseResource
 
     protected static ?string $permission = 'manage settings';
 
-    protected static ?string $navigationGroup = 'Platform';
+    protected static string|\UnitEnum|null $navigationGroup = 'Platform';
 
-    protected static ?string $navigationIcon = 'heroicon-o-arrow-down-on-square';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-arrow-down-on-square';
 
     public static function table(Table $table): Table
     {
@@ -54,10 +57,10 @@ class ImportResource extends BaseResource
                     ]),
             ])
             ->headerActions([
-                Tables\Actions\Action::make('newImport')
+                Action::make('newImport')
                     ->label('New Import')
                     ->icon('heroicon-o-plus')
-                    ->form([
+                    ->schema([
                         Forms\Components\Select::make('import_type')
                             ->label('Data to import')
                             ->options(collect(array_keys(ImportService::importableTypes()))
@@ -67,7 +70,7 @@ class ImportResource extends BaseResource
                             ->live(),
                         Forms\Components\Placeholder::make('expected_columns')
                             ->label('Expected CSV columns')
-                            ->content(function (Forms\Get $get): string {
+                            ->content(function (Get $get): string {
                                 $type = $get('import_type');
                                 $types = ImportService::importableTypes();
 
@@ -109,20 +112,20 @@ class ImportResource extends BaseResource
                         }
                     }),
             ])
-            ->actions([
-                Tables\Actions\Action::make('viewRows')
+            ->recordActions([
+                Action::make('viewRows')
                     ->label('Rows')
                     ->icon('heroicon-o-table-cells')
                     ->modalContent(fn (Import $record) => view('filament.import-rows', ['rows' => $record->rows()->orderBy('row_number')->limit(500)->get()]))
                     ->modalSubmitAction(false)
                     ->visible(fn (Import $record): bool => $record->rows()->exists()),
-                Tables\Actions\Action::make('downloadErrors')
+                Action::make('downloadErrors')
                     ->label('Errors')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->color('danger')
                     ->visible(fn (Import $record): bool => $record->failed_rows > 0)
                     ->action(fn (Import $record) => app(ImportService::class)->errorFileResponse($record)),
-                Tables\Actions\DeleteAction::make(),
+                DeleteAction::make(),
             ])
             ->defaultSort('created_at', 'desc');
     }

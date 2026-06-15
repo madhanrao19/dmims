@@ -6,7 +6,7 @@ use App\Filament\Resources\LocationTypeResource\Pages;
 use App\Http\Middleware\EnsureModuleEnabled;
 use App\Models\LocationType;
 use Filament\Forms;
-use Filament\Forms\Form;
+use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
 
@@ -18,16 +18,16 @@ class LocationTypeResource extends BaseResource
 
     protected static ?string $permission = 'manage inventory';
 
-    protected static ?string $navigationIcon = null;
+    protected static string|\BackedEnum|null $navigationIcon = null;
 
-    protected static ?string $navigationGroup = 'Locations';
+    protected static string|\UnitEnum|null $navigationGroup = 'Locations';
 
     protected static ?int $navigationSort = 2;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
+        return $schema
+            ->components([
                 Forms\Components\TextInput::make('type_code')->required()->maxLength(100),
                 Forms\Components\TextInput::make('type_name')->required()->maxLength(255),
                 Forms\Components\Textarea::make('description')->rows(3),

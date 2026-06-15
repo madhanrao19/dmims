@@ -5,7 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\SubscriptionPlanResource\Pages;
 use App\Models\SubscriptionPlan;
 use Filament\Forms;
-use Filament\Forms\Form;
+use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
 
@@ -15,16 +15,16 @@ class SubscriptionPlanResource extends BaseResource
 
     protected static ?string $permission = 'manage subscriptions';
 
-    protected static ?string $navigationIcon = null;
+    protected static string|\BackedEnum|null $navigationIcon = null;
 
-    protected static ?string $navigationGroup = 'Subscription';
+    protected static string|\UnitEnum|null $navigationGroup = 'Subscription';
 
     protected static ?int $navigationSort = 1;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
+        return $schema
+            ->components([
                 Forms\Components\TextInput::make('plan_code')->required()->maxLength(100),
                 Forms\Components\TextInput::make('plan_name')->required()->maxLength(255),
                 Forms\Components\Textarea::make('description')->rows(3),

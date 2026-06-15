@@ -7,8 +7,8 @@ use App\Services\ReportExportService;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Forms\Form;
 use Filament\Pages\Page;
+use Filament\Schemas\Schema;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -16,13 +16,13 @@ class Reports extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-chart-bar';
 
-    protected static ?string $navigationGroup = 'Shared Services';
+    protected static string|\UnitEnum|null $navigationGroup = 'Shared Services';
 
     protected static ?string $title = 'Reports';
 
-    protected static string $view = 'filament.pages.reports';
+    protected string $view = 'filament.pages.reports';
 
     public ?array $data = [];
 
@@ -47,15 +47,15 @@ class Reports extends Page implements HasForms
         $this->form->fill();
     }
 
-    public function form(Form $form): Form
+    public function form(Schema $schema): Schema
     {
         $options = [];
         foreach (ReportExportService::availableTo(auth()->user()) as $key => $def) {
             $options[$key] = "{$def['group']} — {$def['label']}";
         }
 
-        return $form
-            ->schema([
+        return $schema
+            ->components([
                 Select::make('report')
                     ->label('Report')
                     ->options($options)

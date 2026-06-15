@@ -5,6 +5,8 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\BackupResource\Pages;
 use App\Models\Backup;
 use App\Services\BackupService;
+use Filament\Actions\Action;
+use Filament\Actions\DeleteAction;
 use Filament\Notifications\Notification;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -19,9 +21,9 @@ class BackupResource extends BaseResource
 
     protected static ?string $permission = 'manage settings';
 
-    protected static ?string $navigationGroup = 'Platform';
+    protected static string|\UnitEnum|null $navigationGroup = 'Platform';
 
-    protected static ?string $navigationIcon = 'heroicon-o-circle-stack';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-circle-stack';
 
     public static function table(Table $table): Table
     {
@@ -56,7 +58,7 @@ class BackupResource extends BaseResource
                     ]),
             ])
             ->headerActions([
-                Tables\Actions\Action::make('runBackup')
+                Action::make('runBackup')
                     ->label('Run Database Backup')
                     ->icon('heroicon-o-play')
                     ->requiresConfirmation()
@@ -78,12 +80,12 @@ class BackupResource extends BaseResource
                         }
                     }),
             ])
-            ->actions([
-                Tables\Actions\Action::make('download')
+            ->recordActions([
+                Action::make('download')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->visible(fn (Backup $record): bool => $record->status === 'success' && filled($record->file_path))
                     ->action(fn (Backup $record): StreamedResponse => Storage::disk($record->storage_location ?? 'local')->download($record->file_path)),
-                Tables\Actions\Action::make('restore')
+                Action::make('restore')
                     ->icon('heroicon-o-arrow-uturn-left')
                     ->color('danger')
                     ->visible(fn (Backup $record): bool => in_array($record->status, ['success', 'restored'], true) && filled($record->file_path))
@@ -98,7 +100,7 @@ class BackupResource extends BaseResource
                             Notification::make()->title('Restore failed')->body($e->getMessage())->danger()->send();
                         }
                     }),
-                Tables\Actions\DeleteAction::make(),
+                DeleteAction::make(),
             ])
             ->defaultSort('created_at', 'desc');
     }

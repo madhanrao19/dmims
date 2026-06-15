@@ -6,7 +6,7 @@ use App\Filament\Resources\BarcodeRegistryResource\Pages;
 use App\Http\Middleware\EnsureModuleEnabled;
 use App\Models\BarcodeRegistry;
 use Filament\Forms;
-use Filament\Forms\Form;
+use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
 
@@ -20,16 +20,16 @@ class BarcodeRegistryResource extends BaseResource
 
     protected static ?string $permission = 'manage inventory';
 
-    protected static ?string $navigationIcon = null;
+    protected static string|\BackedEnum|null $navigationIcon = null;
 
-    protected static ?string $navigationGroup = 'Shared Services';
+    protected static string|\UnitEnum|null $navigationGroup = 'Shared Services';
 
     protected static ?int $navigationSort = 1;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
+        return $schema
+            ->components([
                 Forms\Components\Select::make('customer_id')
                     ->relationship('customer', 'company_name')
                     ->searchable()

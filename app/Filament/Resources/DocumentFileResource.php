@@ -8,9 +8,11 @@ use App\Http\Middleware\EnsureModuleEnabled;
 use App\Models\Box;
 use App\Models\DocumentFile;
 use App\Services\DocumentMovementService;
+use Filament\Actions\Action;
+use Filament\Actions\EditAction;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
 
@@ -26,16 +28,16 @@ class DocumentFileResource extends BaseResource
 
     protected static ?string $permission = 'manage documents';
 
-    protected static ?string $navigationIcon = null;
+    protected static string|\BackedEnum|null $navigationIcon = null;
 
-    protected static ?string $navigationGroup = 'Documents';
+    protected static string|\UnitEnum|null $navigationGroup = 'Documents';
 
     protected static ?int $navigationSort = 2;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
+        return $schema
+            ->components([
                 Forms\Components\Select::make('customer_id')
                     ->relationship('customer', 'company_name')
                     ->searchable()
@@ -83,12 +85,12 @@ class DocumentFileResource extends BaseResource
                 Tables\Columns\TextColumn::make('current_status')->sortable(),
                 Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable(),
             ])
-            ->actions([
-                Tables\Actions\Action::make('transferFile')
+            ->recordActions([
+                Action::make('transferFile')
                     ->label('Transfer')
                     ->icon('heroicon-o-arrows-right-left')
                     ->visible(fn (DocumentFile $record): bool => $record->current_status !== 'moved_out')
-                    ->form([
+                    ->schema([
                         Forms\Components\Select::make('to_box_id')->label('To box')
                             ->options(fn () => Box::query()->pluck('box_number', 'id')->all())->searchable()->required(),
                         Forms\Components\Textarea::make('remarks'),
@@ -97,12 +99,12 @@ class DocumentFileResource extends BaseResource
                         app(DocumentMovementService::class)->transferFile($record, (int) $data['to_box_id'], $data);
                         Notification::make()->title('File transferred')->success()->send();
                     }),
-                Tables\Actions\Action::make('moveOutFile')
+                Action::make('moveOutFile')
                     ->label('Move Out')
                     ->icon('heroicon-o-arrow-up-tray')
                     ->color('danger')
                     ->visible(fn (DocumentFile $record): bool => $record->current_status !== 'moved_out')
-                    ->form([
+                    ->schema([
                         Forms\Components\TextInput::make('destination')->label('External destination')->required(),
                         Forms\Components\Textarea::make('remarks'),
                     ])
@@ -110,12 +112,12 @@ class DocumentFileResource extends BaseResource
                         app(DocumentMovementService::class)->moveOutFile($record, $data['destination'], $data);
                         Notification::make()->title('File moved out')->success()->send();
                     }),
-                Tables\Actions\Action::make('returnFile')
+                Action::make('returnFile')
                     ->label('Return')
                     ->icon('heroicon-o-arrow-uturn-left')
                     ->color('success')
                     ->visible(fn (DocumentFile $record): bool => $record->current_status === 'moved_out')
-                    ->form([
+                    ->schema([
                         Forms\Components\Select::make('to_box_id')->label('Return to box')
                             ->options(fn () => Box::query()->pluck('box_number', 'id')->all())->searchable()->required(),
                         Forms\Components\Textarea::make('remarks'),
@@ -124,7 +126,7 @@ class DocumentFileResource extends BaseResource
                         app(DocumentMovementService::class)->returnFile($record, (int) $data['to_box_id'], $data);
                         Notification::make()->title('File returned')->success()->send();
                     }),
-                Tables\Actions\EditAction::make(),
+                EditAction::make(),
                 static::barcodeAction(),
             ])
             ->defaultSort('created_at', 'desc');

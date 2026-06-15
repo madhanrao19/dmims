@@ -8,9 +8,13 @@ use App\Http\Middleware\EnsureModuleEnabled;
 use App\Models\BillingRecord;
 use App\Services\BillingService;
 use App\Services\PaymentService;
+use Filament\Actions\Action;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
 
@@ -22,15 +26,15 @@ class BillingRecordResource extends BaseResource
 
     protected static ?string $permission = 'manage billing';
 
-    protected static ?string $navigationGroup = 'Billing';
+    protected static string|\UnitEnum|null $navigationGroup = 'Billing';
 
-    protected static ?string $navigationIcon = 'heroicon-o-banknotes';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-banknotes';
 
     protected static ?string $modelLabel = 'Invoice';
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form->schema([
+        return $schema->components([
             Forms\Components\Select::make('customer_id')
                 ->relationship('customer', 'company_name')
                 ->searchable()
@@ -46,7 +50,7 @@ class BillingRecordResource extends BaseResource
                 ->numeric()->default(0)->prefix('RM')->live(onBlur: true),
             Forms\Components\Placeholder::make('total_preview')
                 ->label('Total')
-                ->content(fn (Forms\Get $get): string => 'RM '.number_format((float) $get('amount') + (float) $get('tax_amount'), 2)),
+                ->content(fn (Get $get): string => 'RM '.number_format((float) $get('amount') + (float) $get('tax_amount'), 2)),
             Forms\Components\Select::make('billing_status')
                 ->options(['draft' => 'Draft', 'issued' => 'Issued', 'cancelled' => 'Cancelled'])
                 ->default('draft')->required(),
@@ -84,12 +88,12 @@ class BillingRecordResource extends BaseResource
                 Tables\Filters\SelectFilter::make('payment_status')
                     ->options(['unpaid' => 'Unpaid', 'partial' => 'Partial', 'paid' => 'Paid']),
             ])
-            ->actions([
-                Tables\Actions\Action::make('recordPayment')
+            ->recordActions([
+                Action::make('recordPayment')
                     ->icon('heroicon-o-banknotes')
                     ->color('success')
                     ->visible(fn (BillingRecord $record): bool => $record->billing_status !== 'cancelled' && $record->payment_status !== 'paid')
-                    ->form([
+                    ->schema([
                         Forms\Components\TextInput::make('amount')
                             ->numeric()->required()->prefix('RM')
                             ->default(fn (BillingRecord $record): float => $record->outstandingAmount()),
@@ -104,7 +108,7 @@ class BillingRecordResource extends BaseResource
                         app(PaymentService::class)->recordPayment($record, $data);
                         Notification::make()->title('Payment recorded')->success()->send();
                     }),
-                Tables\Actions\Action::make('issue')
+                Action::make('issue')
                     ->icon('heroicon-o-paper-airplane')
                     ->visible(fn (BillingRecord $record): bool => $record->billing_status === 'draft')
                     ->requiresConfirmation()
@@ -112,7 +116,7 @@ class BillingRecordResource extends BaseResource
                         app(BillingService::class)->issue($record);
                         Notification::make()->title('Invoice issued')->success()->send();
                     }),
-                Tables\Actions\Action::make('cancel')
+                Action::make('cancel')
                     ->icon('heroicon-o-x-circle')
                     ->color('danger')
                     ->visible(fn (BillingRecord $record): bool => $record->billing_status !== 'cancelled')
@@ -121,8 +125,8 @@ class BillingRecordResource extends BaseResource
                         app(BillingService::class)->cancel($record);
                         Notification::make()->title('Invoice cancelled')->warning()->send();
                     }),
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
+                ViewAction::make(),
+                EditAction::make(),
             ])
             ->defaultSort('created_at', 'desc');
     }
