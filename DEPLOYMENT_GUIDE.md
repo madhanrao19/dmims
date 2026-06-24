@@ -1,6 +1,8 @@
 # Production Deployment Guide — Ubuntu 24 Server
 
-Complete step-by-step instructions to deploy the DMIMS (Laravel 13 + Filament 5) application.
+Complete step-by-step instructions to deploy the DMIMS (Laravel 13 + Filament 5) application using
+**MySQL**, **Apache**, and a **Cloudflare Tunnel** (no public IP / port-forwarding required, no
+Let's Encrypt needed — Cloudflare terminates TLS at the edge).
 
 ---
 
@@ -17,7 +19,7 @@ sudo add-apt-repository -y ppa:ondrej/php
 sudo apt update
 
 # Install PHP 8.4 + extensions (sqlite3 for local/testing; fileinfo is bundled)
-sudo apt install -y php8.4-cli php8.4-fpm php8.4-mysql php8.4-pgsql php8.4-mbstring \
+sudo apt install -y php8.4-cli php8.4-fpm php8.4-mysql php8.4-mbstring \
   php8.4-xml php8.4-bcmath php8.4-curl php8.4-zip php8.4-gd php8.4-intl \
   php8.4-sqlite3 php8.4-redis php8.4-memcached
 
@@ -29,15 +31,11 @@ php -v   # must report 8.4.x
 curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 composer --version
 
-# Install a web server — choose ONE (configured in Part 7):
-sudo apt install -y nginx          # Option A (default in this guide)
-# sudo apt install -y apache2      # Option B (see Part 7, Option B)
+# Install Apache (configured in Part 7)
+sudo apt install -y apache2
 
-# Install PostgreSQL (if using PostgreSQL) OR MySQL
-# Option A: PostgreSQL
-sudo apt install -y postgresql postgresql-contrib
-# Option B: MySQL
-# sudo apt install -y mysql-server
+# Install MySQL
+sudo apt install -y mysql-server
 
 # Install Node.js & npm (Vite 8 requires Node 20.19+/22+; use the 22 LTS line)
 curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
@@ -53,29 +51,8 @@ sudo usermod -aG www-data appuser
 
 ---
 
-## **PART 2: DATABASE SETUP**
+## **PART 2: DATABASE SETUP (MySQL)**
 
-### Option A: PostgreSQL (Recommended for Laravel)
-```bash
-# Switch to postgres user
-sudo su - postgres
-
-# Create database and user
-psql << EOF
-CREATE DATABASE dmims_production;
-CREATE USER dmims_user WITH PASSWORD 'your_secure_password_here';
-ALTER ROLE dmims_user SET client_encoding TO 'utf8';
-ALTER ROLE dmims_user SET default_transaction_isolation TO 'read committed';
-ALTER ROLE dmims_user SET default_transaction_deferrable TO on;
-ALTER ROLE dmims_user SET default_transaction_read_committed TO on;
-GRANT ALL PRIVILEGES ON DATABASE dmims_production TO dmims_user;
-\q
-EOF
-
-exit  # Exit postgres user
-```
-
-### Option B: MySQL
 ```bash
 sudo mysql -u root << EOF
 CREATE DATABASE dmims_production;
@@ -90,26 +67,27 @@ EOF
 
 ## **PART 3: DEPLOY APPLICATION CODE**
 
-### 3.1 Clone/Copy application
+### 3.1 Create the app directory
 ```bash
-# Create app directory
 sudo mkdir -p /var/www/dmims
 sudo chown appuser:www-data /var/www/dmims
-cd /var/www/dmims
+```
 
-# Option A: Clone from Git (if repo is public/you have SSH keys)
-sudo -u appuser git clone https://your-repo-url.git .
+### 3.2 Copy from local machine (SCP)
+Open PowerShell **on your Windows machine** and run:
+```powershell
+scp -r "d:\Dev\IMS\Source Code\dmims-code\*" appuser@YOUR_SERVER_IP:/var/www/dmims/
+```
+See the **Quick Reference: SCP Copy Command** section below for a port-specific variant and for
+copying only specific folders (useful for incremental updates).
 
-# Option B: Copy from local machine (SCP from your Windows machine)
-# Open PowerShell on your local machine and run:
-# scp -r "d:\Dev\IMS\Source Code\dmims-code\*" appuser@YOUR_SERVER_IP:/var/www/dmims/
-
-# Then SSH into the server and continue:
+Then SSH into the server and continue from there:
+```bash
 ssh appuser@YOUR_SERVER_IP
 cd /var/www/dmims
 ```
 
-### 3.2 Set permissions
+### 3.3 Set permissions
 ```bash
 sudo chown -R appuser:www-data /var/www/dmims
 sudo chmod -R 755 /var/www/dmims
@@ -157,9 +135,9 @@ APP_DEBUG=false
 APP_URL=https://your-domain.com
 
 # Database
-DB_CONNECTION=pgsql  # or mysql
+DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
-DB_PORT=5432         # 5432 for PostgreSQL, 3306 for MySQL
+DB_PORT=3306
 DB_DATABASE=dmims_production
 DB_USERNAME=dmims_user
 DB_PASSWORD=your_secure_password_here
@@ -178,13 +156,18 @@ SESSION_DRIVER=file
 CACHE_DRIVER=file
 QUEUE_CONNECTION=database
 
-# Session cookie hardening (the site is served over HTTPS)
-SESSION_SECURE_COOKIE=true
-SESSION_SAME_SITE=lax
-
-# Trust Cloudflare/Nginx forwarded headers so HTTPS and the real client IP are
-# detected correctly (required for secure cookies and accurate audit logs)
+# Trust Cloudflare's forwarded headers so HTTPS and the real client IP are
+# detected correctly behind the tunnel (required for accurate audit logs)
 TRUSTED_PROXIES=*
+
+# This server is reached two ways: through the Cloudflare Tunnel (HTTPS,
+# public hostname) AND directly via the machine's localhost/LAN IP (plain
+# HTTP, Apache only — no cert installed locally). Because the site is not
+# *always* HTTPS, leave SESSION_SECURE_COOKIE=false; otherwise the session
+# cookie won't be sent on the plain-HTTP localhost path and login will
+# silently fail there. Cloudflare's edge TLS still protects the public URL.
+SESSION_SECURE_COOKIE=false
+SESSION_SAME_SITE=lax
 ```
 
 > **Mail is required for password resets.** The admin panel exposes a
@@ -221,108 +204,24 @@ sudo -u appuser php artisan dmims:create-admin admin@your-domain.com --name="Adm
 > a production install.
 
 > Database backups can be taken from the admin panel (Platform → Backups → "Run Database Backup")
-> or scheduled via the cron job in Part 13. For MySQL, ensure the `mysqldump` and `mysql`
+> or scheduled via the cron job in Part 13. Ensure the `mysqldump` and `mysql`
 > binaries are on the PATH of the user running PHP-FPM/queue workers.
 
 ---
 
-## **PART 7: CONFIGURE WEB SERVER**
-
-Use **either** Nginx (Option A) or Apache (Option B) — not both. Both serve the
-app's `public/` directory and proxy PHP to PHP-FPM 8.4.
-
-### Option A — Nginx
-
-#### 7.1 Create Nginx server block
-```bash
-sudo nano /etc/nginx/sites-available/dmims
-```
-
-**Paste this configuration:**
-```nginx
-server {
-    listen 80;
-    listen [::]:80;
-    server_name your-domain.com www.your-domain.com;
-    root /var/www/dmims/public;
-    index index.php index.html;
-
-    # Redirect HTTP to HTTPS
-    return 301 https://$server_name$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
-    server_name your-domain.com www.your-domain.com;
-    root /var/www/dmims/public;
-    index index.php index.html index.htm;
-
-    # SSL Certificate (use Let's Encrypt after setup)
-    ssl_certificate /etc/letsencrypt/live/your-domain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;
-
-    # Performance
-    client_max_body_size 100M;
-    fastcgi_read_timeout 300s;
-
-    # Logs
-    access_log /var/log/nginx/dmims_access.log;
-    error_log /var/log/nginx/dmims_error.log;
-
-    # Laravel rewrite
-    location / {
-        try_files $uri $uri/ /index.php?$query_string;
-    }
-
-    # PHP-FPM
-    location ~ \.php$ {
-        try_files $uri =404;
-        fastcgi_split_path_info ^(.+\.php)(/.+)$;
-        fastcgi_pass unix:/run/php/php8.4-fpm.sock;
-        fastcgi_index index.php;
-        include fastcgi_params;
-        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
-        fastcgi_param PATH_INFO $fastcgi_path_info;
-    }
-
-    # Static assets caching
-    location ~* \.(jpg|jpeg|png|gif|ico|css|js|svg|woff|woff2|ttf|eot)$ {
-        expires 30d;
-        add_header Cache-Control "public, immutable";
-    }
-
-    # Deny access to sensitive files
-    location ~ /\. {
-        deny all;
-    }
-    location ~ /composer.json {
-        deny all;
-    }
-}
-```
-
-#### 7.2 Enable the site
-```bash
-sudo ln -s /etc/nginx/sites-available/dmims /etc/nginx/sites-enabled/
-sudo nginx -t  # Test configuration
-sudo systemctl restart nginx
-```
-
-### Option B — Apache
+## **PART 7: CONFIGURE APACHE**
 
 Laravel ships a `public/.htaccess` with the rewrite rules, so Apache only needs
-`mod_rewrite` plus the PHP-FPM proxy.
+`mod_rewrite` plus the PHP-FPM proxy. Apache listens on plain **port 80 only** —
+TLS is terminated by Cloudflare at the edge (Part 9), so there is no certificate
+to install on this server.
 
-#### 7.3 Install Apache and enable modules
+### 7.1 Install Apache and enable modules
 ```bash
-sudo apt install -y apache2
-sudo a2enmod rewrite proxy proxy_fcgi setenvif ssl headers expires http2
-# Free port 80/443 if Nginx was installed earlier:
-sudo systemctl disable --now nginx 2>/dev/null || true
+sudo a2enmod rewrite proxy proxy_fcgi setenvif headers expires
 ```
 
-#### 7.4 Create the virtual host
+### 7.2 Create the virtual host
 ```bash
 sudo nano /etc/apache2/sites-available/dmims.conf
 ```
@@ -330,20 +229,11 @@ sudo nano /etc/apache2/sites-available/dmims.conf
 **Paste this configuration:**
 ```apache
 <VirtualHost *:80>
+    # Cloudflare Tunnel forwards your public hostname here; the same vhost
+    # also answers on localhost/the machine's LAN IP for local access.
     ServerName your-domain.com
-    ServerAlias www.your-domain.com
-    # Redirect HTTP to HTTPS
-    Redirect permanent / https://your-domain.com/
-</VirtualHost>
-
-<VirtualHost *:443>
-    ServerName your-domain.com
-    ServerAlias www.your-domain.com
+    ServerAlias localhost 127.0.0.1
     DocumentRoot /var/www/dmims/public
-
-    SSLEngine on
-    SSLCertificateFile /etc/letsencrypt/live/your-domain.com/fullchain.pem
-    SSLCertificateKeyFile /etc/letsencrypt/live/your-domain.com/privkey.pem
 
     <Directory /var/www/dmims/public>
         AllowOverride All           # required so public/.htaccess handles routing
@@ -370,7 +260,7 @@ sudo nano /etc/apache2/sites-available/dmims.conf
 </VirtualHost>
 ```
 
-#### 7.5 Enable the site
+### 7.3 Enable the site
 ```bash
 sudo a2dissite 000-default.conf
 sudo a2ensite dmims.conf
@@ -404,28 +294,60 @@ sudo systemctl restart php8.4-fpm
 
 ---
 
-## **PART 9: SETUP SSL CERTIFICATE (Let's Encrypt)**
+## **PART 9: EXPOSE THE SITE VIA CLOUDFLARE TUNNEL (TLS)**
 
-**If using Nginx (Option A):**
+This server has no fixed public IP, so instead of port-forwarding + Let's Encrypt,
+`cloudflared` opens an outbound connection to Cloudflare and proxies your public
+hostname to Apache on `localhost:80`. Cloudflare issues and renews the TLS
+certificate for you — nothing to install or renew on this server.
+
+### 9.1 Install cloudflared
 ```bash
-sudo apt install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d your-domain.com -d www.your-domain.com
-sudo nginx -t && sudo systemctl reload nginx
+curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo gpg --yes --dearmor -o /usr/share/keyrings/cloudflare-main.gpg
+echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/cloudflared.list
+sudo apt update && sudo apt install -y cloudflared
 ```
 
-**If using Apache (Option B):**
+### 9.2 Authenticate and create the tunnel
 ```bash
-sudo apt install -y certbot python3-certbot-apache
-sudo certbot --apache -d your-domain.com -d www.your-domain.com
-sudo apache2ctl configtest && sudo systemctl reload apache2
+# Opens a browser link — log in to the Cloudflare account that owns your-domain.com
+cloudflared tunnel login
+
+# Creates a named tunnel and a credentials file under ~/.cloudflared/
+cloudflared tunnel create dmims
 ```
 
-**Auto-renewal (both):**
+### 9.3 Configure the tunnel
 ```bash
-sudo systemctl enable certbot.timer
-sudo systemctl start certbot.timer
-sudo certbot renew --dry-run   # verify renewal works
+sudo mkdir -p /etc/cloudflared
+sudo nano /etc/cloudflared/config.yml
 ```
+
+**Paste (replace `TUNNEL_ID` with the UUID printed by `tunnel create`):**
+```yaml
+tunnel: TUNNEL_ID
+credentials-file: /root/.cloudflared/TUNNEL_ID.json
+
+ingress:
+  - hostname: your-domain.com
+    service: http://localhost:80
+  - service: http_status:404
+```
+
+### 9.4 Route DNS and install as a service
+```bash
+# Creates the CNAME record in Cloudflare DNS for your-domain.com
+cloudflared tunnel route dns dmims your-domain.com
+
+# Run the tunnel as a persistent systemd service (auto-starts on boot)
+sudo cloudflared service install
+sudo systemctl enable --now cloudflared
+sudo systemctl status cloudflared
+```
+
+> In the Cloudflare dashboard, set the SSL/TLS mode for the zone to **Full** (or
+> **Flexible**, since Apache here serves plain HTTP) so the edge-to-tunnel hop
+> isn't rejected. No certificate files are needed on this server either way.
 
 ---
 
@@ -507,9 +429,12 @@ php artisan tinker
 # In tinker: DB::connection()->getPdo(); (should not error)
 # exit;
 
-# Check Nginx
+# Check Apache directly on this machine (plain HTTP, no cert needed)
 curl http://localhost
-curl -I https://your-domain.com  # Should return 200
+curl http://127.0.0.1
+
+# Check the public hostname through the Cloudflare Tunnel (TLS terminated at the edge)
+curl -I https://your-domain.com   # Should return 200
 ```
 
 ---
@@ -530,8 +455,9 @@ DATE=$(date +%Y%m%d_%H%M%S)
 # Create backup directory
 mkdir -p $BACKUP_DIR
 
-# Backup database
-pg_dump -U dmims_user dmims_production | gzip > $BACKUP_DIR/db_$DATE.sql.gz
+# Backup database (put credentials in /root/.my.cnf instead of inline -p
+# if you'd rather not have the password appear in `ps`/shell history)
+mysqldump -u dmims_user -p'your_secure_password_here' dmims_production | gzip > $BACKUP_DIR/db_$DATE.sql.gz
 
 # Backup uploads/storage
 tar -czf $BACKUP_DIR/storage_$DATE.tar.gz /var/www/dmims/storage/app
@@ -577,19 +503,20 @@ scp "d:\Dev\IMS\Source Code\dmims-code\package.json" appuser@YOUR_SERVER_IP:/var
 
 ## **DEPLOYMENT CHECKLIST**
 
-- [ ] Server prepared (PHP, Composer, Nginx, DB installed)
-- [ ] Database created with user/password
-- [ ] Source code copied to `/var/www/dmims`
+- [ ] Server prepared (PHP 8.4, Composer, Apache, MySQL, Node, Supervisor installed)
+- [ ] MySQL database created with user/password
+- [ ] Source code copied to `/var/www/dmims` via SCP
 - [ ] Permissions set correctly
-- [ ] Composer dependencies installed
-- [ ] .env configured with production settings
+- [ ] Composer & npm dependencies installed; `filament:assets` published
+- [ ] .env configured with production settings (MySQL, `SESSION_SECURE_COOKIE=false`, `TRUSTED_PROXIES=*`)
 - [ ] Application key generated
-- [ ] Database migrations run
-- [ ] Nginx configured and SSL enabled
+- [ ] Database migrations & seeders run; first admin created
+- [ ] Apache vhost configured (port 80 only) and enabled
 - [ ] PHP-FPM restarted
+- [ ] Cloudflare Tunnel installed, authenticated, routed to your-domain.com, running as a service
 - [ ] Cron job added for scheduler
 - [ ] Queue worker configured (if needed)
-- [ ] Site accessible via HTTPS
+- [ ] Site accessible via `https://your-domain.com` (tunnel) **and** `http://localhost` (direct)
 - [ ] Tests passing on server: `php artisan test`
 - [ ] Backups configured
 
@@ -599,17 +526,16 @@ scp "d:\Dev\IMS\Source Code\dmims-code\package.json" appuser@YOUR_SERVER_IP:/var
 
 **Check error logs:**
 ```bash
-tail -f /var/log/nginx/dmims_error.log      # Nginx (Option A)
-tail -f /var/log/apache2/dmims_error.log    # Apache (Option B)
+tail -f /var/log/apache2/dmims_error.log
 tail -f /var/www/dmims/storage/logs/laravel.log
+journalctl -u cloudflared -f               # Cloudflare Tunnel connection issues
 ```
 
 **Restart services:**
 ```bash
-# Web server — whichever you installed:
-sudo systemctl restart nginx        # Option A
-sudo systemctl restart apache2      # Option B
-sudo systemctl restart php8.4-fpm postgresql
+sudo systemctl restart apache2
+sudo systemctl restart php8.4-fpm mysql
+sudo systemctl restart cloudflared
 ```
 
 **SSH as appuser:**

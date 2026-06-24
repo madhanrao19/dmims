@@ -1,21 +1,25 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Deploy script for Ubuntu Server 24.04 - Laravel + Vite + PWA
+# Deploy script for Ubuntu Server 24.04 - Laravel 13 / Filament 5 / PHP 8.4
+# Stack: MySQL + Apache + Cloudflare Tunnel (no public IP / port-forwarding,
+# no Let's Encrypt cert on this box — TLS is terminated by Cloudflare).
+# Mirrors DEPLOYMENT_GUIDE.md.
+#
 # Usage:
 #   sudo ./deploy-ubuntu-24.sh --repo-dir /var/www/dmims-code --domain example.com --repo-url https://github.com/your/repo.git
 
 REPO_DIR="/var/www/dmims-code"
 REPO_URL=""
 APP_DOMAIN=""
-DB_DRIVER="mysql"
 DB_HOST="127.0.0.1"
 DB_PORT="3306"
 DB_DATABASE="dmims"
 DB_USERNAME="dmims"
 DB_PASSWORD=""
-SKIP_NGINX="false"
+SKIP_APACHE="false"
 SKIP_QUEUE="false"
+SKIP_TUNNEL="false"
 
 function usage() {
   cat <<EOF
@@ -24,15 +28,15 @@ Usage: sudo $0 [options]
 Options:
   --repo-dir DIR       Repository directory (default: /var/www/dmims-code)
   --repo-url URL       Git repository URL (required if repo directory does not exist)
-  --domain DOMAIN      Application domain (required)
-  --db-driver DRIVER   Database driver (mysql|pgsql|sqlite) default: mysql
-  --db-host HOST       Database host default: 127.0.0.1
-  --db-port PORT       Database port default: 3306
+  --domain DOMAIN      Application domain, e.g. dmims.example.com (required)
+  --db-host HOST       MySQL host default: 127.0.0.1
+  --db-port PORT       MySQL port default: 3306
   --db-database NAME   Database name default: dmims
   --db-username USER   Database user default: dmims
   --db-password PASS   Database password default: empty
-  --skip-nginx         Do not configure nginx
+  --skip-apache        Do not configure Apache
   --skip-queue         Do not configure queue worker service
+  --skip-tunnel        Do not install/configure cloudflared
   -h, --help           Show this help
 EOF
   exit 1
@@ -40,19 +44,19 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --repo-dir) REPO_DIR="$2"; shift 2 ;; 
-    --repo-url) REPO_URL="$2"; shift 2 ;; 
-    --domain) APP_DOMAIN="$2"; shift 2 ;; 
-    --db-driver) DB_DRIVER="$2"; shift 2 ;; 
-    --db-host) DB_HOST="$2"; shift 2 ;; 
-    --db-port) DB_PORT="$2"; shift 2 ;; 
-    --db-database) DB_DATABASE="$2"; shift 2 ;; 
-    --db-username) DB_USERNAME="$2"; shift 2 ;; 
-    --db-password) DB_PASSWORD="$2"; shift 2 ;; 
-    --skip-nginx) SKIP_NGINX="true"; shift ;; 
-    --skip-queue) SKIP_QUEUE="true"; shift ;; 
-    -h|--help) usage ;; 
-    *) echo "Unknown option: $1" >&2; usage ;; 
+    --repo-dir) REPO_DIR="$2"; shift 2 ;;
+    --repo-url) REPO_URL="$2"; shift 2 ;;
+    --domain) APP_DOMAIN="$2"; shift 2 ;;
+    --db-host) DB_HOST="$2"; shift 2 ;;
+    --db-port) DB_PORT="$2"; shift 2 ;;
+    --db-database) DB_DATABASE="$2"; shift 2 ;;
+    --db-username) DB_USERNAME="$2"; shift 2 ;;
+    --db-password) DB_PASSWORD="$2"; shift 2 ;;
+    --skip-apache) SKIP_APACHE="true"; shift ;;
+    --skip-queue) SKIP_QUEUE="true"; shift ;;
+    --skip-tunnel) SKIP_TUNNEL="true"; shift ;;
+    -h|--help) usage ;;
+    *) echo "Unknown option: $1" >&2; usage ;;
   esac
 done
 
@@ -68,16 +72,18 @@ fi
 
 function install_packages() {
   apt-get update
-  apt-get install -y nginx git curl unzip software-properties-common
-  apt-get install -y php8.3 php8.3-fpm php8.3-cli php8.3-mbstring php8.3-xml php8.3-curl php8.3-zip php8.3-gd php8.3-intl php8.3-bcmath php8.3-sqlite3
+  apt-get install -y apache2 git curl unzip software-properties-common
 
-  if [[ "$DB_DRIVER" == "mysql" ]]; then
-    apt-get install -y mariadb-client
-  elif [[ "$DB_DRIVER" == "pgsql" ]]; then
-    apt-get install -y postgresql-client
-  fi
+  # Ubuntu 24.04 ships PHP 8.3; this app requires PHP 8.4 (Laravel 13 + Filament 5).
+  add-apt-repository -y ppa:ondrej/php
+  apt-get update
+  apt-get install -y php8.4 php8.4-fpm php8.4-cli php8.4-mysql php8.4-mbstring \
+    php8.4-xml php8.4-curl php8.4-zip php8.4-gd php8.4-intl php8.4-bcmath php8.4-sqlite3
+  update-alternatives --set php /usr/bin/php8.4
 
-  curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  apt-get install -y mysql-server
+
+  curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
   apt-get install -y nodejs build-essential
 }
 
@@ -103,6 +109,7 @@ function install_app_dependencies() {
   composer install --no-dev --optimize-autoloader
   npm ci
   npm run build
+  php artisan filament:assets
 }
 
 function configure_env() {
@@ -116,13 +123,28 @@ function configure_env() {
   sed -i "s|APP_ENV=.*|APP_ENV=production|" .env
   sed -i "s|APP_DEBUG=.*|APP_DEBUG=false|" .env
   sed -i "s|APP_URL=.*|APP_URL=https://$APP_DOMAIN|" .env
-  sed -i "s|DB_CONNECTION=.*|DB_CONNECTION=$DB_DRIVER|" .env
+  sed -i "s|DB_CONNECTION=.*|DB_CONNECTION=mysql|" .env
   sed -i "s|DB_HOST=.*|DB_HOST=$DB_HOST|" .env
   sed -i "s|DB_PORT=.*|DB_PORT=$DB_PORT|" .env
   sed -i "s|DB_DATABASE=.*|DB_DATABASE=$DB_DATABASE|" .env
   sed -i "s|DB_USERNAME=.*|DB_USERNAME=$DB_USERNAME|" .env
   if [[ -n "$DB_PASSWORD" ]]; then
     sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=$DB_PASSWORD|" .env
+  fi
+
+  if grep -q "^TRUSTED_PROXIES=" .env; then
+    sed -i "s|TRUSTED_PROXIES=.*|TRUSTED_PROXIES=*|" .env
+  else
+    echo "TRUSTED_PROXIES=*" >> .env
+  fi
+
+  # Reachable both via the Cloudflare Tunnel (HTTPS) and directly on
+  # localhost/LAN IP (plain HTTP, no cert on this box) — a forced secure
+  # cookie would break login on the plain-HTTP path. See DEPLOYMENT_GUIDE.md.
+  if grep -q "^SESSION_SECURE_COOKIE=" .env; then
+    sed -i "s|SESSION_SECURE_COOKIE=.*|SESSION_SECURE_COOKIE=false|" .env
+  else
+    echo "SESSION_SECURE_COOKIE=false" >> .env
   fi
 }
 
@@ -145,52 +167,55 @@ function fix_permissions() {
   find "$REPO_DIR/bootstrap/cache" -type d -exec chmod 2775 {} \;
 }
 
-function nginx_config() {
-  if [[ "$SKIP_NGINX" == "true" ]]; then
-    echo "Skipping nginx config.";
+function apache_config() {
+  if [[ "$SKIP_APACHE" == "true" ]]; then
+    echo "Skipping Apache config.";
     return
   fi
 
-  local site_conf="/etc/nginx/sites-available/dmims"
+  a2enmod rewrite proxy proxy_fcgi setenvif headers expires
+
+  local site_conf="/etc/apache2/sites-available/dmims.conf"
   cat > "$site_conf" <<EOF
-server {
-    listen 80;
-    server_name $APP_DOMAIN www.$APP_DOMAIN;
-    root $REPO_DIR/public;
-    index index.php index.html;
+<VirtualHost *:80>
+    # Cloudflare Tunnel forwards \$APP_DOMAIN here; the same vhost also
+    # answers on localhost/the machine's LAN IP for local access (no cert
+    # needed here — TLS is terminated by Cloudflare).
+    ServerName $APP_DOMAIN
+    ServerAlias localhost 127.0.0.1
+    DocumentRoot $REPO_DIR/public
 
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header Referrer-Policy "no-referrer-when-downgrade" always;
+    <Directory $REPO_DIR/public>
+        AllowOverride All
+        Require all granted
+        Options -Indexes +FollowSymLinks
+    </Directory>
 
-    location / {
-        try_files \$uri \$uri/ /index.php?\$query_string;
-    }
+    <FilesMatch \.php\$>
+        SetHandler "proxy:unix:/run/php/php8.4-fpm.sock|fcgi://localhost"
+    </FilesMatch>
 
-    location = /service-worker.js { try_files \$uri =404; }
-    location = /sw-register.js { try_files \$uri =404; }
-    location = /manifest.webmanifest { try_files \$uri =404; }
-    location = /offline.html { try_files \$uri =404; }
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Referrer-Policy "no-referrer-when-downgrade"
 
-    location ~ \.php$ {
-        include fastcgi_params;
-        fastcgi_pass unix:/run/php/php8.3-fpm.sock;
-        fastcgi_param SCRIPT_FILENAME \$realpath_root\$fastcgi_script_name;
-        fastcgi_index index.php;
-    }
+    <IfModule mod_expires.c>
+        ExpiresActive On
+        <FilesMatch "\.(css|js|jpg|jpeg|gif|png|svg|webp|woff2?|ttf|ico)\$">
+            ExpiresDefault "access plus 7 days"
+            Header set Cache-Control "public, must-revalidate, proxy-revalidate"
+        </FilesMatch>
+    </IfModule>
 
-    location ~* \.(?:css|js|jpg|jpeg|gif|png|svg|webp|woff2|woff|ttf|ico)$ {
-        try_files \$uri =404;
-        access_log off;
-        expires 7d;
-        add_header Cache-Control "public, must-revalidate, proxy-revalidate";
-    }
-}
+    ErrorLog \${APACHE_LOG_DIR}/dmims_error.log
+    CustomLog \${APACHE_LOG_DIR}/dmims_access.log combined
+</VirtualHost>
 EOF
 
-  ln -sf "$site_conf" /etc/nginx/sites-enabled/dmims
-  nginx -t
-  systemctl reload nginx
+  a2dissite 000-default.conf || true
+  a2ensite dmims.conf
+  apache2ctl configtest
+  systemctl restart apache2
 }
 
 function queue_service() {
@@ -220,6 +245,31 @@ EOF
   systemctl enable --now dmims-worker
 }
 
+function tunnel_setup() {
+  if [[ "$SKIP_TUNNEL" == "true" ]]; then
+    echo "Skipping cloudflared install.";
+    return
+  fi
+
+  if ! command -v cloudflared >/dev/null 2>&1; then
+    echo "Installing cloudflared..."
+    curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | gpg --yes --dearmor -o /usr/share/keyrings/cloudflare-main.gpg
+    echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) main" > /etc/apt/sources.list.d/cloudflared.list
+    apt-get update
+    apt-get install -y cloudflared
+  fi
+
+  echo
+  echo "cloudflared is installed but NOT configured — tunnel login/create needs"
+  echo "an interactive browser auth step, so finish it manually:"
+  echo "  cloudflared tunnel login"
+  echo "  cloudflared tunnel create dmims"
+  echo "  # write /etc/cloudflared/config.yml mapping $APP_DOMAIN -> http://localhost:80"
+  echo "  cloudflared tunnel route dns dmims $APP_DOMAIN"
+  echo "  cloudflared service install && systemctl enable --now cloudflared"
+  echo "See DEPLOYMENT_GUIDE.md Part 9 for the full config.yml example."
+}
+
 function main() {
   install_packages
   clone_repo
@@ -228,11 +278,13 @@ function main() {
   storage_and_db
   optimize_app
   fix_permissions
-  nginx_config
+  apache_config
   queue_service
+  tunnel_setup
 
-  echo "Deployment complete. Verify https://$APP_DOMAIN in your browser."
-  echo "Remember to install TLS using certbot or another certificate manager."
+  echo "Deployment complete."
+  echo "Verify locally: curl http://localhost"
+  echo "Then finish the Cloudflare Tunnel setup above to expose https://$APP_DOMAIN."
 }
 
 main
