@@ -19,8 +19,8 @@ jobs:
 
       # CodeQL does not support PHP; this scans the front-end JS only.
       # PHP-side coverage instead comes from `composer audit` in ci.yml.
-      - uses: github/codeql-action/init@v3
+      - uses: github/codeql-action/init@v4
         with:
           languages: javascript-typescript
 
-      - uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/analyze@v4
