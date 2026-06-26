@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\BackupResource\Pages;
+use App\Jobs\RunDatabaseBackup;
 use App\Models\Backup;
 use App\Services\BackupService;
 use Filament\Actions\Action;
@@ -10,6 +11,7 @@ use Filament\Actions\DeleteAction;
 use Filament\Notifications\Notification;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -64,27 +66,27 @@ class BackupResource extends BaseResource
                     ->requiresConfirmation()
                     ->modalDescription('This will create a full backup of the application database.')
                     ->action(function (): void {
-                        try {
-                            $backup = app(BackupService::class)->backupDatabase();
-                            Notification::make()
-                                ->title('Backup completed')
-                                ->body("Backup {$backup->backup_no} created successfully.")
-                                ->success()
-                                ->send();
-                        } catch (\Throwable $e) {
-                            Notification::make()
-                                ->title('Backup failed')
-                                ->body($e->getMessage())
-                                ->danger()
-                                ->send();
-                        }
+                        $backup = app(BackupService::class)->createPending();
+                        RunDatabaseBackup::dispatch($backup);
+
+                        Notification::make()
+                            ->title('Backup queued')
+                            ->body("Backup {$backup->backup_no} has been queued and will run shortly.")
+                            ->success()
+                            ->send();
                     }),
             ])
             ->recordActions([
                 Action::make('download')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->visible(fn (Backup $record): bool => $record->status === 'success' && filled($record->file_path))
-                    ->action(fn (Backup $record): StreamedResponse => Storage::disk($record->storage_location ?? 'local')->download($record->file_path)),
+                    ->action(function (Backup $record): StreamedResponse {
+                        // Stored encrypted at rest; decrypt for the downloaded file.
+                        $plaintext = Crypt::decryptString(Storage::disk($record->storage_location ?? 'local')->get($record->file_path));
+                        $fileName = basename($record->file_path);
+
+                        return response()->streamDownload(fn () => print ($plaintext), $fileName);
+                    }),
                 Action::make('restore')
                     ->icon('heroicon-o-arrow-uturn-left')
                     ->color('danger')

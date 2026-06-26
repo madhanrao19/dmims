@@ -15,6 +15,8 @@ class Backup extends Model
         'storage_location',
         'file_path',
         'file_size',
+        'checksum',
+        'verified',
         'status',
         'started_at',
         'completed_at',
@@ -25,5 +27,6 @@ class Backup extends Model
     protected $casts = [
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
+        'verified' => 'boolean',
     ];
 }

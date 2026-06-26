@@ -84,4 +84,22 @@ class BarcodeScannerTest extends TestCase
         $this->assertNull($outcome['record']);
         $this->assertDatabaseHas('barcode_scan_logs', ['barcode' => 'PRD-ACME-999999', 'scan_result' => 'unknown']);
     }
+
+    public function test_replace_retires_old_barcode_and_issues_a_new_one(): void
+    {
+        $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACME', 'status' => 'active']);
+        $product = $this->product($customer);
+        $service = app(BarcodeService::class);
+        $original = $service->registerFor($product);
+
+        $replacement = $service->replace($original);
+
+        $this->assertNotSame($original->barcode, $replacement->barcode);
+        $this->assertSame('retired', $original->fresh()->status);
+        $this->assertSame('active', $replacement->status);
+        $this->assertSame($replacement->barcode, $product->fresh()->barcode);
+
+        // registerFor() now sees the new active registration, not the retired one.
+        $this->assertSame($replacement->id, $service->registerFor($product->fresh())->id);
+    }
 }

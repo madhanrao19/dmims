@@ -2,12 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\RunExport;
 use App\Models\Customer;
 use App\Models\Import;
 use App\Models\Product;
 use App\Services\ExportService;
 use App\Services\ImportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -37,6 +39,27 @@ class ImportExportServiceTest extends TestCase
         $this->assertStringContainsString('SKU1', $contents);
         $this->assertStringContainsString('SKU2', $contents);
         $this->assertSame(3, substr_count(trim($contents), "\n") + 1); // header + 2 rows
+    }
+
+    public function test_create_pending_export_does_not_write_until_the_job_runs(): void
+    {
+        Storage::fake('local');
+        Queue::fake();
+        $customer = $this->customer();
+        Product::create(['customer_id' => $customer->id, 'sku' => 'SKU1', 'product_name' => 'Widget', 'status' => 'active']);
+
+        $export = app(ExportService::class)->createPending('products', $customer->id);
+        $this->assertSame('pending', $export->status);
+        $this->assertNull($export->file_path);
+
+        RunExport::dispatch($export);
+        Queue::assertPushed(RunExport::class);
+        $this->assertSame('pending', $export->fresh()->status);
+
+        app(RunExport::class, ['export' => $export])->handle(app(ExportService::class));
+
+        $this->assertSame('completed', $export->fresh()->status);
+        Storage::disk('local')->assertExists($export->fresh()->file_path);
     }
 
     public function test_it_imports_valid_rows_and_flags_invalid_ones(): void

@@ -19,7 +19,7 @@ companies operate in a single system with complete data isolation.
 | Auth / RBAC | Laravel Auth · Spatie Laravel Permission |
 | Queue / Cache / Session | Database driver |
 | Mobile | Progressive Web App (manifest + service worker) |
-| Web server (prod) | Nginx + PHP-FPM, behind Cloudflare |
+| Web server (prod) | Apache + PHP-FPM, behind a Cloudflare Tunnel (TLS terminated at Cloudflare's edge) |
 
 ## Modules
 
@@ -36,7 +36,11 @@ companies operate in a single system with complete data isolation.
   on production).
 - **Notifications** — scheduled alerts (low stock, expiries, overdue billing).
 - **Audit** — immutable, model-level audit trail of all changes.
-- **Import / Export, Backup / Restore, PWA.**
+- **Import / Export, Backup / Restore, PWA.** Backups are encrypted at rest
+  and integrity-verified before being trusted as restorable.
+- **API** — versioned, token-authenticated (`routes/api.php`, `/api/v1/...`),
+  for narrow integrations: barcode resolution, stock inquiry, export status.
+  Issue tokens with `php artisan dmims:issue-api-token {user}`.
 
 ## Security model (defence in depth)
 
@@ -45,6 +49,10 @@ customer isolation → subscription validity → license validity → module
 enablement → operational permission. Customer data is isolated by `customer_id`
 (global query scopes); `customer_id` is never trusted from the browser; all
 changes are audited; direct-URL access is gated, not just navigation.
+
+Optional TOTP app-authentication (2FA) is available per-user from the admin
+profile page — enrollment, QR-code setup, challenge, and recovery codes are
+fully implemented (Filament's built-in multi-factor authentication).
 
 Roles: Datamation Super Admin, Datamation Management, Company Admin, Company
 Supervisor, Stock Inventory User, Document Tracking User, Viewer.
@@ -87,25 +95,38 @@ The seeded demo login (development only) is `admin@example.com` / `password`.
 php artisan test
 ```
 
-The suite (59 tests) covers tenant isolation, the access-control/license layer,
-billing, notifications, barcode/scanner, reporting, import/export, stock and
-document operations, the seeder, and that every resource page renders.
+The suite covers tenant isolation, the access-control/license layer, billing,
+notifications, barcode/scanner, reporting, import/export, stock and document
+operations (including transaction/concurrency-safety and backup integrity),
+the seeder, the v1 API, and that every resource page renders.
 
 ## Scheduled tasks
 
 Add the Laravel scheduler to cron (`* * * * * php artisan schedule:run`). It runs:
 - `dmims:generate-notifications` — hourly operational alerts.
 - `dmims:backup-database` — nightly database backup.
+- `dmims:verify-latest-backup` — weekly restore-readiness check on the latest backup.
+
+A queue worker (`php artisan queue:work`, under Supervisor in production — never
+`queue:listen`) must also be running: database backups and data exports are
+dispatched as queued jobs (`RunDatabaseBackup`, `RunExport`) rather than run
+inline in the web request.
 
 ## Production deployment
 
-See [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for the full Ubuntu + Nginx +
-PHP-FPM + MySQL + Cloudflare setup, including queue worker, scheduler, SSL,
-backups, and the optional PDF/Excel/barcode-image libraries.
+See [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) — the single authoritative
+deployment doc — for the full Ubuntu 24 + Apache + PHP-FPM + MySQL +
+Cloudflare Tunnel setup, including queue worker, scheduler, TLS, backups, and
+the optional PDF/Excel/barcode-image libraries.
 
 Key production `.env`: `APP_ENV=production`, `APP_DEBUG=false`, a real `APP_KEY`
 (`php artisan key:generate`), MySQL credentials, SMTP mail (required for
-password resets), `SESSION_SECURE_COOKIE=true`, and `TRUSTED_PROXIES=*`.
+password resets), and `TRUSTED_PROXIES=*`. `SESSION_SECURE_COOKIE` is
+intentionally `false` — the server is reached both via the Cloudflare Tunnel
+(HTTPS) and directly over plain HTTP on the local network, and Cloudflare's
+edge TLS already protects the public URL (see DEPLOYMENT_GUIDE.md Part 5). If
+you deploy behind a setup where the app is *always* served over HTTPS, set it
+to `true` instead.
 
 ## Documentation
 

@@ -7,7 +7,9 @@ use App\Filament\Resources\DocumentFileResource\Pages;
 use App\Http\Middleware\EnsureModuleEnabled;
 use App\Models\Box;
 use App\Models\DocumentFile;
+use App\Models\Location;
 use App\Services\DocumentMovementService;
+use App\Services\MovementTimelineService;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Forms;
@@ -33,6 +35,11 @@ class DocumentFileResource extends BaseResource
     protected static string|\UnitEnum|null $navigationGroup = 'Documents';
 
     protected static ?int $navigationSort = 2;
+
+    public static function getGloballySearchableAttributes(): array
+    {
+        return ['file_barcode', 'file_reference_no', 'title', 'owner_name'];
+    }
 
     public static function form(Schema $schema): Schema
     {
@@ -71,6 +78,14 @@ class DocumentFileResource extends BaseResource
                 Forms\Components\TextInput::make('destination')->maxLength(255),
                 Forms\Components\DatePicker::make('received_date'),
                 Forms\Components\DatePicker::make('archived_date'),
+                Forms\Components\Select::make('tags')
+                    ->relationship('tags', 'name')
+                    ->multiple()
+                    ->preload()
+                    ->createOptionForm([
+                        Forms\Components\TextInput::make('name')->required(),
+                        Forms\Components\ColorPicker::make('color')->default('#6b7280'),
+                    ]),
                 Forms\Components\Textarea::make('remarks')->rows(3),
             ]);
     }
@@ -81,9 +96,76 @@ class DocumentFileResource extends BaseResource
             ->columns([
                 Tables\Columns\TextColumn::make('file_barcode')->sortable()->searchable(),
                 Tables\Columns\TextColumn::make('title')->sortable()->searchable(),
-                Tables\Columns\TextColumn::make('currentBox.box_number')->label('Box')->sortable(),
-                Tables\Columns\TextColumn::make('current_status')->sortable(),
+                Tables\Columns\TextColumn::make('owner_name')->label('Owner')->sortable()->searchable()->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('currentBox.box_number')->label('Box')->sortable()->searchable(),
+                Tables\Columns\TextColumn::make('physical_path')->label('Location')->toggleable(),
+                Tables\Columns\TextColumn::make('current_status')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'active' => 'success',
+                        'transferred' => 'info',
+                        'moved_out' => 'warning',
+                        'archived', 'closed' => 'gray',
+                        'missing', 'damaged' => 'danger',
+                        default => 'gray',
+                    })
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('tags.name')
+                    ->label('Tags')
+                    ->badge()
+                    ->color(fn (string $state, DocumentFile $record): string => $record->tags->firstWhere('name', $state)?->color ?? 'gray'),
+                Tables\Columns\TextColumn::make('due_date')
+                    ->label('Due back')
+                    ->date()
+                    ->placeholder('—')
+                    ->color(fn (DocumentFile $record): string => $record->is_overdue ? 'danger' : 'gray')
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable(),
+            ])
+            ->filters([
+                Tables\Filters\Filter::make('overdue')
+                    ->label('Overdue returns')
+                    ->query(fn ($query) => $query->where('current_status', 'moved_out')->whereNotNull('due_date')->whereDate('due_date', '<', now())),
+                Tables\Filters\SelectFilter::make('tags')
+                    ->relationship('tags', 'name')
+                    ->multiple()
+                    ->preload(),
+                Tables\Filters\SelectFilter::make('current_status')
+                    ->options([
+                        'active' => 'Active',
+                        'transferred' => 'Transferred',
+                        'moved_out' => 'Moved Out',
+                        'archived' => 'Archived',
+                        'missing' => 'Missing',
+                        'damaged' => 'Damaged',
+                        'closed' => 'Closed',
+                    ]),
+                Tables\Filters\SelectFilter::make('department_id')
+                    ->relationship('department', 'name')
+                    ->label('Department'),
+                Tables\Filters\SelectFilter::make('current_box_id')
+                    ->relationship('currentBox', 'box_number')
+                    ->label('Box')
+                    ->searchable(),
+                Tables\Filters\SelectFilter::make('warehouse')
+                    ->label('Warehouse/Shelf')
+                    ->options(fn () => Location::query()->pluck('location_name', 'id')->all())
+                    ->query(function ($query, array $data) {
+                        return $query->when(
+                            $data['value'] ?? null,
+                            fn ($q, $locationId) => $q->whereHas('currentBox', fn ($bq) => $bq->where('current_location_id', $locationId))
+                        );
+                    }),
+                Tables\Filters\Filter::make('received_date')
+                    ->schema([
+                        Forms\Components\DatePicker::make('from'),
+                        Forms\Components\DatePicker::make('until'),
+                    ])
+                    ->query(function ($query, array $data) {
+                        return $query
+                            ->when($data['from'] ?? null, fn ($q, $date) => $q->whereDate('received_date', '>=', $date))
+                            ->when($data['until'] ?? null, fn ($q, $date) => $q->whereDate('received_date', '<=', $date));
+                    }),
             ])
             ->recordActions([
                 Action::make('transferFile')
@@ -106,6 +188,8 @@ class DocumentFileResource extends BaseResource
                     ->visible(fn (DocumentFile $record): bool => $record->current_status !== 'moved_out')
                     ->schema([
                         Forms\Components\TextInput::make('destination')->label('External destination')->required(),
+                        Forms\Components\TextInput::make('borrowed_by')->label('Borrowed by'),
+                        Forms\Components\DatePicker::make('due_date')->label('Due back'),
                         Forms\Components\Textarea::make('remarks'),
                     ])
                     ->action(function (DocumentFile $record, array $data): void {
@@ -126,6 +210,15 @@ class DocumentFileResource extends BaseResource
                         app(DocumentMovementService::class)->returnFile($record, (int) $data['to_box_id'], $data);
                         Notification::make()->title('File returned')->success()->send();
                     }),
+                Action::make('timeline')
+                    ->label('Timeline')
+                    ->icon('heroicon-o-clock')
+                    ->modalHeading(fn (DocumentFile $record): string => "Activity timeline — {$record->title}")
+                    ->modalContent(fn (DocumentFile $record) => view('filament.activity-timeline', [
+                        'entries' => app(MovementTimelineService::class)->forDocumentFile($record),
+                    ]))
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Close'),
                 EditAction::make(),
                 static::barcodeAction(),
             ])

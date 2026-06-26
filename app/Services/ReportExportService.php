@@ -139,23 +139,23 @@ class ReportExportService
         return match ($key) {
             'customer_summary' => [
                 ['ID', 'Company', 'Code', 'Status', 'Created'],
-                Customer::query()->get()->map(fn ($c) => [$c->id, $c->company_name, $c->company_code, $c->status, (string) $c->created_at]),
+                Customer::query()->lazy()->map(fn ($c) => [$c->id, $c->company_name, $c->company_code, $c->status, (string) $c->created_at]),
             ],
             'subscription_summary' => [
                 ['Subscription No', 'Company', 'Status', 'Valid From', 'Valid To'],
-                CustomerSubscription::with('customer')->get()->map(fn ($s) => [$s->subscription_no, $s->customer?->company_name, $s->status, (string) $s->valid_from, (string) $s->valid_to]),
+                CustomerSubscription::with('customer')->lazy()->map(fn ($s) => [$s->subscription_no, $s->customer?->company_name, $s->status, (string) $s->valid_from, (string) $s->valid_to]),
             ],
             'license_summary' => [
                 ['License No', 'Company', 'Status', 'Access Mode', 'Valid To'],
-                License::with('customer')->get()->map(fn ($l) => [$l->license_no, $l->customer?->company_name, $l->status, $l->technical_access_mode, (string) $l->valid_to]),
+                License::with('customer')->lazy()->map(fn ($l) => [$l->license_no, $l->customer?->company_name, $l->status, $l->technical_access_mode, (string) $l->valid_to]),
             ],
             'billing_summary' => [
                 ['Invoice No', 'Company', 'Total', 'Billing Status', 'Payment Status', 'Due Date'],
-                BillingRecord::with('customer')->get()->map(fn ($b) => [$b->invoice_no, $b->customer?->company_name, $b->total_amount, $b->billing_status, $b->payment_status, (string) $b->due_date]),
+                BillingRecord::with('customer')->lazy()->map(fn ($b) => [$b->invoice_no, $b->customer?->company_name, $b->total_amount, $b->billing_status, $b->payment_status, (string) $b->due_date]),
             ],
             'payment_summary' => [
                 ['Payment No', 'Invoice', 'Amount', 'Method', 'Date'],
-                BillingPayment::with('billingRecord')->get()->map(fn ($p) => [$p->payment_no, $p->billingRecord?->invoice_no, $p->amount, $p->payment_method, (string) $p->payment_date]),
+                BillingPayment::with('billingRecord')->lazy()->map(fn ($p) => [$p->payment_no, $p->billingRecord?->invoice_no, $p->amount, $p->payment_method, (string) $p->payment_date]),
             ],
             'audit_summary' => [
                 ['Date', 'Module', 'Action', 'User ID', 'Auditable'],
@@ -163,25 +163,25 @@ class ReportExportService
             ],
             'inventory_summary' => [
                 ['SKU', 'Product', 'Reorder Level', 'Unit Cost', 'Unit Price', 'Status'],
-                Product::query()->get()->map(fn ($p) => [$p->sku, $p->product_name, $p->reorder_level, $p->unit_cost, $p->unit_price, $p->status]),
+                Product::query()->lazy()->map(fn ($p) => [$p->sku, $p->product_name, $p->reorder_level, $p->unit_cost, $p->unit_price, $p->status]),
             ],
             'low_stock' => $this->lowStock(),
             'stock_movement' => [
                 ['Movement No', 'Product ID', 'Type', 'Qty', 'From', 'To', 'Performed At'],
-                StockMovement::query()->latest('performed_at')->get()->map(fn ($m) => [$m->movement_no, $m->product_id, $m->movement_type, $m->quantity, $m->from_location_id, $m->to_location_id, (string) $m->performed_at]),
+                StockMovement::query()->latest('performed_at')->lazy()->map(fn ($m) => [$m->movement_no, $m->product_id, $m->movement_type, $m->quantity, $m->from_location_id, $m->to_location_id, (string) $m->performed_at]),
             ],
             'stock_value' => $this->stockValue(),
             'file_master' => [
                 ['Reference No', 'Title', 'Status', 'Box ID'],
-                DocumentFile::query()->get()->map(fn ($f) => [$f->file_reference_no, $f->title, $f->current_status, $f->current_box_id]),
+                DocumentFile::query()->lazy()->map(fn ($f) => [$f->file_reference_no, $f->title, $f->current_status, $f->current_box_id]),
             ],
             'box_master' => [
                 ['Box No', 'Barcode', 'Location ID', 'Status'],
-                Box::query()->get()->map(fn ($b) => [$b->box_number, $b->box_barcode, $b->current_location_id, $b->status]),
+                Box::query()->lazy()->map(fn ($b) => [$b->box_number, $b->box_barcode, $b->current_location_id, $b->status]),
             ],
             'movement_history' => [
                 ['Movement No', 'Action', 'From Box', 'To Box', 'Performed At'],
-                DocumentMovementLog::query()->latest('performed_at')->get()->map(fn ($m) => [$m->movement_no, $m->action_type, $m->from_box_id, $m->to_box_id, (string) $m->performed_at]),
+                DocumentMovementLog::query()->latest('performed_at')->lazy()->map(fn ($m) => [$m->movement_no, $m->action_type, $m->from_box_id, $m->to_box_id, (string) $m->performed_at]),
             ],
             'overdue_returns' => $this->overdueReturns(),
             default => throw new InvalidArgumentException("Unknown report: {$key}"),
@@ -192,7 +192,7 @@ class ReportExportService
     {
         $rows = Product::query()
             ->where('reorder_level', '>', 0)
-            ->get()
+            ->lazy()
             ->map(function ($p) {
                 $available = (float) ProductLocationStock::where('product_id', $p->id)->sum('available_quantity');
 
@@ -206,7 +206,7 @@ class ReportExportService
 
     private function stockValue(): array
     {
-        $rows = Product::query()->get()->map(function ($p) {
+        $rows = Product::query()->lazy()->map(function ($p) {
             $available = (float) ProductLocationStock::where('product_id', $p->id)->sum('available_quantity');
             $value = round($available * (float) $p->unit_cost, 2);
 
@@ -225,7 +225,7 @@ class ReportExportService
             ->where('action_type', 'like', 'move_out%')
             ->where('performed_at', '<', $cutoff)
             ->latest('performed_at')
-            ->get()
+            ->lazy()
             ->map(fn ($m) => [$m->movement_no, $m->action_type, $m->movable_type ? class_basename($m->movable_type) : '', $m->movable_id, (string) $m->performed_at]);
 
         return [['Movement No', 'Action', 'Item Type', 'Item ID', 'Moved Out At'], $rows];

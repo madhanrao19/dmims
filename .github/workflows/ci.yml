@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, dom, fileinfo, xml, xmlwriter, sqlite3, pdo_sqlite, zip
+          coverage: none
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Validate composer.json
+        run: composer validate --strict
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Audit PHP dependencies
+        run: composer audit
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Check PHP code style
+        run: vendor/bin/pint --test
+
+      - name: Prepare test environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Run PHP test suite
+        run: php artisan test
+
+      - name: Build front-end assets (and PWA icons)
+        run: npm run build:assets
+
+      - name: Verify PWA icons exist
+        run: |
+          test -f public/build/icons/icon-192.png
+          test -f public/build/icons/icon-512.png
+          test -f public/build/icons/apple-touch-icon.png
+
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4

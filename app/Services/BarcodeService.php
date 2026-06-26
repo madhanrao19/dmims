@@ -8,6 +8,7 @@ use App\Models\DocumentFile;
 use App\Models\Location;
 use App\Models\Product;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 
@@ -33,6 +34,14 @@ class BarcodeService
         DocumentFile::class => ['document_file', 'file_barcode'],
     ];
 
+    /** Map of reference_table => model class (reverse lookup for replace()). */
+    private const TABLE_MODELS = [
+        'products' => Product::class,
+        'locations' => Location::class,
+        'boxes' => Box::class,
+        'document_files' => DocumentFile::class,
+    ];
+
     public function generate(string $type, string $companyCode, int $sequence): string
     {
         if (! isset(self::PREFIXES[$type])) {
@@ -52,35 +61,76 @@ class BarcodeService
     {
         [$type, $column] = $this->resolveModel($record);
 
-        $existing = BarcodeRegistry::withoutGlobalScopes()
-            ->where('reference_table', $record->getTable())
-            ->where('reference_id', $record->getKey())
-            ->first();
-
+        $existing = $this->findExisting($record);
         if ($existing) {
             return $existing;
         }
 
-        $companyCode = $record->customer?->company_code ?? 'DM';
-        $sequence = BarcodeRegistry::withoutGlobalScopes()
-            ->where('customer_id', $record->customer_id)
-            ->where('barcode_type', $type)
-            ->count() + 1;
+        return DB::transaction(function () use ($record, $type, $column) {
+            // re-check under the transaction: another request may have
+            // registered this record between the check above and now.
+            $existing = $this->findExisting($record, lock: true);
+            if ($existing) {
+                return $existing;
+            }
 
-        $barcode = $this->generate($type, $companyCode, $sequence);
+            $companyCode = $record->customer?->company_code ?? 'DM';
+            $sequence = SequenceGenerator::next("barcode:{$record->customer_id}:{$type}");
+            $barcode = $this->generate($type, $companyCode, $sequence);
 
-        $registry = BarcodeRegistry::create([
-            'customer_id' => $record->customer_id,
-            'barcode' => $barcode,
-            'barcode_type' => $type,
-            'reference_table' => $record->getTable(),
-            'reference_id' => $record->getKey(),
-            'status' => 'active',
-        ]);
+            $registry = BarcodeRegistry::create([
+                'customer_id' => $record->customer_id,
+                'barcode' => $barcode,
+                'barcode_type' => $type,
+                'reference_table' => $record->getTable(),
+                'reference_id' => $record->getKey(),
+                'status' => 'active',
+            ]);
 
-        $record->forceFill([$column => $barcode])->save();
+            $record->forceFill([$column => $barcode])->save();
 
-        return $registry;
+            return $registry;
+        });
+    }
+
+    /**
+     * Retire a lost/damaged barcode and issue a new one for the same record.
+     * The old registry row is kept (status 'retired') for history/audit.
+     */
+    public function replace(BarcodeRegistry $registry): BarcodeRegistry
+    {
+        return DB::transaction(function () use ($registry) {
+            $locked = BarcodeRegistry::withoutGlobalScopes()->whereKey($registry->id)->lockForUpdate()->first();
+
+            if (! $locked || $locked->status === 'retired') {
+                throw new InvalidArgumentException('Barcode is already retired.');
+            }
+
+            $locked->update(['status' => 'retired']);
+
+            $modelClass = self::TABLE_MODELS[$locked->reference_table] ?? null;
+            if (! $modelClass) {
+                throw new InvalidArgumentException("Cannot resolve model for table {$locked->reference_table}.");
+            }
+
+            $record = $modelClass::withoutGlobalScopes()->findOrFail($locked->reference_id);
+
+            return $this->registerFor($record);
+        });
+    }
+
+    protected function findExisting(Model $record, bool $lock = false): ?BarcodeRegistry
+    {
+        $query = BarcodeRegistry::withoutGlobalScopes()
+            ->where('reference_table', $record->getTable())
+            ->where('reference_id', $record->getKey())
+            ->where('status', 'active');
+
+        if ($lock) {
+            $query->lockForUpdate();
+        }
+
+        return $query->first();
     }
 
     public function incrementPrinted(BarcodeRegistry $registry): void

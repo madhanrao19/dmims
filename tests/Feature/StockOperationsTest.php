@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Exceptions\InsufficientStockException;
 use App\Models\Customer;
 use App\Models\Location;
 use App\Models\Product;
 use App\Models\ProductLocationStock;
+use App\Models\StockMovement;
 use App\Services\StockMovementService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -78,5 +80,30 @@ class StockOperationsTest extends TestCase
 
         $this->assertStringStartsWith('MV-', $movement->movement_no);
         $this->assertSame($this->customer->id, $movement->customer_id);
+    }
+
+    public function test_movement_numbers_are_unique_across_calls(): void
+    {
+        $service = app(StockMovementService::class);
+        $first = $service->receiveIn($this->product->id, $this->a->id, 1);
+        $second = $service->receiveIn($this->product->id, $this->a->id, 1);
+
+        $this->assertNotSame($first->movement_no, $second->movement_no);
+    }
+
+    public function test_stock_out_beyond_available_quantity_throws_and_rolls_back(): void
+    {
+        app(StockMovementService::class)->receiveIn($this->product->id, $this->a->id, 5);
+
+        $this->expectException(InsufficientStockException::class);
+
+        try {
+            app(StockMovementService::class)->stockOut($this->product->id, $this->a->id, 10);
+        } finally {
+            // the failed movement must not have been committed, and stock
+            // must still reflect only the successful receive-in.
+            $this->assertSame(5.0, $this->qtyAt($this->a));
+            $this->assertSame(1, StockMovement::withoutGlobalScopes()->count());
+        }
     }
 }

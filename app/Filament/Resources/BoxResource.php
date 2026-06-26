@@ -8,6 +8,7 @@ use App\Http\Middleware\EnsureModuleEnabled;
 use App\Models\Box;
 use App\Models\Location;
 use App\Services\DocumentMovementService;
+use App\Services\MovementTimelineService;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Forms;
@@ -34,6 +35,11 @@ class BoxResource extends BaseResource
 
     protected static ?int $navigationSort = 1;
 
+    public static function getGloballySearchableAttributes(): array
+    {
+        return ['box_number', 'box_barcode'];
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema
@@ -49,8 +55,13 @@ class BoxResource extends BaseResource
                     ->searchable()
                     ->required(),
                 Forms\Components\TextInput::make('source_origin')->maxLength(255),
-                Forms\Components\TextInput::make('capacity_limit')->numeric(),
-                Forms\Components\TextInput::make('current_file_count')->numeric()->default(0),
+                Forms\Components\TextInput::make('capacity_limit')->numeric()->helperText('Maximum number of files this box can hold.'),
+                Forms\Components\TextInput::make('current_file_count')
+                    ->numeric()
+                    ->default(0)
+                    ->disabled()
+                    ->dehydrated(false)
+                    ->helperText('Derived automatically from file movements — not editable.'),
                 Forms\Components\Select::make('status')
                     ->options([
                         'active' => 'Active',
@@ -62,6 +73,14 @@ class BoxResource extends BaseResource
                     ])
                     ->default('active')
                     ->required(),
+                Forms\Components\Select::make('tags')
+                    ->relationship('tags', 'name')
+                    ->multiple()
+                    ->preload()
+                    ->createOptionForm([
+                        Forms\Components\TextInput::make('name')->required(),
+                        Forms\Components\ColorPicker::make('color')->default('#6b7280'),
+                    ]),
                 Forms\Components\Textarea::make('remarks')->rows(3),
             ]);
     }
@@ -72,9 +91,39 @@ class BoxResource extends BaseResource
             ->columns([
                 Tables\Columns\TextColumn::make('box_number')->sortable()->searchable(),
                 Tables\Columns\TextColumn::make('box_barcode')->sortable()->searchable(),
-                Tables\Columns\TextColumn::make('currentLocation.location_name')->label('Location')->sortable(),
-                Tables\Columns\TextColumn::make('status')->sortable(),
+                Tables\Columns\TextColumn::make('physical_path')->label('Location')->sortable(),
+                Tables\Columns\TextColumn::make('status')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'active' => 'success',
+                        'closed', 'archived' => 'gray',
+                        'moved_out' => 'info',
+                        'damaged', 'missing' => 'danger',
+                        default => 'gray',
+                    }),
+                Tables\Columns\TextColumn::make('capacity_percent')
+                    ->label('Capacity')
+                    ->state(fn (Box $record): string => $record->capacity_limit
+                        ? "{$record->current_file_count}/{$record->capacity_limit} ({$record->capacity_percent}%)"
+                        : "{$record->current_file_count} files")
+                    ->badge()
+                    ->color(fn (Box $record): string => match (true) {
+                        $record->capacity_percent === null => 'gray',
+                        $record->capacity_percent >= 100 => 'danger',
+                        $record->capacity_percent >= 80 => 'warning',
+                        default => 'success',
+                    }),
+                Tables\Columns\TextColumn::make('tags.name')
+                    ->label('Tags')
+                    ->badge()
+                    ->color(fn (string $state, Box $record): string => $record->tags->firstWhere('name', $state)?->color ?? 'gray'),
                 Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable(),
+            ])
+            ->filters([
+                Tables\Filters\SelectFilter::make('tags')
+                    ->relationship('tags', 'name')
+                    ->multiple()
+                    ->preload(),
             ])
             ->recordActions([
                 Action::make('transferBox')
@@ -117,6 +166,15 @@ class BoxResource extends BaseResource
                         app(DocumentMovementService::class)->returnBox($record, (int) $data['to_location_id'], $data);
                         Notification::make()->title('Box returned')->success()->send();
                     }),
+                Action::make('timeline')
+                    ->label('Timeline')
+                    ->icon('heroicon-o-clock')
+                    ->modalHeading(fn (Box $record): string => "Activity timeline — Box {$record->box_number}")
+                    ->modalContent(fn (Box $record) => view('filament.activity-timeline', [
+                        'entries' => app(MovementTimelineService::class)->forBox($record),
+                    ]))
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Close'),
                 EditAction::make(),
                 static::barcodeAction(),
             ])

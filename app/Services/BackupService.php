@@ -3,9 +3,11 @@
 namespace App\Services;
 
 use App\Models\Backup;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use PDO;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 use Throwable;
@@ -21,33 +23,54 @@ class BackupService
 
     /**
      * Create and execute a database backup, returning the persisted record.
-     * The backup is run synchronously so it works even without a queue worker;
-     * for very large databases run it from the queue (see DatabaseBackup job).
+     * Runs synchronously — fine for the scheduled CLI command, but web-request
+     * callers should use createPending()+queue a RunDatabaseBackup job instead.
      */
     public function backupDatabase(array $data = []): Backup
     {
-        $backup = Backup::create([
+        return $this->run($this->createPending($data));
+    }
+
+    /**
+     * Insert a pending backup record without running the (potentially slow)
+     * dump — cheap enough to call inline from a web request.
+     */
+    public function createPending(array $data = []): Backup
+    {
+        return Backup::create([
             'backup_no' => $data['backup_no'] ?? $this->generateBackupNo(),
             'backup_type' => 'database',
             'storage_location' => $this->disk,
-            'status' => 'running',
-            'started_at' => now(),
+            'status' => 'pending',
             'created_by' => $data['created_by'] ?? auth()->id(),
             'remarks' => $data['remarks'] ?? null,
         ]);
+    }
+
+    /**
+     * Run the actual dump for a pending backup record. This is the slow part
+     * and belongs on a queue worker, not the web request.
+     */
+    public function run(Backup $backup): Backup
+    {
+        $backup->update(['status' => 'running', 'started_at' => now()]);
 
         try {
             $relativePath = $this->dumpDatabase($backup->backup_no);
+            $checksum = $this->encryptAndVerify($relativePath);
 
             $backup->update([
                 'status' => 'success',
                 'file_path' => $relativePath,
                 'file_size' => Storage::disk($this->disk)->size($relativePath),
+                'checksum' => $checksum,
+                'verified' => true,
                 'completed_at' => now(),
             ]);
         } catch (Throwable $e) {
             $backup->update([
                 'status' => 'failed',
+                'verified' => false,
                 'completed_at' => now(),
                 'remarks' => trim(($backup->remarks ? $backup->remarks."\n" : '').'Error: '.$e->getMessage()),
             ]);
@@ -60,7 +83,8 @@ class BackupService
 
     /**
      * Restore a previously created database backup. Destructive: overwrites the
-     * current database with the backup's contents.
+     * current database with the backup's contents. The file is checksum- and
+     * structurally-verified before anything is overwritten.
      */
     public function restoreDatabase(Backup $backup): void
     {
@@ -68,17 +92,95 @@ class BackupService
             throw new RuntimeException('Backup file is missing; cannot restore.');
         }
 
-        $absolutePath = Storage::disk($this->disk)->path($backup->file_path);
-        $connection = config('database.default');
-        $driver = config("database.connections.{$connection}.driver");
+        $encrypted = Storage::disk($this->disk)->get($backup->file_path);
 
-        match ($driver) {
-            'sqlite' => $this->restoreSqlite($connection, $absolutePath),
-            'mysql', 'mariadb' => $this->restoreMysql($connection, $absolutePath),
-            default => throw new RuntimeException("Unsupported database driver for restore: {$driver}"),
-        };
+        if ($backup->checksum && hash('sha256', $encrypted) !== $backup->checksum) {
+            throw new RuntimeException('Backup checksum mismatch; refusing to restore a possibly corrupted or tampered file.');
+        }
 
-        $backup->update(['status' => 'restored']);
+        $plaintext = Crypt::decryptString($encrypted);
+
+        if (! $this->verifyDumpContents($backup->file_path, $plaintext)) {
+            throw new RuntimeException('Backup failed integrity verification; refusing to restore.');
+        }
+
+        $tempPath = tempnam(sys_get_temp_dir(), 'dmims_restore_');
+        file_put_contents($tempPath, $plaintext);
+
+        try {
+            $connection = config('database.default');
+            $driver = config("database.connections.{$connection}.driver");
+
+            match ($driver) {
+                'sqlite' => $this->restoreSqlite($connection, $tempPath),
+                'mysql', 'mariadb' => $this->restoreMysql($connection, $tempPath),
+                default => throw new RuntimeException("Unsupported database driver for restore: {$driver}"),
+            };
+
+            $backup->update(['status' => 'restored']);
+        } finally {
+            @unlink($tempPath);
+        }
+    }
+
+    /**
+     * Encrypt the just-written plaintext dump in place (encryption at rest),
+     * then immediately decrypt and structurally verify it before trusting the
+     * backup as restorable. Returns the checksum of the encrypted file.
+     */
+    protected function encryptAndVerify(string $relativePath): string
+    {
+        $plaintext = Storage::disk($this->disk)->get($relativePath);
+        $encrypted = Crypt::encryptString($plaintext);
+
+        Storage::disk($this->disk)->put($relativePath, $encrypted);
+
+        $decrypted = Crypt::decryptString(Storage::disk($this->disk)->get($relativePath));
+
+        if (! $this->verifyDumpContents($relativePath, $decrypted)) {
+            throw new RuntimeException('Backup verification failed: dump content did not pass integrity check.');
+        }
+
+        return hash('sha256', $encrypted);
+    }
+
+    /**
+     * Structural sanity check on a decrypted dump, keyed off the file
+     * extension set by dumpSqlite()/dumpMysql(). Not a full restore drill
+     * (that needs a scratch database) but catches truncated/corrupt dumps
+     * before they're trusted.
+     */
+    protected function verifyDumpContents(string $relativePath, string $contents): bool
+    {
+        if (str_ends_with($relativePath, '.sqlite')) {
+            return $this->verifySqliteDump($contents);
+        }
+
+        if (str_ends_with($relativePath, '.sql')) {
+            return $contents !== '' && str_contains($contents, 'CREATE TABLE');
+        }
+
+        return false;
+    }
+
+    protected function verifySqliteDump(string $contents): bool
+    {
+        if ($contents === '') {
+            return false;
+        }
+
+        $temp = tempnam(sys_get_temp_dir(), 'dmims_verify_');
+        file_put_contents($temp, $contents);
+
+        try {
+            $pdo = new PDO('sqlite:'.$temp);
+
+            return $pdo->query('PRAGMA integrity_check')->fetchColumn() === 'ok';
+        } catch (Throwable) {
+            return false;
+        } finally {
+            @unlink($temp);
+        }
     }
 
     /**

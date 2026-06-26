@@ -30,6 +30,11 @@ class LocationResource extends BaseResource
 
     protected static ?int $navigationSort = 1;
 
+    public static function getGloballySearchableAttributes(): array
+    {
+        return ['location_code', 'location_name', 'barcode'];
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema
@@ -49,6 +54,7 @@ class LocationResource extends BaseResource
                 Forms\Components\TextInput::make('barcode')->maxLength(100),
                 Forms\Components\Toggle::make('can_store_stock')->default(true),
                 Forms\Components\Toggle::make('can_store_boxes')->default(true),
+                Forms\Components\TextInput::make('box_capacity')->numeric()->helperText('Maximum number of boxes this shelf/rack can hold (optional).'),
                 Forms\Components\Select::make('status')
                     ->options([
                         'active' => 'Active',
@@ -66,7 +72,21 @@ class LocationResource extends BaseResource
                 Tables\Columns\TextColumn::make('location_code')->sortable()->searchable(),
                 Tables\Columns\TextColumn::make('locationType.type_name')->label('Type')->sortable(),
                 Tables\Columns\TextColumn::make('parent.location_name')->label('Parent')->sortable(),
-                Tables\Columns\TextColumn::make('status')->sortable(),
+                Tables\Columns\TextColumn::make('box_capacity')
+                    ->label('Box capacity')
+                    ->state(fn (Location $record): string => $record->box_capacity
+                        ? "{$record->boxes_used_count}/{$record->box_capacity} boxes ({$record->box_capacity_percent}%)"
+                        : "{$record->boxes_used_count} boxes")
+                    ->badge()
+                    ->color(fn (Location $record): string => match (true) {
+                        $record->box_capacity_percent === null => 'gray',
+                        $record->box_capacity_percent >= 100 => 'danger',
+                        $record->box_capacity_percent >= 80 => 'warning',
+                        default => 'success',
+                    }),
+                Tables\Columns\TextColumn::make('status')
+                    ->badge()
+                    ->color(fn (string $state): string => $state === 'active' ? 'success' : 'gray'),
             ])
             ->recordActions([
                 EditAction::make(),

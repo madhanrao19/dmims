@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ExportResource\Pages;
+use App\Jobs\RunExport;
 use App\Models\Export;
 use App\Services\ExportService;
 use Filament\Actions\Action;
@@ -70,16 +71,14 @@ class ExportResource extends BaseResource
                         $user = auth()->user();
                         $customerId = $user->is_platform_user ? null : $user->customer_id;
 
-                        try {
-                            $export = app(ExportService::class)->export($data['export_type'], $customerId);
-                            Notification::make()
-                                ->title('Export ready')
-                                ->body("Export {$export->export_no} generated.")
-                                ->success()
-                                ->send();
-                        } catch (\Throwable $e) {
-                            Notification::make()->title('Export failed')->body($e->getMessage())->danger()->send();
-                        }
+                        $export = app(ExportService::class)->createPending($data['export_type'], $customerId);
+                        RunExport::dispatch($export);
+
+                        Notification::make()
+                            ->title('Export queued')
+                            ->body("Export {$export->export_no} has been queued and will be ready shortly.")
+                            ->success()
+                            ->send();
                     }),
             ])
             ->recordActions([

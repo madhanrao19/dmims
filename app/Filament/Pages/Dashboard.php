@@ -2,7 +2,9 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Widgets\OperationalStatsOverview;
 use App\Filament\Widgets\PlatformStatsOverview;
+use App\Filament\Widgets\RecentActivityWidget;
 use Filament\Pages\Dashboard as FilamentDashboard;
 
 class Dashboard extends FilamentDashboard
@@ -17,6 +19,8 @@ class Dashboard extends FilamentDashboard
     {
         return [
             PlatformStatsOverview::class,
+            OperationalStatsOverview::class,
+            RecentActivityWidget::class,
         ];
     }
 }

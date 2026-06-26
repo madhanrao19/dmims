@@ -14,3 +14,6 @@ Schedule::command('dmims:generate-notifications')->hourly()->withoutOverlapping(
 
 // Nightly database backup (TDD §27).
 Schedule::command('dmims:backup-database')->dailyAt('02:30')->withoutOverlapping();
+
+// Weekly restore-readiness check on the latest backup.
+Schedule::command('dmims:verify-latest-backup')->weekly()->withoutOverlapping();

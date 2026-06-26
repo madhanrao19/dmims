@@ -2,7 +2,8 @@ import sharp from 'sharp';
 import fs from 'fs';
 import path from 'path';
 
-const iconsDir = path.resolve(process.cwd(), 'public', 'build', 'icons');
+const sourceIconsDir = path.resolve(process.cwd(), 'public', 'icons');
+const outputIconsDir = path.resolve(process.cwd(), 'public', 'build', 'icons');
 const pairs = [
   { svg: 'icon-192.svg', png: 'icon-192.png', size: 192 },
   { svg: 'icon-512.svg', png: 'icon-512.png', size: 512 },
@@ -10,14 +11,16 @@ const pairs = [
 ];
 
 async function convert() {
-  if (!fs.existsSync(iconsDir)) {
-    console.error('icons directory missing:', iconsDir);
+  if (!fs.existsSync(sourceIconsDir)) {
+    console.error('icons directory missing:', sourceIconsDir);
     process.exit(1);
   }
 
+  fs.mkdirSync(outputIconsDir, { recursive: true });
+
   for (const p of pairs) {
-    const svgPath = path.join(iconsDir, p.svg);
-    const pngPath = path.join(iconsDir, p.png);
+    const svgPath = path.join(sourceIconsDir, p.svg);
+    const pngPath = path.join(outputIconsDir, p.png);
     if (!fs.existsSync(svgPath)) {
       console.warn('SVG missing:', svgPath);
       continue;

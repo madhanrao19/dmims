@@ -363,7 +363,7 @@ Add this line:
 * * * * * cd /var/www/dmims && php artisan schedule:run >> /dev/null 2>&1
 ```
 
-### 10.2 Queue Worker (if using queues)
+### 10.2 Queue Worker (required — backups and exports run as queued jobs)
 Create supervisor config:
 ```bash
 sudo nano /etc/supervisor/conf.d/dmims-worker.conf

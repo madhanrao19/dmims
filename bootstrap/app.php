@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\AssignRequestContext;
 use App\Http\Middleware\EnsureCompanyActive;
 use App\Http\Middleware\EnsureCompanyAssigned;
 use App\Http\Middleware\EnsureLicenseAllowsAccess;
@@ -15,6 +16,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
+        api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
@@ -27,6 +29,10 @@ return Application::configure(basePath: dirname(__DIR__))
                 at: $proxies === '*' ? '*' : array_map('trim', explode(',', $proxies)),
             );
         }
+
+        $middleware->prepend([
+            AssignRequestContext::class,
+        ]);
 
         $middleware->append([
             SetCompanyContext::class,

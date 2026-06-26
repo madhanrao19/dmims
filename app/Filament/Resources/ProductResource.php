@@ -30,6 +30,11 @@ class ProductResource extends BaseResource
 
     protected static ?int $navigationSort = 1;
 
+    public static function getGloballySearchableAttributes(): array
+    {
+        return ['sku', 'barcode', 'product_name'];
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema

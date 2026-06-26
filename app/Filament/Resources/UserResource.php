@@ -23,6 +23,11 @@ class UserResource extends BaseResource
 
     protected static ?int $navigationSort = 2;
 
+    public static function getGloballySearchableAttributes(): array
+    {
+        return ['name', 'email', 'username', 'employee_id'];
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema
@@ -51,7 +56,6 @@ class UserResource extends BaseResource
                     ])
                     ->required(),
                 Forms\Components\Toggle::make('is_platform_user'),
-                Forms\Components\Toggle::make('two_factor_enabled'),
                 Forms\Components\Select::make('roles')->multiple()
                     ->relationship('roles', 'name'),
             ]);
@@ -66,6 +70,10 @@ class UserResource extends BaseResource
                 Tables\Columns\TextColumn::make('customer.company_name')->label('Company')->sortable()->searchable(),
                 Tables\Columns\TextColumn::make('status')->sortable(),
                 Tables\Columns\IconColumn::make('is_platform_user')->boolean()->label('Platform User'),
+                Tables\Columns\IconColumn::make('app_authentication_secret')
+                    ->label('2FA')
+                    ->boolean()
+                    ->getStateUsing(fn (User $record): bool => $record->hasAppAuthenticationEnabled()),
                 Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable(),
             ])
             ->filters([

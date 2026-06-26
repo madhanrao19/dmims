@@ -43,29 +43,47 @@ class ExportService
 
     /**
      * Generate a CSV export for the given entity type and return the record.
+     * Runs synchronously — web-request callers should use createPending()+
+     * queue a RunExport job instead.
      */
     public function export(string $type, ?int $customerId = null, array $data = []): Export
     {
-        $types = static::exportableTypes();
+        return $this->run($this->createPending($type, $customerId, $data));
+    }
 
-        if (! isset($types[$type])) {
+    /**
+     * Insert a pending export record without writing the (potentially slow)
+     * file — cheap enough to call inline from a web request.
+     */
+    public function createPending(string $type, ?int $customerId = null, array $data = []): Export
+    {
+        if (! isset(static::exportableTypes()[$type])) {
             throw new InvalidArgumentException("Unknown export type: {$type}");
         }
 
         $exportNo = $data['export_no'] ?? $this->generateExportNo();
-        $fileName = "{$exportNo}.csv";
 
-        $export = Export::create([
+        return Export::create([
             'customer_id' => $customerId,
             'export_no' => $exportNo,
             'export_type' => $type,
-            'file_name' => $fileName,
-            'status' => 'processing',
+            'file_name' => "{$exportNo}.csv",
+            'status' => 'pending',
             'requested_by' => $data['requested_by'] ?? auth()->id(),
         ]);
+    }
+
+    /**
+     * Write the actual CSV for a pending export record. This is the slow
+     * part and belongs on a queue worker, not the web request.
+     */
+    public function run(Export $export): Export
+    {
+        $export->update(['status' => 'processing']);
+        $types = static::exportableTypes();
 
         try {
-            $relativePath = $this->writeCsv($types[$type], $fileName, $customerId);
+            $relativePath = $this->writeCsv($types[$export->export_type], $export->file_name, $export->customer_id);
 
             $export->update([
                 'status' => 'completed',
@@ -76,8 +94,8 @@ class ExportService
             app(NotificationService::class)->notify(
                 'export_completed',
                 "Export {$export->export_no} completed",
-                "Your {$type} export is ready to download.",
-                $customerId,
+                "Your {$export->export_type} export is ready to download.",
+                $export->customer_id,
                 $export->requested_by,
             );
         } catch (Throwable $e) {
