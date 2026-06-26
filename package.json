@@ -6,7 +6,7 @@
         "build": "vite build",
         "dev": "vite"
         ,"icons:generate": "node tools/convert-icons.js",
-        "build:assets": "npm run icons:generate && vite build"
+        "build:assets": "vite build && npm run icons:generate"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",
