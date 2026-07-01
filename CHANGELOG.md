@@ -4,6 +4,26 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.4] - 2026-07-01
+
+### Changed
+- **Dependency refresh (within-constraint updates).** Ran `composer update`; 28
+  packages updated, including `laravel/framework` 13.15 → 13.18, `filament/filament`
+  → 5.6.7, `spatie/laravel-permission` 8.0 → 8.1, and `laravel/pint` → 1.29.3.
+  No composer or npm security advisories (`composer audit` / `npm audit` clean).
+  All 104 tests pass on the updated stack.
+
+### Deferred (documented, not applied)
+- Major upgrades that fall outside the current version constraints and would need
+  an intentional, separately-tested change are **not** included here:
+  `phpunit/phpunit` 11 → 13, `openspout/openspout` 4 → 5, and the npm `sharp`
+  0.34 → 0.35 major. None are security fixes.
+- npm minor/patch bumps (`vite` 8.0 → 8.1, `tailwindcss` / `@tailwindcss/vite`
+  4.3.1 → 4.3.2) are deferred: they are not security fixes and the Vite build
+  cannot be verified in the current sandbox (the network policy blocks the
+  build-time `fonts.bunny.net` fetch). Apply them in a normal dev/CI environment
+  where `npm run build` can be validated.
+
 ## [2.1.3] - 2026-07-01
 
 ### Fixed
