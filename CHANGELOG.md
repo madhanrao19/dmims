@@ -4,6 +4,24 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.5] - 2026-07-01
+
+### Changed
+- **Applied the previously-deferred dependency upgrades that validate cleanly.**
+  - `phpunit/phpunit` **11 → 13.2** (dev). Installs without conflict; all 104
+    tests pass unchanged, no config changes needed.
+  - `sharp` **0.34 → 0.35.3** (dev, PWA icon generation). Validated by running
+    `npm run icons:generate` — all icons (192/512/apple-touch) generate correctly.
+  - npm minors bumped in the lockfile: `vite` 8.0 → **8.1.2**, `tailwindcss` /
+    `@tailwindcss/vite` 4.3.1 → **4.3.2** (within existing constraints). Validated
+    by CI's `npm ci` + `npm run build:assets` (the Vite build's build-time font
+    fetch is only reachable in CI, not the local sandbox).
+
+### Not upgraded (blocked)
+- `openspout/openspout` **stays on 4.x**: `filament/actions` (Filament 5) requires
+  `openspout ^4.23`, so 5.x is not installable while on Filament 5. Revisit when
+  Filament relaxes that constraint.
+
 ## [2.1.4] - 2026-07-01
 
 ### Changed
