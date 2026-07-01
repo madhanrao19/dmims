@@ -28,11 +28,12 @@ Legend: ✅ implemented · WIP partial · ❌ missing
 literal `revoked` value; revocation is handled via `cancelled` +
 `technical_access_mode = blocked` (cosmetic divergence).
 
-**Movement-type enum:** dictionary lists `receive_in, stock_out,
-internal_transfer, adjustment`; TDD §18 adds `return, disposal, opening_balance`.
-Actual enum: `opening_balance, stock_in, stock_out, transfer, adjustment, return,
-disposal`. → values diverge (`stock_in` vs `receive_in`, `transfer` vs
-`internal_transfer`). Cosmetic but should be reconciled.
+**Movement-type enum:** ✅ reconciled (docs → code). The implemented enum is
+`opening_balance, stock_in, stock_out, transfer, adjustment, return, disposal`.
+The Database Dictionary's Movement Types section now documents each label with
+its stored enum value (e.g. Receive In → `stock_in`, Internal Transfer →
+`transfer`), so the documentation matches the schema. The values were left
+unchanged to avoid a data-affecting schema migration on the production enum.
 
 ## 2. Models (TDD §10)
 All required models present (SubscriptionLog, BillingRecord/Payment/Log added).
@@ -123,8 +124,10 @@ access. Dependencies updated to Laravel 12 + current packages (CVE-2026-48019
 patched).
 
 ### Remaining (non-code / cosmetic)
-- Movement-type enum naming (`stock_in` vs `receive_in`) and the missing literal
-  `revoked` license status — cosmetic.
+- Movement-type enum naming — ✅ reconciled docs → code (see §1); the Dictionary
+  now documents the stored enum values.
+- The missing literal `revoked` license status — cosmetic (handled via
+  `cancelled` + `technical_access_mode = blocked`).
 - Operational `.env` values on the server: DB credentials, `key:generate`, SMTP.
 - **Documentation stack references — reconciled.** The root files and the whole
   `/docs` set now document the tested stack — Ubuntu 24.04 + **Apache** +
