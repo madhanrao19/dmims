@@ -136,10 +136,14 @@ class AccessControlService
             return self::MODE_BLOCKED;
         }
 
-        // Expired beyond grace also blocks operational use.
+        // Past validity (plus any grace period) degrades to read-only. The date
+        // is authoritative regardless of the `status` column: nothing
+        // automatically flips status to `expired`, so gating this on status
+        // would let an unmaintained, still-"active" license keep full access
+        // after it has actually lapsed. `valid_to` is inclusive (valid through
+        // the end of that day + grace), matching LicenseService::isLicenseValid.
         if ($license->valid_to && Carbon::parse($license->valid_to)
-            ->addDays((int) $license->grace_period_days)->isPast()
-            && ! in_array($license->status, ['active', 'trial', 'near_expiry'], true)) {
+            ->addDays((int) $license->grace_period_days)->endOfDay()->isPast()) {
             return self::MODE_VIEW_ONLY;
         }
 

@@ -4,6 +4,24 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.2] - 2026-07-01
+
+### Fixed
+- **Expired licenses could retain full access (licensing enforcement gap).**
+  `AccessControlService::modeFromLicense()` gated its date-based expiry check on
+  the license `status` column (`&& ! in_array($status, ['active','trial','near_expiry'])`),
+  so it never fired while a license was still marked `active` — and nothing
+  transitions `status` to `expired` automatically. A lapsed license therefore
+  kept `MODE_FULL`. The date is now authoritative: once `valid_to` (+ grace
+  period, inclusive to end-of-day) is past, access degrades to `view_only`
+  regardless of the `status` column, matching `LicenseService::isLicenseValid()`.
+  Added `AccessControlTest` cases for expired-but-active, valid-through-today and
+  within-grace-period licenses.
+
+### Changed
+- Billing form inputs now enforce non-negative money: invoice `amount`/`tax_amount`
+  use `minValue(0)` and the Record Payment amount uses `minValue(0.01)`.
+
 ## [2.1.1] - 2026-07-01
 
 ### Security
