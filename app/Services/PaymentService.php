@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\BillingPayment;
 use App\Models\BillingRecord;
 use Illuminate\Support\Carbon;
+use RuntimeException;
 
 /**
  * Records manual payments against invoices and keeps the invoice payment status
@@ -16,6 +17,12 @@ class PaymentService
 
     public function recordPayment(BillingRecord $record, array $data): BillingPayment
     {
+        // Defence-in-depth behind the UI gate: never record a payment against a
+        // cancelled invoice.
+        if ($record->billing_status === 'cancelled') {
+            throw new RuntimeException("Cannot record a payment against cancelled invoice {$record->invoice_no}.");
+        }
+
         $payment = BillingPayment::create([
             'customer_id' => $record->customer_id,
             'billing_record_id' => $record->id,

@@ -151,3 +151,32 @@ patched).
   kept full access if its `status` column was never updated; date-based expiry is
   now authoritative. Also enforced non-negative billing amounts. Regression tests
   added.
+- v2.1.3: fixed `BoxResource` requiring `manage inventory` (locked the Document
+  Tracking User / Viewer roles out of a document-tracking resource) → now
+  `manage documents`; added billing money-path service guards (issue/cancel/pay
+  state checks); removed the dead `RecentlyViewed` model. Regression tests added.
+
+---
+
+## Cleanup & unused-schema report (v2.1.3)
+
+Dead code removed: `RecentlyViewed` model (unwired — no references, UI, factory
+or tests).
+
+**Unused / scaffolded — reported, not dropped (DB left intact per instruction):**
+
+| Item | State | Recommendation |
+|---|---|---|
+| `recently_viewed` table | Model removed; table now orphaned | Add a reversible drop migration in a future release if the "recently viewed" feature is not planned. |
+| `favorites` table + `Favorite` model + `Favoritable` trait | Trait mixed into `Box`/`DocumentFile`, but no UI, tests, or callers | Either surface a "favorites" UI or retire the feature (drop table + trait + model). |
+| `tags` / `taggables` tables + `Tag` model + `Taggable` trait | Functioning and **test-covered** (`TagsTest`) but not surfaced in any Filament resource | Surface tagging in the UI, or leave as a supported-but-headless capability. |
+
+**Optional / future (not implemented — noted for a later, planned change):**
+- Billing `invoice_no` / `payment_no` use `count()+1`. The unique constraints
+  prevent duplicates, but under concurrent creation the second insert errors
+  instead of taking the next number. Migrating to `SequenceGenerator` (as stock
+  and document movements already do) would make it robust — but the counter must
+  first be seeded to the current max per year to avoid colliding with existing
+  numbers, so this is deferred to a planned change with a data-migration step.
+- Redis cache/queues, HA, read replicas, object storage — infrastructure
+  roadmap items already tracked in the Deployment, Operations & DR Guide §28.
