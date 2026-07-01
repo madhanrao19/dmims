@@ -31,17 +31,17 @@ The objective is to ensure every developer builds the system consistently and ac
 
 | Layer | Technology |
 | ----- | ----- |
-| Backend | Laravel 12 |
-| Admin Panel | Filament 4 |
-| Language | PHP 8.3+ |
-| Database | MySQL 8 / MariaDB |
+| Backend | Laravel 13 |
+| Admin Panel | Filament 5 |
+| Language | PHP 8.4+ |
+| Database | MariaDB 11 (MySQL 8 compatible) |
 | Authentication | Laravel \+ Filament |
 | Permissions | Spatie Laravel Permission |
 | Frontend | Blade \+ Tailwind CSS \+ Alpine.js |
 | Build Tool | Vite |
 | Queue | Database Queue |
 | Cache | File Cache (Redis-ready) |
-| Web Server | Nginx |
+| Web Server | Apache (PHP-FPM) |
 | Runtime | PHP-FPM |
 | Operating System | Ubuntu 24.04 LTS |
 

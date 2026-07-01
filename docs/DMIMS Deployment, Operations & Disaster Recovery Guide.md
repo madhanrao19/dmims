@@ -2,7 +2,7 @@
 
 **Datamation Inventory Management System (DMIMS)**
 
-Version 1.0
+Version 1.1
 
 ---
 
@@ -32,9 +32,9 @@ It is intended for:
                         │  
                     Ubuntu 24.04  
                         │  
-                     Nginx  
+                     Apache  
                         │  
-                    PHP-FPM 8.3  
+                    PHP-FPM 8.4  
                         │  
                      Laravel  
                         │  
@@ -54,11 +54,11 @@ Ubuntu Server 24.04 LTS
 
 Web Server
 
-Nginx
+Apache (with PHP-FPM)
 
 Runtime
 
-PHP 8.3+
+PHP 8.4+
 
 Database
 
@@ -170,17 +170,17 @@ Disk
 Deployment order:
 
 1. Provision server  
-2. Install PHP  
+2. Install PHP 8.4 (ondrej/php PPA)  
 3. Install MariaDB  
 4. Install Composer  
-5. Install Node.js  
+5. Install Node.js 22  
 6. Clone repository  
 7. Install dependencies  
 8. Configure .env  
 9. Run migrations  
 10. Seed database  
 11. Build assets  
-12. Configure Nginx  
+12. Configure Apache  
 13. Configure Supervisor  
 14. Configure Scheduler  
 15. Configure Cloudflare  
@@ -207,7 +207,14 @@ CACHE\_STORE=file
 
 LOG\_CHANNEL=stack
 
-SESSION\_SECURE\_COOKIE=true
+SESSION\_SECURE\_COOKIE
+
+TRUSTED\_PROXIES=\*
+
+Set SESSION\_SECURE\_COOKIE=true only when the app is served over HTTPS on every
+path. The reference Cloudflare Tunnel deployment is also reached over plain HTTP
+on localhost/LAN, so it keeps SESSION\_SECURE\_COOKIE=false — see
+DEPLOYMENT\_GUIDE.md.
 
 Never commit .env to version control.
 
@@ -275,13 +282,13 @@ Scheduler responsibilities:
 
 ---
 
-# **10\. Nginx Configuration**
+# **10\. Apache Configuration**
 
 Requirements
 
-* HTTPS only  
-* HTTP → HTTPS redirect  
-* PHP-FPM  
+* mod\_rewrite (Laravel `public/.htaccess` handles routing)  
+* PHP-FPM 8.4 via the Unix socket (proxy\_fcgi)  
+* Plain HTTP on port 80 (TLS terminated by Cloudflare at the edge)  
 * Static asset caching  
 * Security headers  
 * File upload limits
@@ -332,7 +339,7 @@ Separate backup storage volume.
 
 Laravel logs
 
-Nginx logs
+Apache logs
 
 PHP logs
 
@@ -355,7 +362,7 @@ Monitor:
 * Disk  
 * Queue workers  
 * Scheduler  
-* Nginx  
+* Apache  
 * PHP-FPM  
 * Database  
 * Storage  
@@ -706,4 +713,5 @@ Operational excellence is achieved through repeatable processes, monitoring, bac
 | Version | Date | Description |
 | ----- | ----- | ----- |
 | 1.0 | June 2026 | Initial Deployment, Operations & Disaster Recovery Guide |
+| 1.1 | July 2026 | Aligned the production stack with the tested deployment and root DEPLOYMENT_GUIDE.md: Apache (was Nginx), PHP 8.4 (was 8.3), Node 22, and the Cloudflare Tunnel SESSION_SECURE_COOKIE / TRUSTED_PROXIES guidance. |
 

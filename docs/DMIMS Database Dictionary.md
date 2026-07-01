@@ -724,19 +724,21 @@ Stores immutable inventory history.
 
 ## **Movement Types**
 
-Opening Balance
+The `movement_type` column stores these enum values (label — stored value):
 
-Receive In
+Opening Balance — `opening_balance`
 
-Stock Out
+Receive In — `stock_in`
 
-Internal Transfer
+Stock Out — `stock_out`
 
-Adjustment
+Internal Transfer — `transfer`
 
-Return
+Adjustment — `adjustment`
 
-Disposal
+Return — `return`
+
+Disposal — `disposal`
 
 ---
 

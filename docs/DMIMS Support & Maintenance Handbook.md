@@ -223,7 +223,7 @@ Every business day verify:
 Tasks
 
 * Review Laravel logs  
-* Review Nginx logs  
+* Review Apache logs  
 * Check queue failures  
 * Review failed jobs  
 * Verify scheduled tasks  
@@ -274,7 +274,7 @@ Monitor:
 * Database performance  
 * Queue workers  
 * PHP-FPM  
-* Nginx  
+* Apache  
 * SSL expiry  
 * Scheduled jobs  
 * Application response time
@@ -288,8 +288,8 @@ Investigate sustained anomalies before they become incidents.
 Review:
 
 * Laravel application log  
-* Nginx access log  
-* Nginx error log  
+* Apache access log  
+* Apache error log  
 * PHP-FPM log  
 * Supervisor log  
 * System log

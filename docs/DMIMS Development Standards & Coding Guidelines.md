@@ -66,7 +66,7 @@ Middleware performs cross-cutting checks.
 
 Required
 
-* PHP 8.3+  
+* PHP 8.4+  
 * PSR-12 coding style  
 * Strict typing where practical  
 * Constructor property promotion  

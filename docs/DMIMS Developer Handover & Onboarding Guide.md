@@ -45,14 +45,14 @@ The application is designed around these principles:
 
 | Layer | Technology |
 | ----- | ----- |
-| Backend | Laravel 12 |
-| Admin Panel | Filament 4 |
-| Language | PHP 8.3+ |
-| Database | MariaDB / MySQL |
+| Backend | Laravel 13 |
+| Admin Panel | Filament 5 |
+| Language | PHP 8.4+ |
+| Database | MariaDB 11 (MySQL 8 compatible) |
 | Frontend | Blade \+ Tailwind \+ Alpine.js |
 | Build Tool | Vite |
 | Queue | Laravel Database Queue |
-| Deployment | Ubuntu 24.04 \+ Nginx |
+| Deployment | Ubuntu 24.04 \+ Apache \+ Cloudflare Tunnel |
 
 ---
 
@@ -433,7 +433,7 @@ php artisan schedule:run
 Useful logs:
 
 * Laravel log  
-* Nginx log  
+* Apache log  
 * PHP-FPM log  
 * Queue worker log
 

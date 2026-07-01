@@ -28,11 +28,12 @@ Legend: ✅ implemented · WIP partial · ❌ missing
 literal `revoked` value; revocation is handled via `cancelled` +
 `technical_access_mode = blocked` (cosmetic divergence).
 
-**Movement-type enum:** dictionary lists `receive_in, stock_out,
-internal_transfer, adjustment`; TDD §18 adds `return, disposal, opening_balance`.
-Actual enum: `opening_balance, stock_in, stock_out, transfer, adjustment, return,
-disposal`. → values diverge (`stock_in` vs `receive_in`, `transfer` vs
-`internal_transfer`). Cosmetic but should be reconciled.
+**Movement-type enum:** ✅ reconciled (docs → code). The implemented enum is
+`opening_balance, stock_in, stock_out, transfer, adjustment, return, disposal`.
+The Database Dictionary's Movement Types section now documents each label with
+its stored enum value (e.g. Receive In → `stock_in`, Internal Transfer →
+`transfer`), so the documentation matches the schema. The values were left
+unchanged to avoid a data-affecting schema migration on the production enum.
 
 ## 2. Models (TDD §10)
 All required models present (SubscriptionLog, BillingRecord/Payment/Log added).
@@ -92,11 +93,15 @@ All six dictionary module codes are present (`stock_inventory`,
 | PWA | ✅ | manifest, service worker, offline page present |
 
 ## 8. Configuration (TDD §29) & security (§30)
-✅ `APP_ENV=production`, `APP_DEBUG=false`, `SESSION_SECURE_COOKIE=true`,
-`SESSION_DRIVER=database`, `QUEUE_CONNECTION=database`, HTTPS, isolation, audit,
-direct-URL protection, secure cookies, ✅ `TRUSTED_PROXIES=*` (Cloudflare).
-Operational values still set on the server: real `DB_*` credentials,
-`php artisan key:generate`, and SMTP mail (password reset).
+✅ `APP_ENV=production`, `APP_DEBUG=false`, `SESSION_DRIVER=database`,
+`QUEUE_CONNECTION=database`, isolation, audit, direct-URL protection, ✅
+`TRUSTED_PROXIES=*` (Cloudflare). `SESSION_SECURE_COOKIE=false` is intentional
+for the reference Cloudflare Tunnel deployment, which is reached over the tunnel
+(HTTPS) **and** directly over plain HTTP on localhost/LAN — a forced secure
+cookie would break the HTTP path. Set it to `true` only for HTTPS-on-every-path
+deployments (see DEPLOYMENT_GUIDE.md). Operational values still set on the
+server: real `DB_*` credentials, `php artisan key:generate`, and SMTP mail
+(password reset).
 
 ---
 
@@ -119,8 +124,22 @@ access. Dependencies updated to Laravel 12 + current packages (CVE-2026-48019
 patched).
 
 ### Remaining (non-code / cosmetic)
-- Movement-type enum naming (`stock_in` vs `receive_in`) and the missing literal
-  `revoked` license status — cosmetic.
+- Movement-type enum naming — ✅ reconciled docs → code (see §1); the Dictionary
+  now documents the stored enum values.
+- The missing literal `revoked` license status — cosmetic (handled via
+  `cancelled` + `technical_access_mode = blocked`).
 - Operational `.env` values on the server: DB credentials, `key:generate`, SMTP.
-- Optional: Filament 5 / Laravel 13 upgrade (prepared on the
-  `upgrade/filament5-laravel13` branch; not a documented requirement).
+- **Documentation stack references — reconciled.** The root files and the whole
+  `/docs` set now document the tested stack — Ubuntu 24.04 + **Apache** +
+  **PHP 8.4** + **MariaDB** + Node 22 + Cloudflare Tunnel, on Laravel 13 +
+  Filament 5. The SAD, TDD, Developer Getting Started / Handover, Support &
+  Maintenance Handbook and RAID Log were updated from the earlier
+  Nginx / PHP 8.3 / Laravel 12 / Filament 4 wording. (The 2026-06-14 audit note
+  below is retained as historical record and predates the Laravel 13 / Filament 5
+  upgrade.)
+
+### Done since the 2026-06-14 audit
+- Filament 5 / Laravel 13 / PHP 8.4 upgrade shipped in v2.0.0 (see CHANGELOG).
+- Root project files aligned with `/docs` governance and the tested Ubuntu
+  deployment in v2.1.0; fixed `AssignRequestContext` fataling on download
+  responses.

@@ -4,6 +4,45 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.0] - 2026-07-01
+
+### Changed
+- **Root project files aligned with the `/docs` governance system and the
+  tested Ubuntu deployment.** Removed contradictions between `README.md`,
+  `DEPLOYMENT_GUIDE.md`, `SECURITY.md` and `/docs`, and made
+  **Ubuntu 24.04 + Apache + PHP 8.4 + MariaDB + Cloudflare Tunnel** the single
+  documented production stack (previously "MySQL"; MariaDB is used via the
+  MySQL-compatible `mysql` driver).
+- **`CLAUDE.md` trimmed to a concise pointer** to the governance documents in
+  `/docs` (Engineering Constitution, Project Governance, Definition of Done,
+  Conformance Gap Analysis) instead of duplicating them.
+- **`SECURITY.md`** replaced the GitHub stub template with a real security
+  policy: supported versions (2.x), private vulnerability reporting, the
+  seven-layer defence-in-depth model, and production security notes.
+- **`.env.example`** now uses safe local defaults (`APP_NAME=DMIMS`, SQLite,
+  `SESSION_SECURE_COOKIE=false`, empty `TRUSTED_PROXIES`, `MAIL_MAILER=log`)
+  with explicit `PRODUCTION:` notes for MariaDB, HTTPS cookies, trusted proxies
+  and SMTP mail.
+- **`deploy-ubuntu-24.sh`** installs `mariadb-server` (was `mysql-server`),
+  documents the required install order, splits PHP-dependency install from asset
+  build so `composer install` always precedes any `php artisan` call, and sets
+  `APP_NAME` / `SESSION_SAME_SITE` in the generated `.env`.
+- Added a **Deployment Lessons Learned** section to `DEPLOYMENT_GUIDE.md`
+  (composer before artisan; `vendor/autoload.php` must exist on the server;
+  `SESSION_SECURE_COOKIE` false for local HTTP / true for HTTPS-only; short
+  explicit MySQL/MariaDB index names; `AssignRequestContext` must not use
+  `withHeaders()`; publish Filament assets every deploy; make PHP 8.4 default).
+- `composer.json` / `package.json` project identity updated from the Laravel
+  skeleton to DMIMS.
+
+### Fixed
+- **Report/export/backup downloads could fatal on every request.**
+  `AssignRequestContext` (registered globally) called
+  `$response->withHeaders(...)`, which only exists on Illuminate responses — on
+  the `StreamedResponse` / `BinaryFileResponse` returned by downloads it would
+  throw. Now sets the correlation-ID header via `$response->headers->set(...)`,
+  which works on every Symfony response type.
+
 ## [2.0.0] - 2026-06-15
 
 ### Changed
