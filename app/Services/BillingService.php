@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\BillingLog;
 use App\Models\BillingRecord;
 use Illuminate\Support\Carbon;
+use RuntimeException;
 
 /**
  * Manual billing (PRD §13). Creates invoices, maintains totals and payment
@@ -41,6 +42,12 @@ class BillingService
 
     public function issue(BillingRecord $record): BillingRecord
     {
+        // Defence-in-depth behind the UI gate: only a draft invoice can be
+        // issued (never re-issue an issued one or resurrect a cancelled one).
+        if ($record->billing_status !== 'draft') {
+            throw new RuntimeException("Only draft invoices can be issued (invoice {$record->invoice_no} is {$record->billing_status}).");
+        }
+
         $record->update(['billing_status' => 'issued']);
         $this->log($record, 'issued');
 
@@ -49,6 +56,10 @@ class BillingService
 
     public function cancel(BillingRecord $record): BillingRecord
     {
+        if ($record->billing_status === 'cancelled') {
+            throw new RuntimeException("Invoice {$record->invoice_no} is already cancelled.");
+        }
+
         $record->update(['billing_status' => 'cancelled']);
         $this->log($record, 'cancelled');
 

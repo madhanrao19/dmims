@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Resources\BoxResource;
 use App\Filament\Resources\ProductResource;
 use App\Models\Customer;
 use App\Models\CustomerModule;
@@ -73,5 +74,48 @@ class RbacViewOnlyTest extends TestCase
 
         $this->assertFalse(ProductResource::can('viewAny'));
         $this->assertFalse(ProductResource::can('create'));
+    }
+
+    private function documentUser(string $role): User
+    {
+        $customer = Customer::create(['company_name' => 'Docs', 'company_code' => 'DOC', 'status' => 'active']);
+
+        $module = Module::create(['module_code' => 'document_tracking', 'module_name' => 'Documents', 'status' => 'active']);
+        CustomerModule::create([
+            'customer_id' => $customer->id,
+            'module_id' => $module->id,
+            'is_enabled' => true,
+            'enabled_at' => now(),
+        ]);
+
+        $user = User::factory()->create([
+            'customer_id' => $customer->id,
+            'is_platform_user' => false,
+            'status' => 'active',
+        ]);
+        $user->assignRole($role);
+
+        return $user;
+    }
+
+    public function test_document_tracking_user_can_manage_boxes(): void
+    {
+        // Boxes are a document-tracking resource gated on "manage documents";
+        // the Document Tracking User role must be able to reach and manage them.
+        $this->actingAs($this->documentUser('Document Tracking User'));
+
+        $this->assertTrue(BoxResource::can('viewAny'));
+        $this->assertTrue(BoxResource::can('create'));
+        $this->assertTrue(BoxResource::can('update'));
+    }
+
+    public function test_viewer_can_read_boxes_but_not_write(): void
+    {
+        // Viewer holds "view documents" only.
+        $this->actingAs($this->documentUser('Viewer'));
+
+        $this->assertTrue(BoxResource::can('viewAny'));
+        $this->assertFalse(BoxResource::can('create'));
+        $this->assertFalse(BoxResource::can('update'));
     }
 }

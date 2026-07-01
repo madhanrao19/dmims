@@ -64,4 +64,22 @@ class BillingServiceTest extends TestCase
         app(BillingService::class)->cancel($invoice);
         $this->assertSame('cancelled', $invoice->refresh()->billing_status);
     }
+
+    public function test_cannot_pay_a_cancelled_invoice(): void
+    {
+        $invoice = app(BillingService::class)->createInvoice(['customer_id' => $this->customer()->id, 'amount' => 50]);
+        app(BillingService::class)->cancel($invoice);
+
+        $this->expectException(\RuntimeException::class);
+        app(PaymentService::class)->recordPayment($invoice->refresh(), ['amount' => 50]);
+    }
+
+    public function test_cannot_issue_a_non_draft_invoice(): void
+    {
+        $invoice = app(BillingService::class)->createInvoice(['customer_id' => $this->customer()->id, 'amount' => 50]);
+        app(BillingService::class)->issue($invoice);
+
+        $this->expectException(\RuntimeException::class);
+        app(BillingService::class)->issue($invoice->refresh());
+    }
 }

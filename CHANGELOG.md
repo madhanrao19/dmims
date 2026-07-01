@@ -4,6 +4,30 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.3] - 2026-07-01
+
+### Fixed
+- **Boxes were unreachable by the roles meant to manage them.** `BoxResource`
+  required the `manage inventory` permission despite being a document-tracking
+  resource (Document Tracking nav group, gated on the `document_tracking`
+  module). The Document Tracking User (`manage documents`) and Viewer
+  (`view documents`) roles were therefore locked out of Boxes. It now uses the
+  `manage documents` permission, matching the sibling document resources. Added
+  `RbacViewOnlyTest` cases for box access.
+
+### Security
+- **Billing money-path service guards (defence-in-depth).** `BillingService::issue`
+  now rejects non-draft invoices, `BillingService::cancel` rejects
+  already-cancelled invoices, and `PaymentService::recordPayment` rejects payments
+  against cancelled invoices — previously these were only guarded in the Filament
+  UI. Added `BillingServiceTest` cases.
+
+### Removed
+- Dead `RecentlyViewed` model (unwired — `record()` was never called and the
+  model had no references, UI, factory or tests). The `recently_viewed` table is
+  left in place; see `docs/CONFORMANCE_GAP_ANALYSIS.md` for the unused-schema
+  report.
+
 ## [2.1.2] - 2026-07-01
 
 ### Fixed
