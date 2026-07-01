@@ -4,7 +4,7 @@
 
 **Version:** 1.0  
 **Project Status:** Production Development  
-**Technology Stack:** Laravel 12 \+ Filament 4 \+ MySQL/MariaDB \+ Vite \+ PHP 8.3+
+**Technology Stack:** Laravel 13 \+ Filament 5 \+ MariaDB (MySQL-compatible) \+ Vite \+ PHP 8.4+
 
 ---
 
@@ -60,19 +60,19 @@ Major modules include:
 
 ## **Backend**
 
-Laravel 12
+Laravel 13
 
 ## **Admin Framework**
 
-Filament 4
+Filament 5
 
 ## **Programming Language**
 
-PHP 8.3+
+PHP 8.4+
 
 ## **Database**
 
-MySQL 8 or MariaDB
+MariaDB 11 (MySQL 8 compatible)
 
 ## **Authentication**
 
@@ -124,7 +124,7 @@ Print View
 
 Ubuntu 24.04 LTS
 
-Nginx
+Apache
 
 PHP-FPM
 
@@ -214,15 +214,15 @@ Install the following:
 
 Git
 
-PHP 8.3+
+PHP 8.4+
 
 Composer
 
-Node.js LTS
+Node.js 22 LTS
 
 npm
 
-MySQL 8 or MariaDB
+MariaDB 11 (MySQL 8 compatible)
 
 Visual Studio Code
 

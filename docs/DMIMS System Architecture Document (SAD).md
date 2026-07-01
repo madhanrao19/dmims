@@ -67,7 +67,7 @@ Business logic must never bypass the Service layer.
                     HTTPS / Cloudflare  
                             |  
                   \+---------v--------+  
-                  |      Nginx       |  
+                  |      Apache      |  
                   \+---------+--------+  
                             |  
                      PHP-FPM / Laravel  
@@ -100,7 +100,7 @@ Business logic must never bypass the Service layer.
                             |  
                      Eloquent Models  
                             |  
-                     MySQL / MariaDB
+                     MariaDB (MySQL-compatible)
 
 ---
 
@@ -108,19 +108,19 @@ Business logic must never bypass the Service layer.
 
 Backend
 
-Laravel 12
+Laravel 13
 
 Admin Framework
 
-Filament 4
+Filament 5
 
 Programming Language
 
-PHP 8.3+
+PHP 8.4+
 
 Database
 
-MySQL 8 / MariaDB
+MariaDB 11 (MySQL 8 compatible)
 
 Frontend
 
@@ -146,7 +146,7 @@ Deployment
 
 Ubuntu 24.04 LTS
 
-Nginx
+Apache
 
 PHP-FPM
 
@@ -755,7 +755,7 @@ Ubuntu Server
 
 ↓
 
-Nginx
+Apache
 
 ↓
 
@@ -767,7 +767,7 @@ Laravel
 
 ↓
 
-MySQL
+MariaDB
 
 ↓
 

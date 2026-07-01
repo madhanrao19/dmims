@@ -645,7 +645,7 @@ Medium
 
 ## **DEP-010**
 
-Nginx
+Apache
 
 Purpose
 

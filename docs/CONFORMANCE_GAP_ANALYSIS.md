@@ -126,13 +126,14 @@ patched).
 - Movement-type enum naming (`stock_in` vs `receive_in`) and the missing literal
   `revoked` license status — cosmetic.
 - Operational `.env` values on the server: DB credentials, `key:generate`, SMTP.
-- **Documentation stack drift (open):** the root files and the Deployment,
-  Operations & DR Guide now document the tested stack — Ubuntu 24.04 + **Apache**
-  + **PHP 8.4** + **MariaDB** + Node 22 + Cloudflare Tunnel, on Laravel 13 +
-  Filament 5. Several other reference docs (SAD, TDD, Developer Getting Started /
-  Handover, Support & Maintenance Handbook) still cite the earlier
-  Nginx / PHP 8.3 / Laravel 12 / Filament 4 stack and should be reconciled in a
-  follow-up documentation pass. Not a code gap.
+- **Documentation stack references — reconciled.** The root files and the whole
+  `/docs` set now document the tested stack — Ubuntu 24.04 + **Apache** +
+  **PHP 8.4** + **MariaDB** + Node 22 + Cloudflare Tunnel, on Laravel 13 +
+  Filament 5. The SAD, TDD, Developer Getting Started / Handover, Support &
+  Maintenance Handbook and RAID Log were updated from the earlier
+  Nginx / PHP 8.3 / Laravel 12 / Filament 4 wording. (The 2026-06-14 audit note
+  below is retained as historical record and predates the Laravel 13 / Filament 5
+  upgrade.)
 
 ### Done since the 2026-06-14 audit
 - Filament 5 / Laravel 13 / PHP 8.4 upgrade shipped in v2.0.0 (see CHANGELOG).
