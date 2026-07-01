@@ -67,4 +67,21 @@ class TenantScopeTest extends TestCase
 
         $this->assertSame($this->customerB->id, $product->customer_id);
     }
+
+    public function test_customer_user_cannot_write_into_another_tenant(): void
+    {
+        // customer_id is mass-assignable; a crafted create must not be able to
+        // plant a record in another customer's tenant. The creating hook forces
+        // it back to the acting user's customer.
+        $this->actingAs($this->customerUser($this->customerB));
+
+        $product = Product::create([
+            'customer_id' => $this->customerA->id, // attempt to write into tenant A
+            'sku' => 'B3',
+            'product_name' => 'Spoofed Tenant',
+            'status' => 'active',
+        ]);
+
+        $this->assertSame($this->customerB->id, $product->customer_id);
+    }
 }

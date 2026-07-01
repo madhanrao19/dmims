@@ -4,6 +4,21 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.1] - 2026-07-01
+
+### Security
+- **Tenant write-protection hardened.** `customer_id` is mass-assignable on the
+  operational models, and the `BelongsToCustomer` creating hook previously only
+  filled it when empty — so a crafted create could plant a record in another
+  tenant. The hook now *always* binds a non-platform user's records to their own
+  `customer_id`, overriding any supplied value. Platform users and
+  unauthenticated contexts (seeders, queued jobs, console) are unchanged. Added
+  `TenantScopeTest::test_customer_user_cannot_write_into_another_tenant`.
+
+### Changed
+- `InjectPwaScript::handle()` now declares its `Response` return type (the PWA
+  injection remains guarded to `text/html`, so downloads are untouched).
+
 ## [2.1.0] - 2026-07-01
 
 ### Changed
