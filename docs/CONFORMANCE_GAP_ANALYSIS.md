@@ -57,7 +57,7 @@ All required models present (SubscriptionLog, BillingRecord/Payment/Log added).
 | 2 Role/permission validation | ✅ `manage X` / `view X` permissions; reads on either, writes on `manage` |
 | 3 Customer isolation | ✅ global scopes + Filament scope |
 | 4 Subscription validation | ✅ `EnsureSubscriptionActive` (TDD calls it `EnsureSubscriptionValid`) |
-| 5 License validation | ✅ `EnsureLicenseAllowsAccess` + `technical_access_mode` |
+| 5 License validation | ✅ `EnsureLicenseAllowsAccess` + `technical_access_mode`; date-based expiry now authoritative (v2.1.2 — lapsed licenses degrade to view-only even if `status` is stale) |
 | 6 Module validation | ✅ enforced in `can()` + nav |
 | 7 Operational permission | ✅ permission check in `can()` |
 
@@ -147,3 +147,7 @@ patched).
   hook now always binds a tenant user's records to their own `customer_id`
   (defence-in-depth against mass-assignment of `customer_id`), with a regression
   test.
+- v2.1.2: fixed a licensing enforcement gap where an expired-by-date license
+  kept full access if its `status` column was never updated; date-based expiry is
+  now authoritative. Also enforced non-negative billing amounts. Regression tests
+  added.
