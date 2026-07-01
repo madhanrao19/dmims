@@ -143,3 +143,7 @@ patched).
 - Root project files aligned with `/docs` governance and the tested Ubuntu
   deployment in v2.1.0; fixed `AssignRequestContext` fataling on download
   responses.
+- v2.1.1: tenant write-protection hardened — the `BelongsToCustomer` creating
+  hook now always binds a tenant user's records to their own `customer_id`
+  (defence-in-depth against mass-assignment of `customer_id`), with a regression
+  test.
