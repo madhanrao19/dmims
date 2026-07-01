@@ -1,10 +1,10 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/laravel",
+    "name": "datamation/dmims",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
-    "keywords": ["laravel", "framework"],
-    "license": "MIT",
+    "description": "DMIMS — Datamation Inventory Management System (Laravel 13 + Filament 5).",
+    "keywords": ["dmims", "laravel", "filament", "inventory", "document-management"],
+    "license": "proprietary",
     "require": {
         "php": "^8.4",
         "barryvdh/laravel-dompdf": "^3.1",

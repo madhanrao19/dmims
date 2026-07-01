@@ -15,7 +15,7 @@ companies operate in a single system with complete data isolation.
 |---|---|
 | Backend | PHP 8.4+ · Laravel 13 |
 | Admin UI | Filament 5 (Livewire + Blade + Tailwind) |
-| Database | MySQL 8 / MariaDB (SQLite for local/testing) |
+| Database | MariaDB 11 (MySQL 8 compatible; SQLite for local/testing) |
 | Auth / RBAC | Laravel Auth · Spatie Laravel Permission |
 | Queue / Cache / Session | Database driver |
 | Mobile | Progressive Web App (manifest + service worker) |
@@ -59,8 +59,8 @@ Supervisor, Stock Inventory User, Document Tracking User, Viewer.
 
 ## Local development
 
-Requirements: PHP 8.4+, Composer, Node.js 20+, and a database (SQLite is fine
-locally).
+Requirements: PHP 8.4+, Composer, Node.js 22 (or 20.19+, required by Vite 8),
+and a database (SQLite is fine locally).
 
 ```bash
 composer install
@@ -115,7 +115,7 @@ inline in the web request.
 ## Production deployment
 
 See [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) — the single authoritative
-deployment doc — for the full Ubuntu 24 + Apache + PHP-FPM + MySQL +
+deployment doc — for the full Ubuntu 24.04 + Apache + PHP-FPM 8.4 + MariaDB +
 Cloudflare Tunnel setup, including queue worker, scheduler, TLS, backups, and
 the optional PDF/Excel/barcode-image libraries.
 
@@ -131,9 +131,13 @@ to `true` instead.
 ## Documentation
 
 - [CHANGELOG.md](CHANGELOG.md) — full change history.
-- [docs/CONFORMANCE_GAP_ANALYSIS.md](docs/CONFORMANCE_GAP_ANALYSIS.md) —
-  requirements conformance audit.
-- [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) — production operations guide.
+- [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) — production operations guide
+  (Ubuntu 24.04 + Apache + PHP 8.4 + MariaDB + Cloudflare Tunnel).
+- [SECURITY.md](SECURITY.md) — security policy and vulnerability reporting.
+- [`/docs`](docs/) — the governance source of truth: Engineering Constitution,
+  Project Governance, SAD, TDD, Business Rules, Security & Access Control Matrix,
+  Database Dictionary, and the
+  [Conformance Gap Analysis](docs/CONFORMANCE_GAP_ANALYSIS.md).
 
 ## License
 

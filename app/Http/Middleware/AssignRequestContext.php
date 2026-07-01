@@ -30,6 +30,13 @@ class AssignRequestContext
 
         $response = $next($request);
 
-        return $response->withHeaders(['X-Request-Id' => $requestId]);
+        // Set the header via the shared HeaderBag rather than
+        // Illuminate\Http\Response::withHeaders(): that helper only exists on
+        // Illuminate responses, so calling it here would fatal on the
+        // StreamedResponse / BinaryFileResponse returned by report, export and
+        // backup downloads. headers->set() works on every Symfony response.
+        $response->headers->set('X-Request-Id', $requestId);
+
+        return $response;
     }
 }

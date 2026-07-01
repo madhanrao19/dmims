@@ -92,11 +92,15 @@ All six dictionary module codes are present (`stock_inventory`,
 | PWA | ✅ | manifest, service worker, offline page present |
 
 ## 8. Configuration (TDD §29) & security (§30)
-✅ `APP_ENV=production`, `APP_DEBUG=false`, `SESSION_SECURE_COOKIE=true`,
-`SESSION_DRIVER=database`, `QUEUE_CONNECTION=database`, HTTPS, isolation, audit,
-direct-URL protection, secure cookies, ✅ `TRUSTED_PROXIES=*` (Cloudflare).
-Operational values still set on the server: real `DB_*` credentials,
-`php artisan key:generate`, and SMTP mail (password reset).
+✅ `APP_ENV=production`, `APP_DEBUG=false`, `SESSION_DRIVER=database`,
+`QUEUE_CONNECTION=database`, isolation, audit, direct-URL protection, ✅
+`TRUSTED_PROXIES=*` (Cloudflare). `SESSION_SECURE_COOKIE=false` is intentional
+for the reference Cloudflare Tunnel deployment, which is reached over the tunnel
+(HTTPS) **and** directly over plain HTTP on localhost/LAN — a forced secure
+cookie would break the HTTP path. Set it to `true` only for HTTPS-on-every-path
+deployments (see DEPLOYMENT_GUIDE.md). Operational values still set on the
+server: real `DB_*` credentials, `php artisan key:generate`, and SMTP mail
+(password reset).
 
 ---
 
@@ -122,5 +126,16 @@ patched).
 - Movement-type enum naming (`stock_in` vs `receive_in`) and the missing literal
   `revoked` license status — cosmetic.
 - Operational `.env` values on the server: DB credentials, `key:generate`, SMTP.
-- Optional: Filament 5 / Laravel 13 upgrade (prepared on the
-  `upgrade/filament5-laravel13` branch; not a documented requirement).
+- **Documentation stack drift (open):** the root files and the Deployment,
+  Operations & DR Guide now document the tested stack — Ubuntu 24.04 + **Apache**
+  + **PHP 8.4** + **MariaDB** + Node 22 + Cloudflare Tunnel, on Laravel 13 +
+  Filament 5. Several other reference docs (SAD, TDD, Developer Getting Started /
+  Handover, Support & Maintenance Handbook) still cite the earlier
+  Nginx / PHP 8.3 / Laravel 12 / Filament 4 stack and should be reconciled in a
+  follow-up documentation pass. Not a code gap.
+
+### Done since the 2026-06-14 audit
+- Filament 5 / Laravel 13 / PHP 8.4 upgrade shipped in v2.0.0 (see CHANGELOG).
+- Root project files aligned with `/docs` governance and the tested Ubuntu
+  deployment in v2.1.0; fixed `AssignRequestContext` fataling on download
+  responses.
