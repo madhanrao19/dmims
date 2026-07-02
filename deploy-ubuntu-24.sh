@@ -13,9 +13,9 @@ set -euo pipefail
 # fix permissions last (so all generated artifacts end up owned by www-data).
 #
 # Usage:
-#   sudo ./deploy-ubuntu-24.sh --repo-dir /var/www/dmims-code --domain example.com --repo-url https://github.com/your/repo.git
+#   sudo ./deploy-ubuntu-24.sh --repo-dir /var/www/dmims --domain example.com --repo-url https://github.com/your/repo.git
 
-REPO_DIR="/var/www/dmims-code"
+REPO_DIR="/var/www/dmims"
 REPO_URL=""
 APP_DOMAIN=""
 DB_HOST="127.0.0.1"
@@ -32,7 +32,7 @@ function usage() {
 Usage: sudo $0 [options]
 
 Options:
-  --repo-dir DIR       Repository directory (default: /var/www/dmims-code)
+  --repo-dir DIR       Repository directory (default: /var/www/dmims)
   --repo-url URL       Git repository URL (required if repo directory does not exist)
   --domain DOMAIN      Application domain, e.g. dmims.example.com (required)
   --db-host HOST       MySQL host default: 127.0.0.1
