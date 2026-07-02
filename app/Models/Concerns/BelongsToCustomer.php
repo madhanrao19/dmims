@@ -38,7 +38,13 @@ trait BelongsToCustomer
         static::creating(function (Model $model): void {
             $user = auth()->user();
 
-            if ($user && ! $user->is_platform_user && $user->customer_id && empty($model->customer_id)) {
+            // Always bind a tenant user's records to their own customer,
+            // overriding any customer_id supplied by the caller. customer_id is
+            // mass-assignable on the operational models, so forcing it here (not
+            // just when empty) closes the gap where a crafted create could
+            // otherwise write into another tenant. Platform users and unauthenticated
+            // contexts (seeders, queued jobs, console) keep whatever they set.
+            if ($user && ! $user->is_platform_user && $user->customer_id) {
                 $model->customer_id = $user->customer_id;
             }
         });

@@ -2,14 +2,20 @@
 set -euo pipefail
 
 # Deploy script for Ubuntu Server 24.04 - Laravel 13 / Filament 5 / PHP 8.4
-# Stack: MySQL + Apache + Cloudflare Tunnel (no public IP / port-forwarding,
+# Stack: MariaDB + Apache + Cloudflare Tunnel (no public IP / port-forwarding,
 # no Let's Encrypt cert on this box — TLS is terminated by Cloudflare).
-# Mirrors DEPLOYMENT_GUIDE.md.
+# Mirrors DEPLOYMENT_GUIDE.md. See its "Deployment Lessons Learned" section.
+#
+# Installation order (must not be reordered): ondrej/php PPA -> PHP 8.4 ->
+# Composer -> Node 22 -> MariaDB -> clone repo -> composer install (creates
+# vendor/autoload.php, required before ANY php artisan call) -> configure .env
+# -> migrate -> build Vite assets -> publish Filament assets -> optimize ->
+# fix permissions last (so all generated artifacts end up owned by www-data).
 #
 # Usage:
-#   sudo ./deploy-ubuntu-24.sh --repo-dir /var/www/dmims-code --domain example.com --repo-url https://github.com/your/repo.git
+#   sudo ./deploy-ubuntu-24.sh --repo-dir /var/www/dmims --domain example.com --repo-url https://github.com/your/repo.git
 
-REPO_DIR="/var/www/dmims-code"
+REPO_DIR="/var/www/dmims"
 REPO_URL=""
 APP_DOMAIN=""
 DB_HOST="127.0.0.1"
@@ -26,7 +32,7 @@ function usage() {
 Usage: sudo $0 [options]
 
 Options:
-  --repo-dir DIR       Repository directory (default: /var/www/dmims-code)
+  --repo-dir DIR       Repository directory (default: /var/www/dmims)
   --repo-url URL       Git repository URL (required if repo directory does not exist)
   --domain DOMAIN      Application domain, e.g. dmims.example.com (required)
   --db-host HOST       MySQL host default: 127.0.0.1
@@ -81,8 +87,10 @@ function install_packages() {
     php8.4-xml php8.4-curl php8.4-zip php8.4-gd php8.4-intl php8.4-bcmath php8.4-sqlite3
   update-alternatives --set php /usr/bin/php8.4
 
-  apt-get install -y mysql-server
+  # MariaDB (MySQL-compatible; provides the mysql/mysqldump clients used by backups)
+  apt-get install -y mariadb-server
 
+  # Node.js 22 LTS (Vite 8 requires Node 20.19+/22+)
   curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
   apt-get install -y nodejs build-essential
 }
@@ -103,13 +111,19 @@ function clone_repo() {
   fi
 }
 
-function install_app_dependencies() {
+function install_php_dependencies() {
   cd "$REPO_DIR"
   install_composer
+  # composer install must run before any `php artisan` call: artisan boots from
+  # vendor/autoload.php, which does not exist until Composer creates it.
   composer install --no-dev --optimize-autoloader
+}
+
+function build_assets() {
+  cd "$REPO_DIR"
   npm ci
-  npm run build
-  php artisan filament:assets
+  npm run build                # Vite assets
+  php artisan filament:assets   # publish Filament admin-panel CSS/JS/fonts
 }
 
 function configure_env() {
@@ -120,9 +134,11 @@ function configure_env() {
 
   php artisan key:generate --force
 
+  sed -i "s|APP_NAME=.*|APP_NAME=DMIMS|" .env
   sed -i "s|APP_ENV=.*|APP_ENV=production|" .env
   sed -i "s|APP_DEBUG=.*|APP_DEBUG=false|" .env
   sed -i "s|APP_URL=.*|APP_URL=https://$APP_DOMAIN|" .env
+  # MariaDB is MySQL-compatible; use the mysql driver.
   sed -i "s|DB_CONNECTION=.*|DB_CONNECTION=mysql|" .env
   sed -i "s|DB_HOST=.*|DB_HOST=$DB_HOST|" .env
   sed -i "s|DB_PORT=.*|DB_PORT=$DB_PORT|" .env
@@ -145,6 +161,12 @@ function configure_env() {
     sed -i "s|SESSION_SECURE_COOKIE=.*|SESSION_SECURE_COOKIE=false|" .env
   else
     echo "SESSION_SECURE_COOKIE=false" >> .env
+  fi
+
+  if grep -q "^SESSION_SAME_SITE=" .env; then
+    sed -i "s|SESSION_SAME_SITE=.*|SESSION_SAME_SITE=lax|" .env
+  else
+    echo "SESSION_SAME_SITE=lax" >> .env
   fi
 }
 
@@ -273,9 +295,10 @@ function tunnel_setup() {
 function main() {
   install_packages
   clone_repo
-  install_app_dependencies
+  install_php_dependencies
   configure_env
   storage_and_db
+  build_assets
   optimize_app
   fix_permissions
   apache_config

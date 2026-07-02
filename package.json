@@ -1,18 +1,19 @@
 {
     "$schema": "https://www.schemastore.org/package.json",
+    "name": "dmims",
     "private": true,
     "type": "module",
     "scripts": {
         "build": "vite build",
         "dev": "vite"
         ,"icons:generate": "node tools/convert-icons.js",
-        "build:assets": "npm run icons:generate && vite build"
+        "build:assets": "vite build && npm run icons:generate"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",
         "concurrently": "^10.0.3",
         "laravel-vite-plugin": "^3.1",
-        "sharp": "^0.34.5",
+        "sharp": "^0.35.0",
         "tailwindcss": "^4.0.0",
         "vite": "^8.0.0"
     },

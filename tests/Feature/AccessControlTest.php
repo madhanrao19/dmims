@@ -107,4 +107,63 @@ class AccessControlTest extends TestCase
         $this->assertTrue($access->canPerformOperationalAction($platform));
         $this->assertTrue($access->canLogin($platform));
     }
+
+    /** A license whose validity has lapsed must not keep full access just because
+     *  a scheduled job never flipped its `status` column to expired. */
+    public function test_expired_license_degrades_to_view_only_even_if_status_still_active(): void
+    {
+        $customer = Customer::create(['company_name' => 'Lapsed', 'company_code' => 'LAP', 'status' => 'active']);
+        License::create([
+            'customer_id' => $customer->id,
+            'license_no' => 'LIC-LAP',
+            'valid_from' => now()->subYear(),
+            'valid_to' => now()->subDay(),   // lapsed yesterday
+            'grace_period_days' => 0,
+            'status' => 'active',            // status never updated
+            'technical_access_mode' => 'full',
+        ]);
+
+        $access = app(AccessControlService::class);
+        AccessControlService::flushCache();
+
+        $this->assertSame(AccessControlService::MODE_VIEW_ONLY, $access->getEffectiveAccessMode($customer->id));
+    }
+
+    public function test_license_valid_through_today_keeps_full_access(): void
+    {
+        $customer = Customer::create(['company_name' => 'Current', 'company_code' => 'CUR', 'status' => 'active']);
+        License::create([
+            'customer_id' => $customer->id,
+            'license_no' => 'LIC-CUR',
+            'valid_from' => now()->subYear(),
+            'valid_to' => now(),             // valid through end of today
+            'grace_period_days' => 0,
+            'status' => 'active',
+            'technical_access_mode' => 'full',
+        ]);
+
+        $access = app(AccessControlService::class);
+        AccessControlService::flushCache();
+
+        $this->assertSame(AccessControlService::MODE_FULL, $access->getEffectiveAccessMode($customer->id));
+    }
+
+    public function test_expired_license_within_grace_period_keeps_full_access(): void
+    {
+        $customer = Customer::create(['company_name' => 'Grace', 'company_code' => 'GRC', 'status' => 'active']);
+        License::create([
+            'customer_id' => $customer->id,
+            'license_no' => 'LIC-GRC',
+            'valid_from' => now()->subYear(),
+            'valid_to' => now()->subDay(),   // lapsed yesterday
+            'grace_period_days' => 7,        // but within a 7-day grace window
+            'status' => 'active',
+            'technical_access_mode' => 'full',
+        ]);
+
+        $access = app(AccessControlService::class);
+        AccessControlService::flushCache();
+
+        $this->assertSame(AccessControlService::MODE_FULL, $access->getEffectiveAccessMode($customer->id));
+    }
 }
