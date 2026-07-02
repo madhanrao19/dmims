@@ -4,6 +4,27 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.6] - 2026-07-02
+
+### Fixed
+- **Deployment blocker on MySQL/MariaDB: index name too long.** The auto-generated
+  unique index on `product_location_stocks (customer_id, product_id, location_id)`
+  was 65 characters — one over MySQL/MariaDB's 64-char identifier limit — so
+  `php artisan migrate` would abort on a real MySQL/MariaDB deploy (SQLite, used by
+  the test suite, has no such limit, so it was never caught). Gave it an explicit
+  short name (`product_location_stocks_cpl_unique`) and also named the
+  `document_movement_logs` composite index (which was exactly at the 64 limit) as
+  `doc_movement_logs_movable_index`. Verified: after the fix the longest generated
+  index name is 60 chars and the longest foreign-key name is 52 — all within limit.
+
+### Deployment readiness (verified, no code change)
+- Dry-ran the full deploy sequence: `composer install --no-dev` resolves (no dev
+  deps used at runtime), `migrate:fresh` + `RolesAndPermissionsSeeder` +
+  `dmims:create-admin` run without Faker, and `config:cache` / `route:cache` /
+  `view:cache` / `storage:link` / `filament:assets` all succeed. PWA icons are
+  served from the committed `public/icons/` (not build output), so `npm run build`
+  in the deploy script is sufficient. No TEXT/JSON column defaults (MySQL-safe).
+
 ## [2.1.5] - 2026-07-01
 
 ### Changed
