@@ -251,7 +251,10 @@ return new class extends Migration
             $table->decimal('available_quantity', 18, 4)->default(0);
             $table->timestamp('last_movement_at')->nullable();
             $table->timestamps();
-            $table->unique(['customer_id', 'product_id', 'location_id']);
+            // Explicit short name: the auto-generated
+            // "product_location_stocks_customer_id_product_id_location_id_unique"
+            // is 65 chars and exceeds MySQL/MariaDB's 64-char identifier limit.
+            $table->unique(['customer_id', 'product_id', 'location_id'], 'product_location_stocks_cpl_unique');
         });
 
         Schema::create('stock_movements', function (Blueprint $table) {
@@ -371,7 +374,9 @@ return new class extends Migration
             $table->timestamp('performed_at')->nullable();
             $table->timestamps();
             $table->unique(['customer_id', 'movement_no']);
-            $table->index(['customer_id', 'movable_type', 'movable_id']);
+            // Explicit short name (the auto-generated one is 64 chars — at the
+            // MySQL/MariaDB limit; name it to keep a safety margin).
+            $table->index(['customer_id', 'movable_type', 'movable_id'], 'doc_movement_logs_movable_index');
             $table->index(['customer_id', 'action_type']);
             $table->index(['customer_id', 'performed_at']);
         });

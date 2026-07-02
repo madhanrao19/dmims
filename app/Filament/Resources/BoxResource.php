@@ -27,7 +27,11 @@ class BoxResource extends BaseResource
 
     protected static bool $applyCustomerScope = true;
 
-    protected static ?string $permission = 'manage inventory';
+    // Boxes are a document-tracking concept (Document Tracking nav group, gated on
+    // the document_tracking module), so they use the documents permission — not
+    // "manage inventory". With the old value the Document Tracking User and Viewer
+    // roles (which hold manage/view documents, not inventory) were locked out.
+    protected static ?string $permission = 'manage documents';
 
     protected static string|\BackedEnum|null $navigationIcon = null;
 

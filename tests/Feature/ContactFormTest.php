@@ -8,6 +8,13 @@ use Tests\TestCase;
 
 class ContactFormTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->withoutVite();
+    }
+
     public function test_contact_page_renders(): void
     {
         $this->get('/contact')->assertStatus(200);
