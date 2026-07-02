@@ -28,11 +28,12 @@ Legend: ✅ implemented · WIP partial · ❌ missing
 literal `revoked` value; revocation is handled via `cancelled` +
 `technical_access_mode = blocked` (cosmetic divergence).
 
-**Movement-type enum:** dictionary lists `receive_in, stock_out,
-internal_transfer, adjustment`; TDD §18 adds `return, disposal, opening_balance`.
-Actual enum: `opening_balance, stock_in, stock_out, transfer, adjustment, return,
-disposal`. → values diverge (`stock_in` vs `receive_in`, `transfer` vs
-`internal_transfer`). Cosmetic but should be reconciled.
+**Movement-type enum:** ✅ reconciled (docs → code). The implemented enum is
+`opening_balance, stock_in, stock_out, transfer, adjustment, return, disposal`.
+The Database Dictionary's Movement Types section now documents each label with
+its stored enum value (e.g. Receive In → `stock_in`, Internal Transfer →
+`transfer`), so the documentation matches the schema. The values were left
+unchanged to avoid a data-affecting schema migration on the production enum.
 
 ## 2. Models (TDD §10)
 All required models present (SubscriptionLog, BillingRecord/Payment/Log added).
@@ -56,7 +57,7 @@ All required models present (SubscriptionLog, BillingRecord/Payment/Log added).
 | 2 Role/permission validation | ✅ `manage X` / `view X` permissions; reads on either, writes on `manage` |
 | 3 Customer isolation | ✅ global scopes + Filament scope |
 | 4 Subscription validation | ✅ `EnsureSubscriptionActive` (TDD calls it `EnsureSubscriptionValid`) |
-| 5 License validation | ✅ `EnsureLicenseAllowsAccess` + `technical_access_mode` |
+| 5 License validation | ✅ `EnsureLicenseAllowsAccess` + `technical_access_mode`; date-based expiry now authoritative (v2.1.2 — lapsed licenses degrade to view-only even if `status` is stale) |
 | 6 Module validation | ✅ enforced in `can()` + nav |
 | 7 Operational permission | ✅ permission check in `can()` |
 
@@ -92,11 +93,15 @@ All six dictionary module codes are present (`stock_inventory`,
 | PWA | ✅ | manifest, service worker, offline page present |
 
 ## 8. Configuration (TDD §29) & security (§30)
-✅ `APP_ENV=production`, `APP_DEBUG=false`, `SESSION_SECURE_COOKIE=true`,
-`SESSION_DRIVER=database`, `QUEUE_CONNECTION=database`, HTTPS, isolation, audit,
-direct-URL protection, secure cookies, ✅ `TRUSTED_PROXIES=*` (Cloudflare).
-Operational values still set on the server: real `DB_*` credentials,
-`php artisan key:generate`, and SMTP mail (password reset).
+✅ `APP_ENV=production`, `APP_DEBUG=false`, `SESSION_DRIVER=database`,
+`QUEUE_CONNECTION=database`, isolation, audit, direct-URL protection, ✅
+`TRUSTED_PROXIES=*` (Cloudflare). `SESSION_SECURE_COOKIE=false` is intentional
+for the reference Cloudflare Tunnel deployment, which is reached over the tunnel
+(HTTPS) **and** directly over plain HTTP on localhost/LAN — a forced secure
+cookie would break the HTTP path. Set it to `true` only for HTTPS-on-every-path
+deployments (see DEPLOYMENT_GUIDE.md). Operational values still set on the
+server: real `DB_*` credentials, `php artisan key:generate`, and SMTP mail
+(password reset).
 
 ---
 
@@ -119,8 +124,59 @@ access. Dependencies updated to Laravel 12 + current packages (CVE-2026-48019
 patched).
 
 ### Remaining (non-code / cosmetic)
-- Movement-type enum naming (`stock_in` vs `receive_in`) and the missing literal
-  `revoked` license status — cosmetic.
+- Movement-type enum naming — ✅ reconciled docs → code (see §1); the Dictionary
+  now documents the stored enum values.
+- The missing literal `revoked` license status — cosmetic (handled via
+  `cancelled` + `technical_access_mode = blocked`).
 - Operational `.env` values on the server: DB credentials, `key:generate`, SMTP.
-- Optional: Filament 5 / Laravel 13 upgrade (prepared on the
-  `upgrade/filament5-laravel13` branch; not a documented requirement).
+- **Documentation stack references — reconciled.** The root files and the whole
+  `/docs` set now document the tested stack — Ubuntu 24.04 + **Apache** +
+  **PHP 8.4** + **MariaDB** + Node 22 + Cloudflare Tunnel, on Laravel 13 +
+  Filament 5. The SAD, TDD, Developer Getting Started / Handover, Support &
+  Maintenance Handbook and RAID Log were updated from the earlier
+  Nginx / PHP 8.3 / Laravel 12 / Filament 4 wording. (The 2026-06-14 audit note
+  below is retained as historical record and predates the Laravel 13 / Filament 5
+  upgrade.)
+
+### Done since the 2026-06-14 audit
+- Filament 5 / Laravel 13 / PHP 8.4 upgrade shipped in v2.0.0 (see CHANGELOG).
+- Root project files aligned with `/docs` governance and the tested Ubuntu
+  deployment in v2.1.0; fixed `AssignRequestContext` fataling on download
+  responses.
+- v2.1.1: tenant write-protection hardened — the `BelongsToCustomer` creating
+  hook now always binds a tenant user's records to their own `customer_id`
+  (defence-in-depth against mass-assignment of `customer_id`), with a regression
+  test.
+- v2.1.2: fixed a licensing enforcement gap where an expired-by-date license
+  kept full access if its `status` column was never updated; date-based expiry is
+  now authoritative. Also enforced non-negative billing amounts. Regression tests
+  added.
+- v2.1.3: fixed `BoxResource` requiring `manage inventory` (locked the Document
+  Tracking User / Viewer roles out of a document-tracking resource) → now
+  `manage documents`; added billing money-path service guards (issue/cancel/pay
+  state checks); removed the dead `RecentlyViewed` model. Regression tests added.
+
+---
+
+## Cleanup & unused-schema report (v2.1.3)
+
+Dead code removed: `RecentlyViewed` model (unwired — no references, UI, factory
+or tests).
+
+**Unused / scaffolded — reported, not dropped (DB left intact per instruction):**
+
+| Item | State | Recommendation |
+|---|---|---|
+| `recently_viewed` table | Model removed; table now orphaned | Add a reversible drop migration in a future release if the "recently viewed" feature is not planned. |
+| `favorites` table + `Favorite` model + `Favoritable` trait | Trait mixed into `Box`/`DocumentFile`, but no UI, tests, or callers | Either surface a "favorites" UI or retire the feature (drop table + trait + model). |
+| `tags` / `taggables` tables + `Tag` model + `Taggable` trait | Functioning and **test-covered** (`TagsTest`) but not surfaced in any Filament resource | Surface tagging in the UI, or leave as a supported-but-headless capability. |
+
+**Optional / future (not implemented — noted for a later, planned change):**
+- Billing `invoice_no` / `payment_no` use `count()+1`. The unique constraints
+  prevent duplicates, but under concurrent creation the second insert errors
+  instead of taking the next number. Migrating to `SequenceGenerator` (as stock
+  and document movements already do) would make it robust — but the counter must
+  first be seeded to the current max per year to avoid colliding with existing
+  numbers, so this is deferred to a planned change with a data-migration step.
+- Redis cache/queues, HA, read replicas, object storage — infrastructure
+  roadmap items already tracked in the Deployment, Operations & DR Guide §28.

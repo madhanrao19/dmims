@@ -1,8 +1,16 @@
 # Production Deployment Guide — Ubuntu 24 Server
 
-Complete step-by-step instructions to deploy the DMIMS (Laravel 13 + Filament 5) application using
-**MySQL**, **Apache**, and a **Cloudflare Tunnel** (no public IP / port-forwarding required, no
-Let's Encrypt needed — Cloudflare terminates TLS at the edge).
+Complete step-by-step instructions to deploy the DMIMS (Laravel 13 + Filament 5) application on
+**Ubuntu 24.04 LTS** with **PHP 8.4**, **MariaDB**, **Apache**, and a **Cloudflare Tunnel** (no
+public IP / port-forwarding required, no Let's Encrypt needed — Cloudflare terminates TLS at the
+edge). This is the reference production stack and matches the tested DMIMS deployment.
+
+> MariaDB is MySQL wire-compatible, so Laravel's `DB_CONNECTION=mysql` driver and the `mysql` /
+> `mysqldump` client binaries are used throughout — "MySQL" in commands below refers to those
+> MariaDB-provided clients.
+>
+> **Read the [Deployment Lessons Learned](#deployment-lessons-learned) section at the end before
+> you start** — it captures the mistakes that break a fresh install.
 
 ---
 
@@ -34,8 +42,8 @@ composer --version
 # Install Apache (configured in Part 7)
 sudo apt install -y apache2
 
-# Install MySQL
-sudo apt install -y mysql-server
+# Install MariaDB (MySQL-compatible; provides the mysql/mysqldump clients)
+sudo apt install -y mariadb-server
 
 # Install Node.js & npm (Vite 8 requires Node 20.19+/22+; use the 22 LTS line)
 curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
@@ -51,9 +59,10 @@ sudo usermod -aG www-data appuser
 
 ---
 
-## **PART 2: DATABASE SETUP (MySQL)**
+## **PART 2: DATABASE SETUP (MariaDB)**
 
 ```bash
+# `sudo mysql` uses the MariaDB client shipped with mariadb-server
 sudo mysql -u root << EOF
 CREATE DATABASE dmims_production;
 CREATE USER 'dmims_user'@'localhost' IDENTIFIED BY 'your_secure_password_here';
@@ -76,7 +85,7 @@ sudo chown appuser:www-data /var/www/dmims
 ### 3.2 Copy from local machine (SCP)
 Open PowerShell **on your Windows machine** and run:
 ```powershell
-scp -r "d:\Dev\IMS\Source Code\dmims-code\*" appuser@YOUR_SERVER_IP:/var/www/dmims/
+scp -r "C:\path\to\dmims\*" appuser@YOUR_SERVER_IP:/var/www/dmims/
 ```
 See the **Quick Reference: SCP Copy Command** section below for a port-specific variant and for
 copying only specific folders (useful for incremental updates).
@@ -106,6 +115,11 @@ cd /var/www/dmims
 # composer.lock, including the barcode (picqer), PDF (dompdf) and Excel
 # (openspout) libraries that power scannable labels and PDF/Excel reports —
 # no extra `composer require` is needed.
+#
+# IMPORTANT: run `composer install` BEFORE any `php artisan` command. artisan
+# boots from vendor/autoload.php; if vendor/ is missing every artisan call
+# (key:generate, migrate, filament:assets, config:cache) fails with
+# "Failed opening required '.../vendor/autoload.php'".
 sudo -u appuser composer install --optimize-autoloader --no-dev
 
 # Install Node dependencies (for frontend assets)
@@ -134,7 +148,7 @@ APP_ENV=production
 APP_DEBUG=false
 APP_URL=https://your-domain.com
 
-# Database
+# Database (MariaDB — use the mysql driver; it is wire-compatible)
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
@@ -482,29 +496,29 @@ sudo crontab -e
 
 ```powershell
 # Copy entire project to Ubuntu server
-scp -r "d:\Dev\IMS\Source Code\dmims-code\*" appuser@YOUR_SERVER_IP:/var/www/dmims/
+scp -r "C:\path\to\dmims\*" appuser@YOUR_SERVER_IP:/var/www/dmims/
 
 # Or with specific port (if SSH on non-standard port)
-scp -r -P 2222 "d:\Dev\IMS\Source Code\dmims-code\*" appuser@YOUR_SERVER_IP:/var/www/dmims/
+scp -r -P 2222 "C:\path\to\dmims\*" appuser@YOUR_SERVER_IP:/var/www/dmims/
 
 # Copy just source code (exclude node_modules, vendor)
-scp -r "d:\Dev\IMS\Source Code\dmims-code\app" appuser@YOUR_SERVER_IP:/var/www/dmims/
-scp -r "d:\Dev\IMS\Source Code\dmims-code\config" appuser@YOUR_SERVER_IP:/var/www/dmims/
-scp -r "d:\Dev\IMS\Source Code\dmims-code\database" appuser@YOUR_SERVER_IP:/var/www/dmims/
-scp -r "d:\Dev\IMS\Source Code\dmims-code\routes" appuser@YOUR_SERVER_IP:/var/www/dmims/
-scp -r "d:\Dev\IMS\Source Code\dmims-code\resources" appuser@YOUR_SERVER_IP:/var/www/dmims/
-scp -r "d:\Dev\IMS\Source Code\dmims-code\public" appuser@YOUR_SERVER_IP:/var/www/dmims/
-scp "d:\Dev\IMS\Source Code\dmims-code\composer.json" appuser@YOUR_SERVER_IP:/var/www/dmims/
-scp "d:\Dev\IMS\Source Code\dmims-code\composer.lock" appuser@YOUR_SERVER_IP:/var/www/dmims/
-scp "d:\Dev\IMS\Source Code\dmims-code\package.json" appuser@YOUR_SERVER_IP:/var/www/dmims/
+scp -r "C:\path\to\dmims\app" appuser@YOUR_SERVER_IP:/var/www/dmims/
+scp -r "C:\path\to\dmims\config" appuser@YOUR_SERVER_IP:/var/www/dmims/
+scp -r "C:\path\to\dmims\database" appuser@YOUR_SERVER_IP:/var/www/dmims/
+scp -r "C:\path\to\dmims\routes" appuser@YOUR_SERVER_IP:/var/www/dmims/
+scp -r "C:\path\to\dmims\resources" appuser@YOUR_SERVER_IP:/var/www/dmims/
+scp -r "C:\path\to\dmims\public" appuser@YOUR_SERVER_IP:/var/www/dmims/
+scp "C:\path\to\dmims\composer.json" appuser@YOUR_SERVER_IP:/var/www/dmims/
+scp "C:\path\to\dmims\composer.lock" appuser@YOUR_SERVER_IP:/var/www/dmims/
+scp "C:\path\to\dmims\package.json" appuser@YOUR_SERVER_IP:/var/www/dmims/
 ```
 
 ---
 
 ## **DEPLOYMENT CHECKLIST**
 
-- [ ] Server prepared (PHP 8.4, Composer, Apache, MySQL, Node, Supervisor installed)
-- [ ] MySQL database created with user/password
+- [ ] Server prepared (PHP 8.4, Composer, Apache, MariaDB, Node 22, Supervisor installed)
+- [ ] MariaDB database created with user/password
 - [ ] Source code copied to `/var/www/dmims` via SCP
 - [ ] Permissions set correctly
 - [ ] Composer & npm dependencies installed; `filament:assets` published
@@ -522,6 +536,48 @@ scp "d:\Dev\IMS\Source Code\dmims-code\package.json" appuser@YOUR_SERVER_IP:/var
 
 ---
 
+## **DEPLOYMENT LESSONS LEARNED**
+
+Hard-won notes from real DMIMS installs. Ignoring these is what breaks a fresh
+deployment most often.
+
+1. **`composer install` before any `php artisan` command.** artisan boots from
+   `vendor/autoload.php`. Run `composer install` first (Part 4); otherwise
+   `key:generate`, `migrate`, `filament:assets` and `config:cache` all fail.
+
+2. **`vendor/autoload.php` must exist on the server.** `vendor/` is git-ignored
+   and never copied by SCP — it is created by `composer install` *on the
+   server*. A "Failed opening required 'vendor/autoload.php'" error means
+   dependencies were never installed there. Re-run
+   `sudo -u appuser composer install --optimize-autoloader --no-dev`.
+
+3. **`SESSION_SECURE_COOKIE=false` for local HTTP; `true` for HTTPS-only
+   production.** This deployment is reached both over the Cloudflare Tunnel
+   (HTTPS) and directly on localhost/LAN (plain HTTP), so it stays `false` — a
+   secure cookie is never sent on the HTTP path and login silently fails. Only
+   set `true` if the app is served over HTTPS on *every* path.
+
+4. **Use short, explicit MySQL/MariaDB index names in migrations.** Auto-derived
+   names on composite indexes (`table_col1_col2_col3_index`) can exceed the
+   64-character identifier limit and abort `migrate`. Name them explicitly, e.g.
+   `$table->index(['customer_id', 'movement_type'], 'stock_moves_cust_type_idx');`.
+
+5. **`AssignRequestContext` must not use `withHeaders()`.** `withHeaders()` only
+   exists on Illuminate responses; the middleware runs globally, so on the
+   `StreamedResponse` / `BinaryFileResponse` returned by report/export/backup
+   downloads it would fatal. Set the header on the shared bag instead:
+   `$response->headers->set('X-Request-Id', $requestId);`.
+
+6. **Publish Filament assets after every deploy.** `php artisan filament:assets`
+   copies the admin-panel CSS/JS/fonts to `public/`. Skipping it leaves an
+   unstyled panel. Re-run it (and `npm run build`) on every code update.
+
+7. **PHP 8.4 must be the default `php`.** Ubuntu 24.04 ships 8.3; after adding
+   the ondrej/php PPA run `sudo update-alternatives --set php /usr/bin/php8.4`
+   so Composer's post-scripts and artisan use 8.4.
+
+---
+
 ## **SUPPORT & TROUBLESHOOTING**
 
 **Check error logs:**
@@ -534,7 +590,7 @@ journalctl -u cloudflared -f               # Cloudflare Tunnel connection issues
 **Restart services:**
 ```bash
 sudo systemctl restart apache2
-sudo systemctl restart php8.4-fpm mysql
+sudo systemctl restart php8.4-fpm mariadb
 sudo systemctl restart cloudflared
 ```
 
