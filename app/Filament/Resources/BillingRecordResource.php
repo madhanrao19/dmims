@@ -45,9 +45,9 @@ class BillingRecordResource extends BaseResource
             Forms\Components\DatePicker::make('invoice_date')->required()->default(now()),
             Forms\Components\DatePicker::make('due_date'),
             Forms\Components\TextInput::make('amount')
-                ->numeric()->required()->default(0)->prefix('RM')->live(onBlur: true),
+                ->numeric()->required()->minValue(0)->default(0)->prefix('RM')->live(onBlur: true),
             Forms\Components\TextInput::make('tax_amount')
-                ->numeric()->default(0)->prefix('RM')->live(onBlur: true),
+                ->numeric()->minValue(0)->default(0)->prefix('RM')->live(onBlur: true),
             Forms\Components\Placeholder::make('total_preview')
                 ->label('Total')
                 ->content(fn (Get $get): string => 'RM '.number_format((float) $get('amount') + (float) $get('tax_amount'), 2)),
@@ -95,7 +95,7 @@ class BillingRecordResource extends BaseResource
                     ->visible(fn (BillingRecord $record): bool => $record->billing_status !== 'cancelled' && $record->payment_status !== 'paid')
                     ->schema([
                         Forms\Components\TextInput::make('amount')
-                            ->numeric()->required()->prefix('RM')
+                            ->numeric()->required()->minValue(0.01)->prefix('RM')
                             ->default(fn (BillingRecord $record): float => $record->outstandingAmount()),
                         Forms\Components\Select::make('payment_method')
                             ->options(['cash' => 'Cash', 'bank_transfer' => 'Bank Transfer', 'cheque' => 'Cheque', 'other' => 'Other'])
