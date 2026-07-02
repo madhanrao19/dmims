@@ -4,6 +4,19 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.7] - 2026-07-02
+
+### Changed
+- **Removed remaining "dmims-code" naming** from deployment tooling — a leftover
+  from a pre-rename local folder/repo name. `deploy-ubuntu-24.sh`'s `REPO_DIR`
+  default and usage examples now use `/var/www/dmims` (matching
+  `DEPLOYMENT_GUIDE.md` throughout, instead of the inconsistent
+  `/var/www/dmims-code`). `DEPLOYMENT_GUIDE.md`'s Windows SCP examples now use a
+  generic `C:\path\to\dmims\` placeholder instead of a personal
+  `d:\Dev\IMS\Source Code\dmims-code\` path. `composer.json`/`package.json`
+  project identity (`datamation/dmims` / `dmims`) was already clean. No other
+  "dmims-code" references exist anywhere in the tracked codebase.
+
 ## [2.1.6] - 2026-07-02
 
 ### Fixed

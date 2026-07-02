@@ -85,7 +85,7 @@ sudo chown appuser:www-data /var/www/dmims
 ### 3.2 Copy from local machine (SCP)
 Open PowerShell **on your Windows machine** and run:
 ```powershell
-scp -r "d:\Dev\IMS\Source Code\dmims-code\*" appuser@YOUR_SERVER_IP:/var/www/dmims/
+scp -r "C:\path\to\dmims\*" appuser@YOUR_SERVER_IP:/var/www/dmims/
 ```
 See the **Quick Reference: SCP Copy Command** section below for a port-specific variant and for
 copying only specific folders (useful for incremental updates).
@@ -496,21 +496,21 @@ sudo crontab -e
 
 ```powershell
 # Copy entire project to Ubuntu server
-scp -r "d:\Dev\IMS\Source Code\dmims-code\*" appuser@YOUR_SERVER_IP:/var/www/dmims/
+scp -r "C:\path\to\dmims\*" appuser@YOUR_SERVER_IP:/var/www/dmims/
 
 # Or with specific port (if SSH on non-standard port)
-scp -r -P 2222 "d:\Dev\IMS\Source Code\dmims-code\*" appuser@YOUR_SERVER_IP:/var/www/dmims/
+scp -r -P 2222 "C:\path\to\dmims\*" appuser@YOUR_SERVER_IP:/var/www/dmims/
 
 # Copy just source code (exclude node_modules, vendor)
-scp -r "d:\Dev\IMS\Source Code\dmims-code\app" appuser@YOUR_SERVER_IP:/var/www/dmims/
-scp -r "d:\Dev\IMS\Source Code\dmims-code\config" appuser@YOUR_SERVER_IP:/var/www/dmims/
-scp -r "d:\Dev\IMS\Source Code\dmims-code\database" appuser@YOUR_SERVER_IP:/var/www/dmims/
-scp -r "d:\Dev\IMS\Source Code\dmims-code\routes" appuser@YOUR_SERVER_IP:/var/www/dmims/
-scp -r "d:\Dev\IMS\Source Code\dmims-code\resources" appuser@YOUR_SERVER_IP:/var/www/dmims/
-scp -r "d:\Dev\IMS\Source Code\dmims-code\public" appuser@YOUR_SERVER_IP:/var/www/dmims/
-scp "d:\Dev\IMS\Source Code\dmims-code\composer.json" appuser@YOUR_SERVER_IP:/var/www/dmims/
-scp "d:\Dev\IMS\Source Code\dmims-code\composer.lock" appuser@YOUR_SERVER_IP:/var/www/dmims/
-scp "d:\Dev\IMS\Source Code\dmims-code\package.json" appuser@YOUR_SERVER_IP:/var/www/dmims/
+scp -r "C:\path\to\dmims\app" appuser@YOUR_SERVER_IP:/var/www/dmims/
+scp -r "C:\path\to\dmims\config" appuser@YOUR_SERVER_IP:/var/www/dmims/
+scp -r "C:\path\to\dmims\database" appuser@YOUR_SERVER_IP:/var/www/dmims/
+scp -r "C:\path\to\dmims\routes" appuser@YOUR_SERVER_IP:/var/www/dmims/
+scp -r "C:\path\to\dmims\resources" appuser@YOUR_SERVER_IP:/var/www/dmims/
+scp -r "C:\path\to\dmims\public" appuser@YOUR_SERVER_IP:/var/www/dmims/
+scp "C:\path\to\dmims\composer.json" appuser@YOUR_SERVER_IP:/var/www/dmims/
+scp "C:\path\to\dmims\composer.lock" appuser@YOUR_SERVER_IP:/var/www/dmims/
+scp "C:\path\to\dmims\package.json" appuser@YOUR_SERVER_IP:/var/www/dmims/
 ```
 
 ---
