@@ -174,6 +174,24 @@ or tests).
 **Optional / future (not implemented — noted for a later, planned change):**
 - Redis cache/queues, HA, read replicas, object storage — infrastructure
   roadmap items already tracked in the Deployment, Operations & DR Guide §28.
+- **PHPStan / Larastan static analysis — attempted, blocked by sandbox network
+  policy, not a code decision.** `composer require --dev larastan/larastan`
+  requires downloading from `api.github.com`/`codeload.github.com` (no
+  Packagist-hosted dist mirror exists for this package/version); the sandbox
+  used for the rest of this hardening pass returns a hard `403` (confirmed via
+  the proxy's own diagnostics as an organizational egress policy block, not a
+  transient failure) for those hosts. Composer's `require-dev` change was
+  reverted rather than commit an unverifiable `composer.lock`. **To complete:**
+  in an environment with normal GitHub access, run
+  `composer require --dev larastan/larastan` then
+  `vendor/bin/phpstan analyse --level=5 app --generate-baseline`, commit the
+  resulting `composer.json`/`composer.lock`/`phpstan-baseline.neon`, add a
+  `phpstan.neon` (`includes: [vendor/larastan/larastan/extension.neon]`,
+  `paths: [app]`, `level: 5`, `includes: [phpstan-baseline.neon]`), and a CI
+  step (`vendor/bin/phpstan analyse`) after the Pint check in
+  `.github/workflows/ci.yml`. Generating the baseline in the same change that
+  adds the CI step is important — otherwise the first CI run after merge fails
+  on pre-existing findings unrelated to the change.
 
 ### Done since the 2026-07-02 review
 - **Billing `invoice_no` / `payment_no` race condition fixed.** Both now use
@@ -182,3 +200,17 @@ or tests).
   (`2026_07_03_000000_seed_sequence_counters_for_billing_numbering`) seeded the
   counters from existing data (max of row count and parsed existing numbers per
   year) so no collision or renumbering occurred.
+- **LICENSE file added**; `composer.json`'s `audit.block-insecure` override
+  removed so Composer's own default (block installs with known advisories)
+  applies.
+- **Sanctum API tokens hardened**: `dmims:issue-api-token` now defaults to a
+  restricted `api:read` ability and a 365-day expiration
+  (`SANCTUM_TOKEN_EXPIRATION`), `abilities:api:read` is enforced on
+  `routes/api.php`, and `sanctum:prune-expired` runs daily. Existing tokens are
+  unaffected (Sanctum's global `sanctum.expiration` is deliberately left
+  `null` — see `config/sanctum.php` for why).
+- **API rate limiting added**: a named `api` limiter (60/min per user,
+  configurable via `API_RATE_LIMIT_PER_MINUTE`) is applied to `/api/v1/*`.
+- **Backup script credential handling fixed** in `DEPLOYMENT_GUIDE.md`'s
+  optional OS-level cron example (now uses `/root/.my.cnf` instead of an
+  inline `mysqldump -p` flag).
