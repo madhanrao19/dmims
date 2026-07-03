@@ -190,6 +190,17 @@ SESSION_SAME_SITE=lax
 > mailer with valid credentials, then verify with
 > `php artisan tinker --execute="Mail::raw('test', fn(\$m) => \$m->to('you@example.com')->subject('test'));"`.
 
+**Optional API settings** (safe defaults ship in `.env.example`; only touch
+these if you need different values):
+```
+# API tokens issued via `dmims:issue-api-token` expire after this many minutes
+# (default 525600 = 365 days). Blank disables expiration.
+SANCTUM_TOKEN_EXPIRATION=525600
+
+# /api/v1/* rate limit, requests per minute per authenticated user.
+API_RATE_LIMIT_PER_MINUTE=60
+```
+
 ### Generate application key
 ```bash
 cd /var/www/dmims

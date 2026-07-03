@@ -40,7 +40,10 @@ companies operate in a single system with complete data isolation.
   and integrity-verified before being trusted as restorable.
 - **API** — versioned, token-authenticated (`routes/api.php`, `/api/v1/...`),
   for narrow integrations: barcode resolution, stock inquiry, export status.
-  Issue tokens with `php artisan dmims:issue-api-token {user}`.
+  Issue tokens with `php artisan dmims:issue-api-token {user}` — tokens default
+  to a restricted `api:read` ability and a 365-day expiration
+  (`SANCTUM_TOKEN_EXPIRATION`; `--ability=` to override). Rate-limited to
+  60 requests/minute per user (`API_RATE_LIMIT_PER_MINUTE`).
 
 ## Security model (defence in depth)
 
@@ -106,6 +109,7 @@ Add the Laravel scheduler to cron (`* * * * * php artisan schedule:run`). It run
 - `dmims:generate-notifications` — hourly operational alerts.
 - `dmims:backup-database` — nightly database backup.
 - `dmims:verify-latest-backup` — weekly restore-readiness check on the latest backup.
+- `sanctum:prune-expired --hours=24` — daily cleanup of expired API tokens.
 
 A queue worker (`php artisan queue:work`, under Supervisor in production — never
 `queue:listen`) must also be running: database backups and data exports are
