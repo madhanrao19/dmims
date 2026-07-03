@@ -455,8 +455,37 @@ curl -I https://your-domain.com   # Should return 200
 
 ## **PART 13: BACKUP STRATEGY**
 
+The application already schedules an encrypted, integrity-verified nightly
+backup via `dmims:backup-database` (see Part 10 and the CHANGELOG) — that is
+the primary backup mechanism and needs no further setup. The OS-level script
+below is an **optional supplement** for a raw file-level snapshot outside the
+app (e.g. for an external backup tool to pick up); most deployments do not
+need both.
+
+### 13.1 Store MySQL credentials outside the script
+
+Create `/root/.my.cnf` so `mysqldump` picks up credentials automatically,
+instead of passing the password inline on the command line (which would leak
+it via `ps`/shell history):
+
 ```bash
-# Create daily backup script
+sudo nano /root/.my.cnf
+```
+
+**Paste (replace the password), then lock down the permissions:**
+```ini
+[client]
+user=dmims_user
+password=your_secure_password_here
+```
+
+```bash
+sudo chmod 600 /root/.my.cnf
+```
+
+### 13.2 Create the backup script
+
+```bash
 sudo nano /usr/local/bin/backup-dmims.sh
 ```
 
@@ -469,9 +498,8 @@ DATE=$(date +%Y%m%d_%H%M%S)
 # Create backup directory
 mkdir -p $BACKUP_DIR
 
-# Backup database (put credentials in /root/.my.cnf instead of inline -p
-# if you'd rather not have the password appear in `ps`/shell history)
-mysqldump -u dmims_user -p'your_secure_password_here' dmims_production | gzip > $BACKUP_DIR/db_$DATE.sql.gz
+# Backup database. No -u/-p here: /root/.my.cnf (created above) supplies both.
+mysqldump dmims_production | gzip > $BACKUP_DIR/db_$DATE.sql.gz
 
 # Backup uploads/storage
 tar -czf $BACKUP_DIR/storage_$DATE.tar.gz /var/www/dmims/storage/app
