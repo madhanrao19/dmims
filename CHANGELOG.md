@@ -4,6 +4,21 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.13] - 2026-07-03
+
+### Changed
+- **Docs sync follow-up for the Sanctum/rate-limiting hardening (v2.1.10/v2.1.11).**
+  `README.md`'s Scheduled tasks list now includes the daily
+  `sanctum:prune-expired --hours=24` job, and the API bullet notes that issued
+  tokens default to a restricted `api:read` ability, a 365-day expiration, and
+  a 60/min rate limit. `DEPLOYMENT_GUIDE.md` documents the two new optional
+  env vars (`SANCTUM_TOKEN_EXPIRATION`, `API_RATE_LIMIT_PER_MINUTE`) — both
+  already shipped with safe defaults in `.env.example`, so no deployment
+  behavior changed, just visibility for anyone wanting to override them.
+  `deploy-ubuntu-24.sh` needed no change: it copies `.env.example` wholesale
+  and only overrides the keys it explicitly cares about, so the new vars
+  already carried through with their defaults.
+
 ## [2.1.12] - 2026-07-03
 
 ### Changed
