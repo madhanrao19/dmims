@@ -4,6 +4,28 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.10] - 2026-07-03
+
+### Security
+- **API tokens now default to a restricted ability and an expiration.**
+  `dmims:issue-api-token` previously issued full-access (`['*']`) tokens that
+  never expired. It now defaults to a single `api:read` ability (all current
+  `/api/v1/*` endpoints are read-only) and an explicit `expires_at` (365 days,
+  configurable via `SANCTUM_TOKEN_EXPIRATION`, blank disables it). Sanctum's
+  ability-check middleware (`abilities`/`ability`, not previously registered)
+  is now aliased in `bootstrap/app.php`, and `routes/api.php` requires
+  `abilities:api:read`. `sanctum:prune-expired --hours=24` is scheduled daily.
+  **Existing tokens are unaffected**: Sanctum's global `sanctum.expiration`
+  config is deliberately left `null` (it ANDs an age check based on
+  `created_at` independently of a token's own `expires_at` — setting it
+  globally would have retroactively invalidated already-issued tokens
+  regardless of their `expires_at`, verified directly against Sanctum's
+  `Guard::isValidAccessToken()`). The new expiration only applies via each new
+  token's own `expires_at`, going forward. Old tokens issued before this
+  change default to Sanctum's own `['*']` ability, which still passes the new
+  ability check. Added `ApiTokenAbilityTest` covering ability enforcement,
+  backward compatibility, and the command's new defaults.
+
 ## [2.1.9] - 2026-07-03
 
 ### Fixed

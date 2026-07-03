@@ -12,6 +12,8 @@ use App\Http\Middleware\SetCompanyContext;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Laravel\Sanctum\Http\Middleware\CheckAbilities;
+use Laravel\Sanctum\Http\Middleware\CheckForAnyAbility;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -29,6 +31,11 @@ return Application::configure(basePath: dirname(__DIR__))
                 at: $proxies === '*' ? '*' : array_map('trim', explode(',', $proxies)),
             );
         }
+
+        $middleware->alias([
+            'abilities' => CheckAbilities::class,
+            'ability' => CheckForAnyAbility::class,
+        ]);
 
         $middleware->prepend([
             AssignRequestContext::class,
