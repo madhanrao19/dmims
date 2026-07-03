@@ -2257,16 +2257,16 @@
         },
         {
             "name": "laravel/framework",
-            "version": "v13.18.0",
+            "version": "v13.18.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/laravel/framework.git",
-                "reference": "138e5806ed7e4e21591948b661119d3810f052cf"
+                "reference": "7d66044819e269f05924793a6800022dc181d850"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/laravel/framework/zipball/138e5806ed7e4e21591948b661119d3810f052cf",
-                "reference": "138e5806ed7e4e21591948b661119d3810f052cf",
+                "url": "https://api.github.com/repos/laravel/framework/zipball/7d66044819e269f05924793a6800022dc181d850",
+                "reference": "7d66044819e269f05924793a6800022dc181d850",
                 "shasum": ""
             },
             "require": {
@@ -2477,7 +2477,7 @@
                 "issues": "https://github.com/laravel/framework/issues",
                 "source": "https://github.com/laravel/framework"
             },
-            "time": "2026-06-30T12:54:13+00:00"
+            "time": "2026-07-02T18:35:20+00:00"
         },
         {
             "name": "laravel/prompts",
@@ -5678,16 +5678,16 @@
         },
         {
             "name": "spatie/laravel-permission",
-            "version": "8.1.0",
+            "version": "8.2.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/spatie/laravel-permission.git",
-                "reference": "754db00705dc98f9d79ace30dbb553837581571e"
+                "reference": "e97b03679f1767af7d181c14efce2dd8cb242e57"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/spatie/laravel-permission/zipball/754db00705dc98f9d79ace30dbb553837581571e",
-                "reference": "754db00705dc98f9d79ace30dbb553837581571e",
+                "url": "https://api.github.com/repos/spatie/laravel-permission/zipball/e97b03679f1767af7d181c14efce2dd8cb242e57",
+                "reference": "e97b03679f1767af7d181c14efce2dd8cb242e57",
                 "shasum": ""
             },
             "require": {
@@ -5753,7 +5753,7 @@
             ],
             "support": {
                 "issues": "https://github.com/spatie/laravel-permission/issues",
-                "source": "https://github.com/spatie/laravel-permission/tree/8.1.0"
+                "source": "https://github.com/spatie/laravel-permission/tree/8.2.0"
             },
             "funding": [
                 {
@@ -5761,7 +5761,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-06-27T19:35:14+00:00"
+            "time": "2026-07-02T23:59:17+00:00"
         },
         {
             "name": "spatie/shiki-php",
@@ -11113,5 +11113,5 @@
     "platform-overrides": {
         "php": "8.4.22"
     },
-    "plugin-api-version": "2.6.0"
+    "plugin-api-version": "2.9.0"
 }
