@@ -4,6 +4,20 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.9] - 2026-07-03
+
+### Fixed
+- **Billing/payment numbering race condition.** `BillingService::generateInvoiceNo()`
+  and `PaymentService::generatePaymentNo()` used `count()+1` — the exact pattern
+  already replaced elsewhere in the codebase with `SequenceGenerator` (a
+  row-locked counter) because it collides under concurrent writes. Both now use
+  `SequenceGenerator`, matching `StockMovementService`/`DocumentMovementService`.
+  A one-time migration seeds the counters from existing data (the max of the
+  row count and the highest numeric suffix parsed out of existing
+  `invoice_no`/`payment_no` values, per year) so the switch doesn't collide with
+  or reuse numbers already issued. Added regression tests for gapless
+  sequencing and for the seeding migration's collision avoidance.
+
 ## [2.1.8] - 2026-07-02
 
 ### Added

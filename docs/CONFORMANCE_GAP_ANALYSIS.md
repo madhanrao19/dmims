@@ -172,11 +172,13 @@ or tests).
 | `tags` / `taggables` tables + `Tag` model + `Taggable` trait | Functioning and **test-covered** (`TagsTest`) but not surfaced in any Filament resource | Surface tagging in the UI, or leave as a supported-but-headless capability. |
 
 **Optional / future (not implemented — noted for a later, planned change):**
-- Billing `invoice_no` / `payment_no` use `count()+1`. The unique constraints
-  prevent duplicates, but under concurrent creation the second insert errors
-  instead of taking the next number. Migrating to `SequenceGenerator` (as stock
-  and document movements already do) would make it robust — but the counter must
-  first be seeded to the current max per year to avoid colliding with existing
-  numbers, so this is deferred to a planned change with a data-migration step.
 - Redis cache/queues, HA, read replicas, object storage — infrastructure
   roadmap items already tracked in the Deployment, Operations & DR Guide §28.
+
+### Done since the 2026-07-02 review
+- **Billing `invoice_no` / `payment_no` race condition fixed.** Both now use
+  `SequenceGenerator` (the same row-locked counter already used by stock and
+  document movements) instead of `count()+1`. A one-time migration
+  (`2026_07_03_000000_seed_sequence_counters_for_billing_numbering`) seeded the
+  counters from existing data (max of row count and parsed existing numbers per
+  year) so no collision or renumbering occurred.

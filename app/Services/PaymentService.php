@@ -48,10 +48,8 @@ class PaymentService
     public function generatePaymentNo(): string
     {
         $year = Carbon::now()->year;
-        $count = BillingPayment::withoutGlobalScopes()
-            ->whereYear('created_at', $year)
-            ->count();
+        $seq = SequenceGenerator::next("payment:{$year}");
 
-        return sprintf('PAY-%d-%04d', $year, $count + 1);
+        return sprintf('PAY-%d-%04d', $year, $seq);
     }
 }

@@ -108,10 +108,8 @@ class BillingService
     public function generateInvoiceNo(): string
     {
         $year = Carbon::now()->year;
-        $count = BillingRecord::withoutGlobalScopes()
-            ->whereYear('created_at', $year)
-            ->count();
+        $seq = SequenceGenerator::next("invoice:{$year}");
 
-        return sprintf('INV-%d-%04d', $year, $count + 1);
+        return sprintf('INV-%d-%04d', $year, $seq);
     }
 }
