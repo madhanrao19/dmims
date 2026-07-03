@@ -48,9 +48,30 @@ return [
     | considered expired. This will override any values set in the token's
     | "expires_at" attribute, but first-party sessions are not affected.
     |
+    | Left null deliberately: Sanctum's guard ANDs this age-based check (by
+    | created_at) together with the token's own expires_at — setting this
+    | globally would retroactively invalidate every already-issued token older
+    | than the window, regardless of its expires_at. New tokens instead get an
+    | explicit expires_at at issuance (see `dmims_token_expiration` below and
+    | app/Console/Commands/IssueApiToken.php), which only affects future tokens.
+    |
     */
 
     'expiration' => null,
+
+    /*
+    |--------------------------------------------------------------------------
+    | DMIMS Default Token Expiration
+    |--------------------------------------------------------------------------
+    |
+    | Not read by Sanctum itself — used by `dmims:issue-api-token` as the
+    | default expires_at horizon (in minutes) for newly issued tokens. Blank
+    | disables expiration for new tokens too. Existing tokens are unaffected
+    | either way.
+    |
+    */
+
+    'dmims_token_expiration' => env('SANCTUM_TOKEN_EXPIRATION', 525600),
 
     /*
     |--------------------------------------------------------------------------

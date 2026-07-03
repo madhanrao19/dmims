@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Route;
  * integration boundary"). Narrow, read-only, token-authenticated endpoints
  * only — extend this file rather than exposing Filament resources directly.
  */
-Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
+Route::prefix('v1')->middleware(['auth:sanctum', 'abilities:api:read'])->group(function () {
     Route::get('/barcodes/{barcode}', [BarcodeController::class, 'show']);
     Route::get('/products/{product}/stock', [StockController::class, 'show']);
     Route::get('/exports/{exportNo}', [ExportStatusController::class, 'show']);

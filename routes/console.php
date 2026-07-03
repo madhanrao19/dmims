@@ -17,3 +17,6 @@ Schedule::command('dmims:backup-database')->dailyAt('02:30')->withoutOverlapping
 
 // Weekly restore-readiness check on the latest backup.
 Schedule::command('dmims:verify-latest-backup')->weekly()->withoutOverlapping();
+
+// Prune expired Sanctum tokens (defence-in-depth alongside SANCTUM_TOKEN_EXPIRATION).
+Schedule::command('sanctum:prune-expired', ['--hours=24'])->daily();

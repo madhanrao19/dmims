@@ -12,7 +12,10 @@ use Illuminate\Console\Command;
  */
 class IssueApiToken extends Command
 {
-    protected $signature = 'dmims:issue-api-token {user : User ID or email} {name=api : Token name}';
+    protected $signature = 'dmims:issue-api-token
+        {user : User ID or email}
+        {name=api : Token name}
+        {--ability=* : Token ability (repeatable); defaults to api:read since routes/api.php is read-only}';
 
     protected $description = 'Issue a Sanctum API token for a user, for use against routes/api.php.';
 
@@ -30,10 +33,18 @@ class IssueApiToken extends Command
             return self::FAILURE;
         }
 
-        $token = $user->createToken($this->argument('name'));
+        $abilities = $this->option('ability') ?: ['api:read'];
+        $expiration = config('sanctum.dmims_token_expiration');
+        $expiresAt = $expiration ? now()->addMinutes((int) $expiration) : null;
 
-        $this->info("Token for {$user->email}:");
+        $token = $user->createToken($this->argument('name'), $abilities, $expiresAt);
+
+        $this->info("Token for {$user->email} (abilities: ".implode(', ', $abilities).'):');
         $this->line($token->plainTextToken);
+
+        if ($expiresAt) {
+            $this->comment("Expires: {$expiresAt->toDateTimeString()}");
+        }
 
         return self::SUCCESS;
     }
