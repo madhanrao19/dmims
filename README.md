@@ -141,4 +141,4 @@ to `true` instead.
 
 ## License
 
-Proprietary — © Datamation Group. All rights reserved.
+Proprietary — © Datamation Group. All rights reserved. See [LICENSE](LICENSE).

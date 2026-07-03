@@ -4,6 +4,20 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.8] - 2026-07-02
+
+### Added
+- **`LICENSE` file** at the repo root, matching the existing proprietary
+  declaration in `composer.json` and the README's "© Datamation Group" notice.
+
+### Changed
+- **`composer.json`** no longer overrides `config.audit.block-insecure` to
+  `false`; Composer's own default (`true`) now applies, so `composer
+  install`/`update`/`require` refuses to install a package with a known
+  security advisory — matching what CI's `composer audit` step already
+  enforces for the build, but now also enforced for local/dev installs.
+  `composer audit` remains clean (no advisories).
+
 ## [2.1.7] - 2026-07-02
 
 ### Changed
