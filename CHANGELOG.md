@@ -4,6 +4,15 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.11] - 2026-07-03
+
+### Security
+- **API rate limiting.** `/api/v1/*` had no rate limiting at all. Added a
+  named `api` limiter (`AppServiceProvider::boot()`) — 60 requests/minute per
+  authenticated user (falling back to IP), configurable via
+  `API_RATE_LIMIT_PER_MINUTE` — and applied `throttle:api` to the `v1` route
+  group. Added `ApiV1Test::test_exceeding_the_rate_limit_returns_429`.
+
 ## [2.1.10] - 2026-07-03
 
 ### Security

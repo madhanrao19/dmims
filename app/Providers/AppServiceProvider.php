@@ -9,6 +9,9 @@ use App\Observers\StockMovementObserver;
 use Filament\Facades\Filament;
 use Filament\Navigation\NavigationGroup;
 use Filament\Navigation\NavigationItem;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -50,5 +53,12 @@ class AppServiceProvider extends ServiceProvider
         // Register model observers
         CustomerSubscription::observe(CustomerSubscriptionObserver::class);
         StockMovement::observe(StockMovementObserver::class);
+
+        // routes/api.php's v1 group is lightweight and read-only; 60/min per
+        // token (falling back to IP) is generous headroom, not a hard cap.
+        RateLimiter::for('api', function (Request $request) {
+            return Limit::perMinute((int) env('API_RATE_LIMIT_PER_MINUTE', 60))
+                ->by($request->user()?->id ?: $request->ip());
+        });
     }
 }

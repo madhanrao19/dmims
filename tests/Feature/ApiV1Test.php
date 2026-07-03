@@ -103,4 +103,22 @@ class ApiV1Test extends TestCase
 
         $this->actingAs($userA)->getJson('/api/v1/exports/EXP-OTHER')->assertStatus(403);
     }
+
+    public function test_exceeding_the_rate_limit_returns_429(): void
+    {
+        $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACM', 'status' => 'active']);
+        $user = $this->tenantUser($customer);
+        $product = Product::create(['customer_id' => $customer->id, 'sku' => 'SKU1', 'product_name' => 'Widget', 'status' => 'active']);
+
+        $this->actingAs($user);
+
+        for ($i = 0; $i < 60; $i++) {
+            $this->getJson("/api/v1/products/{$product->id}/stock")->assertOk();
+        }
+
+        $response = $this->getJson("/api/v1/products/{$product->id}/stock");
+
+        $response->assertStatus(429);
+        $response->assertHeader('Retry-After');
+    }
 }
