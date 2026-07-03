@@ -4,7 +4,19 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
-## [2.1.11] - 2026-07-03
+## [2.1.12] - 2026-07-03
+
+### Changed
+- **`DEPLOYMENT_GUIDE.md` Part 13 (backup strategy) — credential handling fixed.**
+  The optional OS-level cron backup script documented an inline
+  `mysqldump -u ... -p'password'` invocation (password visible in
+  `ps`/shell history), though the guide already flagged this as a concern.
+  It now creates a chmod-600 `/root/.my.cnf` and drops the inline `-u`/`-p`
+  flags entirely. Also clarified that the app's own `dmims:backup-database`
+  (already scheduled nightly, encrypted, integrity-verified) is the primary
+  backup mechanism — this OS-level script is an optional supplement. No code
+  changed; the app's real `BackupService` already used the safer `MYSQL_PWD`
+  env var, not an inline flag.
 
 ### Security
 - **API rate limiting.** `/api/v1/*` had no rate limiting at all. Added a
