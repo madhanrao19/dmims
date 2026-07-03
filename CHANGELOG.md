@@ -18,6 +18,8 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
   changed; the app's real `BackupService` already used the safer `MYSQL_PWD`
   env var, not an inline flag.
 
+## [2.1.11] - 2026-07-03
+
 ### Security
 - **API rate limiting.** `/api/v1/*` had no rate limiting at all. Added a
   named `api` limiter (`AppServiceProvider::boot()`) — 60 requests/minute per
