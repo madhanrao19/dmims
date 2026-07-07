@@ -7,8 +7,8 @@ use App\Models\StockMovement;
 use App\Observers\CustomerSubscriptionObserver;
 use App\Observers\StockMovementObserver;
 use Filament\Facades\Filament;
+use Filament\Navigation\MenuItem;
 use Filament\Navigation\NavigationGroup;
-use Filament\Navigation\NavigationItem;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -42,8 +42,12 @@ class AppServiceProvider extends ServiceProvider
                     NavigationGroup::make('Shared Services')->label('Shared Services'),
                 ]);
 
+                // Filament v5 user-menu items must be MenuItem/Action instances,
+                // not NavigationItem — passing a NavigationItem here throws a
+                // TypeError while rendering the authenticated panel layout.
                 Filament::registerUserMenuItems([
-                    NavigationItem::make('Return to Site')
+                    MenuItem::make()
+                        ->label('Return to Site')
                         ->url(config('app.url'))
                         ->icon('heroicon-o-arrow-left'),
                 ]);

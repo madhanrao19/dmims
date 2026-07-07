@@ -38,6 +38,21 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
   - Added `tests/Feature/TenantIsolationHardeningTest.php` covering each boundary above.
 
 ### Fixed
+- **Admin panel had no session/cookie/CSRF middleware — browser login was broken.**
+  `FilamentPanelProvider` was missing its base `->middleware([...])` stack
+  (`EncryptCookies`, `AddQueuedCookiesToResponse`, `StartSession`,
+  `AuthenticateSession`, `ShareErrorsFromSession`, CSRF, `SubstituteBindings`,
+  Filament's icon/event middleware). Filament does not apply these automatically, so
+  `/admin/*` routes started no session and set no cookie: after authenticating, the
+  next request was treated as a guest and bounced back to the login page (and admin
+  panel forms had no CSRF protection). The standard stack is now registered. This was
+  invisible to the test suite because `actingAs()` bypasses the HTTP session; a live
+  browser walkthrough (Playwright) surfaced it.
+- **User-menu item crashed every authenticated panel page.**
+  `AppServiceProvider` registered the "Return to Site" user-menu entry as a
+  `NavigationItem`, but Filament v5 `registerUserMenuItems()` requires a
+  `MenuItem`/`Action`; rendering the authenticated layout threw a `TypeError` (500).
+  Switched to `MenuItem::make()`.
 - **Deployment doc/script drift.** `DEPLOYMENT_GUIDE.md` now uses the tested
   database-backed session/cache drivers (`SESSION_DRIVER=database`,
   `CACHE_STORE=database`) instead of the incorrect `file`/obsolete `CACHE_DRIVER`
