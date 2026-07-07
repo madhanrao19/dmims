@@ -4,6 +4,23 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.14] - 2026-07-03
+
+### Added
+- **Claude Code workflow tooling under `.claude/`** (committed, team-shared) to run
+  Claude Code as a disciplined system rather than a chatbot:
+  - Slash commands: `/roast` (adversarial 5-role review ending in a
+    GREEN LIGHT / RESHAPE / KILL verdict), `/selfcheck` (completion checklist that
+    runs `php artisan test` + `pint` and grades against `docs/DEFINITION_OF_DONE.md`),
+    and `/handoff` (compact, copy-pasteable session handoff).
+  - Sub-agents: `security-reviewer`, `qa-tester`, and `docs-writer`, each tailored to
+    the DMIMS stack and `/docs` governance (tenant isolation, the seven access-control
+    layers, the test/lint/deploy-smoke commands, doc-sync rules).
+  - `CLAUDE.md` gains an explicit "Operating rules (every task)" checklist alongside the
+    existing governance pointer.
+  - `.claude/skills/` documented as the home for future reusable skills.
+  `/.claude/settings.local.json` remains git-ignored (per-developer settings).
+
 ## [2.1.13] - 2026-07-03
 
 ### Changed
