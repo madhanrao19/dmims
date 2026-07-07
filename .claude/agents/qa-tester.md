@@ -17,8 +17,21 @@ Run through, and report PASS/FAIL for each:
 4. **Access control** — the seven roles and the `manage X` / `view X` permissions behave
    correctly; tenant isolation holds (no cross-`customer_id` leakage).
 5. **Resource pages** — every Filament resource page renders without error.
-6. **Deployment smoke** — `php artisan migrate:fresh` + `db:seed --class=RolesAndPermissionsSeeder`
-   + `config:cache` / `route:cache` / `view:cache` all succeed.
+6. **Deployment smoke (non-destructive)** — confirm a clean install migrates and seeds, and
+   that the caches build. **`migrate:fresh` drops every table**, so NEVER run it against the
+   app's configured/default database — a local or staging checkout may point at real MariaDB
+   data. Run it only against a disposable scratch SQLite file via explicit env overrides, e.g.:
+
+   ```bash
+   SMOKE_DB="$(pwd)/database/qa_smoke.sqlite"; rm -f "$SMOKE_DB"; touch "$SMOKE_DB"
+   DB_CONNECTION=sqlite DB_DATABASE="$SMOKE_DB" php artisan migrate:fresh --force
+   DB_CONNECTION=sqlite DB_DATABASE="$SMOKE_DB" php artisan db:seed --class=RolesAndPermissionsSeeder --force
+   rm -f "$SMOKE_DB"
+   ```
+
+   For `config:cache` / `route:cache` / `view:cache`, run them, then immediately
+   `php artisan optimize:clear` so you don't leave stale cached config behind.
 
 Return a clear PASS/FAIL per area, and for anything that fails give the exact failing command,
-test, or file. Do **not** fix code unless asked — report what's broken and where.
+test, or file. Do **not** fix code, or write to the configured database, unless asked — report
+what's broken and where.
