@@ -48,10 +48,7 @@ class BoxResource extends BaseResource
     {
         return $schema
             ->components([
-                Forms\Components\Select::make('customer_id')
-                    ->relationship('customer', 'company_name')
-                    ->searchable()
-                    ->required(),
+                static::customerIdField(),
                 Forms\Components\TextInput::make('box_barcode')->required()->maxLength(150),
                 Forms\Components\TextInput::make('box_number')->required()->maxLength(100),
                 Forms\Components\Select::make('current_location_id')

@@ -4,6 +4,47 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.15] - 2026-07-07
+
+### Security
+- **Tenant-isolation & privilege-escalation hardening** (from a full security review).
+  The common root cause was write-time `customer_id`/privilege fields being trusted
+  from the Filament form; every fix derives them from the authenticated user instead.
+  - **Critical — privilege escalation via the Users form.** A tenant "Company Admin"
+    (who holds `manage users`) could set `is_platform_user`, pick any customer, and
+    attach a platform super-admin role, granting themselves full cross-tenant control.
+    `UserResource` now hides those fields from non-platform users, forces
+    `customer_id`/`is_platform_user` server-side on create and edit, restricts the
+    assignable role list to non-platform roles, and strips any platform role that
+    reaches a tenant-owned user.
+  - **High — cross-tenant reassignment on edit.** `BelongsToCustomer` forced
+    `customer_id` only on create; it now re-forces it on every `saving`, so a tenant
+    user can no longer move a record into (or out to) another tenant by editing the
+    `customer_id` field.
+  - **High — customer roster disclosure.** The `customer_id` select on the 11
+    tenant-operational resources enumerated every customer's name to any tenant user.
+    A shared `BaseResource::customerIdField()` now scopes the options to the user's own
+    customer and hides the field from tenants entirely.
+  - **High — global reference data writable by tenants.** `LocationTypeResource` (shared,
+    customer-less data) was editable/deletable by tenant `manage inventory` roles; writes
+    are now restricted to platform staff while tenants keep read access.
+  - **Medium — missing defense-in-depth scopes.** `Setting`, `Export`, `Import`,
+    `AuditLog`, and `Department` now use the `BelongsToCustomer` global scope. (The
+    Export status API therefore returns 404 rather than 403 for another tenant's export —
+    information hiding.)
+  - **Medium — stock-adjustment segregation of duties.** Approver identity and timestamp
+    are now recorded server-side from the authenticated user, a new request is always
+    created pending, and a requester can no longer approve or reject their own adjustment.
+  - Added `tests/Feature/TenantIsolationHardeningTest.php` covering each boundary above.
+
+### Fixed
+- **Deployment doc/script drift.** `DEPLOYMENT_GUIDE.md` now uses the tested
+  database-backed session/cache drivers (`SESSION_DRIVER=database`,
+  `CACHE_STORE=database`) instead of the incorrect `file`/obsolete `CACHE_DRIVER`
+  values. `deploy-ubuntu-24.sh` now seeds `RolesAndPermissionsSeeder` and creates the
+  platform admin (via a new optional `--admin-email` flag, otherwise printing the manual
+  step), so a script-only deploy no longer lands with no roles and no way to log in.
+
 ## [2.1.14] - 2026-07-03
 
 ### Added

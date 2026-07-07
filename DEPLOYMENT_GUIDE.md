@@ -165,9 +165,10 @@ MAIL_PASSWORD=your-email-password
 MAIL_ENCRYPTION=tls
 MAIL_FROM_ADDRESS=noreply@your-domain.com
 
-# Session & Cache (use Redis if available)
-SESSION_DRIVER=file
-CACHE_DRIVER=file
+# Session & Cache (database-backed, matching .env.example and the tested stack;
+# switch SESSION_DRIVER/CACHE_STORE to redis if Redis is available)
+SESSION_DRIVER=database
+CACHE_STORE=database
 QUEUE_CONNECTION=database
 
 # Trust Cloudflare's forwarded headers so HTTPS and the real client IP are

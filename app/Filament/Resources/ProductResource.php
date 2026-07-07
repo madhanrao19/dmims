@@ -39,10 +39,7 @@ class ProductResource extends BaseResource
     {
         return $schema
             ->components([
-                Forms\Components\Select::make('customer_id')
-                    ->relationship('customer', 'company_name')
-                    ->searchable()
-                    ->required(),
+                static::customerIdField(),
                 Forms\Components\TextInput::make('sku')->required()->maxLength(100),
                 Forms\Components\TextInput::make('barcode')->maxLength(150),
                 Forms\Components\TextInput::make('product_name')->required()->maxLength(255),

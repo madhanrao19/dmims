@@ -101,7 +101,10 @@ class ApiV1Test extends TestCase
             'status' => 'completed',
         ]);
 
-        $this->actingAs($userA)->getJson('/api/v1/exports/EXP-OTHER')->assertStatus(403);
+        // Export is tenant-scoped via BelongsToCustomer, so another tenant's
+        // export is not visible at all — the API returns 404 (information
+        // hiding) rather than confirming the record exists with a 403.
+        $this->actingAs($userA)->getJson('/api/v1/exports/EXP-OTHER')->assertStatus(404);
     }
 
     public function test_exceeding_the_rate_limit_returns_429(): void

@@ -23,6 +23,7 @@ DB_PORT="3306"
 DB_DATABASE="dmims"
 DB_USERNAME="dmims"
 DB_PASSWORD=""
+ADMIN_EMAIL=""
 SKIP_APACHE="false"
 SKIP_QUEUE="false"
 SKIP_TUNNEL="false"
@@ -40,6 +41,8 @@ Options:
   --db-database NAME   Database name default: dmims
   --db-username USER   Database user default: dmims
   --db-password PASS   Database password default: empty
+  --admin-email EMAIL  Create a platform admin with this email (password auto-generated
+                       and printed once). Omit to seed roles only and create the admin manually.
   --skip-apache        Do not configure Apache
   --skip-queue         Do not configure queue worker service
   --skip-tunnel        Do not install/configure cloudflared
@@ -58,6 +61,7 @@ while [[ $# -gt 0 ]]; do
     --db-database) DB_DATABASE="$2"; shift 2 ;;
     --db-username) DB_USERNAME="$2"; shift 2 ;;
     --db-password) DB_PASSWORD="$2"; shift 2 ;;
+    --admin-email) ADMIN_EMAIL="$2"; shift 2 ;;
     --skip-apache) SKIP_APACHE="true"; shift ;;
     --skip-queue) SKIP_QUEUE="true"; shift ;;
     --skip-tunnel) SKIP_TUNNEL="true"; shift ;;
@@ -174,6 +178,24 @@ function storage_and_db() {
   cd "$REPO_DIR"
   php artisan storage:link --force
   php artisan migrate --force
+
+  # Seed the roles and permissions the access-control layer depends on. The
+  # seeder is idempotent and ships no demo data, so it is safe to run on every
+  # deploy (DEPLOYMENT_GUIDE.md Part 6). Without it there are no roles to
+  # authorize against and no one can be granted access.
+  php artisan db:seed --class=RolesAndPermissionsSeeder --force
+
+  # Create the first platform administrator. dmims:create-admin prompts for an
+  # email when none is given, which would hang an unattended deploy, so only run
+  # it when --admin-email was supplied; otherwise tell the operator to run it.
+  if [[ -n "$ADMIN_EMAIL" ]]; then
+    php artisan dmims:create-admin "$ADMIN_EMAIL"
+  else
+    echo
+    echo "No --admin-email given: roles are seeded but no admin user exists yet."
+    echo "Create one before first login (DEPLOYMENT_GUIDE.md Part 6):"
+    echo "  php artisan dmims:create-admin admin@your-domain.com"
+  fi
 }
 
 function optimize_app() {

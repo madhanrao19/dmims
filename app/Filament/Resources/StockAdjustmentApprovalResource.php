@@ -19,14 +19,40 @@ class StockAdjustmentApprovalResource extends BaseResource
 
     protected static string|\UnitEnum|null $navigationGroup = 'Platform';
 
+    /**
+     * Segregation of duties: the user who raised an adjustment may not be the
+     * one who approves or rejects it. Compared by the authenticated user's name,
+     * which is also what {@see stampApprover()} records — never trusted input.
+     */
+    public static function isSelfApproval(array $data, StockAdjustmentApproval $record): bool
+    {
+        return in_array($data['approval_status'] ?? null, ['approved', 'rejected'], true)
+            && $record->requested_by !== null
+            && auth()->user()?->name === $record->requested_by;
+    }
+
+    /**
+     * Record the approver server-side from the authenticated user when the
+     * request is decided; clear it while the request is still pending.
+     */
+    public static function stampApprover(array $data): array
+    {
+        if (in_array($data['approval_status'] ?? null, ['approved', 'rejected'], true)) {
+            $data['approved_by'] = auth()->user()?->name;
+            $data['approved_at'] = now();
+        } else {
+            $data['approved_by'] = null;
+            $data['approved_at'] = null;
+        }
+
+        return $data;
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema
             ->components([
-                Forms\Components\Select::make('customer_id')
-                    ->relationship('customer', 'company_name')
-                    ->searchable()
-                    ->required(),
+                static::customerIdField(),
                 Forms\Components\TextInput::make('stock_movement_id')->numeric()->required(),
                 Forms\Components\Select::make('approval_status')
                     ->options([
@@ -35,9 +61,12 @@ class StockAdjustmentApprovalResource extends BaseResource
                         'rejected' => 'Rejected',
                     ])
                     ->required(),
-                Forms\Components\TextInput::make('requested_by')->maxLength(100),
-                Forms\Components\TextInput::make('approved_by')->maxLength(100),
-                Forms\Components\DateTimePicker::make('approved_at'),
+                // Requester and approver identity are recorded server-side from
+                // the authenticated user, never from form input — this is the
+                // segregation-of-duties control. Shown read-only for context.
+                Forms\Components\TextInput::make('requested_by')->disabled()->dehydrated(false),
+                Forms\Components\TextInput::make('approved_by')->disabled()->dehydrated(false),
+                Forms\Components\DateTimePicker::make('approved_at')->disabled()->dehydrated(false),
                 Forms\Components\Textarea::make('remarks')->maxLength(65535),
             ]);
     }
@@ -70,9 +99,11 @@ class StockAdjustmentApprovalResource extends BaseResource
 namespace App\Filament\Resources\StockAdjustmentApprovalResource\Pages;
 
 use App\Filament\Resources\StockAdjustmentApprovalResource;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Resources\Pages\ListRecords;
+use Filament\Support\Exceptions\Halt;
 
 class ListStockAdjustmentApprovals extends ListRecords
 {
@@ -82,9 +113,43 @@ class ListStockAdjustmentApprovals extends ListRecords
 class CreateStockAdjustmentApproval extends CreateRecord
 {
     protected static string $resource = StockAdjustmentApprovalResource::class;
+
+    /**
+     * The creator is the requester, and a new request is always pending — an
+     * adjustment can never be created pre-approved (that would let one person
+     * both raise and approve it). Approval happens on edit, by someone else.
+     */
+    protected function mutateFormDataBeforeCreate(array $data): array
+    {
+        $data['requested_by'] = auth()->user()?->name;
+        $data['approval_status'] = 'pending';
+        $data['approved_by'] = null;
+        $data['approved_at'] = null;
+
+        return $data;
+    }
 }
 
 class EditStockAdjustmentApproval extends EditRecord
 {
     protected static string $resource = StockAdjustmentApprovalResource::class;
+
+    /**
+     * Stamp the approver server-side and enforce segregation of duties: the
+     * requester may not approve or reject their own adjustment.
+     */
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        if (StockAdjustmentApprovalResource::isSelfApproval($data, $this->record)) {
+            Notification::make()
+                ->danger()
+                ->title('You cannot approve or reject your own adjustment request.')
+                ->persistent()
+                ->send();
+
+            throw new Halt;
+        }
+
+        return StockAdjustmentApprovalResource::stampApprover($data);
+    }
 }

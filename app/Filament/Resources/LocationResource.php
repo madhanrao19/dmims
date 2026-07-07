@@ -39,10 +39,7 @@ class LocationResource extends BaseResource
     {
         return $schema
             ->components([
-                Forms\Components\Select::make('customer_id')
-                    ->relationship('customer', 'company_name')
-                    ->searchable()
-                    ->required(),
+                static::customerIdField(),
                 Forms\Components\Select::make('parent_id')
                     ->relationship('parent', 'location_name')
                     ->searchable(),

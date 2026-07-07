@@ -35,11 +35,7 @@ class BillingRecordResource extends BaseResource
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
-            Forms\Components\Select::make('customer_id')
-                ->relationship('customer', 'company_name')
-                ->searchable()
-                ->required()
-                ->visible(fn (): bool => (bool) auth()->user()?->is_platform_user),
+            static::customerIdField(),
             Forms\Components\TextInput::make('invoice_no')
                 ->disabled()->dehydrated(false)->visibleOn('edit'),
             Forms\Components\DatePicker::make('invoice_date')->required()->default(now()),

@@ -55,7 +55,7 @@ All required models present (SubscriptionLog, BillingRecord/Payment/Log added).
 |---|---|
 | 1 Authentication | ✅ |
 | 2 Role/permission validation | ✅ `manage X` / `view X` permissions; reads on either, writes on `manage` |
-| 3 Customer isolation | ✅ global scopes + Filament scope |
+| 3 Customer isolation | ✅ global scopes + Filament scope; write-time `customer_id` re-forced on every `saving` (not just create), privileged Users fields platform-only, tenant-facing `customer_id` selects scoped/hidden, shared `LocationType` write-gated to platform, and `Setting`/`Export`/`Import`/`AuditLog`/`Department` brought under the global scope (v2.1.15) |
 | 4 Subscription validation | ✅ `EnsureSubscriptionActive` (TDD calls it `EnsureSubscriptionValid`) |
 | 5 License validation | ✅ `EnsureLicenseAllowsAccess` + `technical_access_mode`; date-based expiry now authoritative (v2.1.2 — lapsed licenses degrade to view-only even if `status` is stale) |
 | 6 Module validation | ✅ enforced in `can()` + nav |
@@ -155,6 +155,16 @@ patched).
   Tracking User / Viewer roles out of a document-tracking resource) → now
   `manage documents`; added billing money-path service guards (issue/cancel/pay
   state checks); removed the dead `RecentlyViewed` model. Regression tests added.
+- v2.1.15: tenant-isolation & privilege-escalation hardening from a full security
+  review — closed a **critical** self-escalation path in `UserResource` (tenant
+  Company Admin could grant themselves a platform super-admin account), re-forced
+  `customer_id` on every write (not just create) so records can't be reassigned
+  across tenants on edit, scoped/hid the tenant-facing `customer_id` selects (were
+  leaking the full customer roster), write-gated shared `LocationType` data to
+  platform staff, brought `Setting`/`Export`/`Import`/`AuditLog`/`Department` under
+  the `BelongsToCustomer` scope, and added segregation of duties to stock-adjustment
+  approval (server-side approver identity, no self-approval). Regression tests added
+  (`TenantIsolationHardeningTest`).
 
 ---
 

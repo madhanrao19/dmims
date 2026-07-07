@@ -23,10 +23,7 @@ class StockAlertResource extends BaseResource
     {
         return $schema
             ->components([
-                Forms\Components\Select::make('customer_id')
-                    ->relationship('customer', 'company_name')
-                    ->searchable()
-                    ->required(),
+                static::customerIdField(),
                 Forms\Components\TextInput::make('product_id')->numeric()->required(),
                 Forms\Components\TextInput::make('location_id')->numeric()->required(),
                 Forms\Components\Select::make('alert_type')

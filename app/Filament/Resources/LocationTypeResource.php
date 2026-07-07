@@ -9,6 +9,7 @@ use Filament\Forms;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 
 class LocationTypeResource extends BaseResource
 {
@@ -23,6 +24,22 @@ class LocationTypeResource extends BaseResource
     protected static string|\UnitEnum|null $navigationGroup = 'Locations';
 
     protected static ?int $navigationSort = 2;
+
+    /**
+     * LocationType is global reference data (no customer_id) shared by every
+     * tenant. Tenants keep read access via `manage/view inventory` so they can
+     * assign location types, but only platform staff may create/edit/delete
+     * them — otherwise one tenant could rename or delete types other tenants'
+     * locations depend on.
+     */
+    public static function can(string|\UnitEnum $action, ?Model $record = null): bool
+    {
+        if (in_array($action, self::WRITE_ACTIONS, true) && ! auth()->user()?->is_platform_user) {
+            return false;
+        }
+
+        return parent::can($action, $record);
+    }
 
     public static function form(Schema $schema): Schema
     {

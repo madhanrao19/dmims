@@ -30,10 +30,7 @@ class CategoryResource extends BaseResource
     {
         return $schema
             ->components([
-                Forms\Components\Select::make('customer_id')
-                    ->relationship('customer', 'company_name')
-                    ->searchable()
-                    ->required(),
+                static::customerIdField(),
                 Forms\Components\TextInput::make('category_code')->maxLength(100),
                 Forms\Components\TextInput::make('category_name')->required()->maxLength(255),
                 Forms\Components\Textarea::make('description')->rows(3),

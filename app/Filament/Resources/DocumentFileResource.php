@@ -45,10 +45,7 @@ class DocumentFileResource extends BaseResource
     {
         return $schema
             ->components([
-                Forms\Components\Select::make('customer_id')
-                    ->relationship('customer', 'company_name')
-                    ->searchable()
-                    ->required(),
+                static::customerIdField(),
                 Forms\Components\TextInput::make('file_barcode')->required()->maxLength(150),
                 Forms\Components\TextInput::make('file_reference_no')->maxLength(150),
                 Forms\Components\TextInput::make('title')->required()->maxLength(255),

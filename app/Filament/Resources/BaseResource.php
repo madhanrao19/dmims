@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Services\AccessControlService;
 use App\Services\ModuleAccessService;
+use Filament\Forms\Components\Select;
 use Filament\Resources\Resource;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -14,6 +15,31 @@ abstract class BaseResource extends Resource
     protected static bool $applyCustomerScope = false;
 
     protected static ?string $permission = null;
+
+    /**
+     * A `customer_id` select for tenant-owned resources. Platform users pick any
+     * customer; tenant users never see the field (nor the full customer roster it
+     * would enumerate) and the owning customer is forced server-side by the
+     * BelongsToCustomer `saving` hook. Keeps `customer_id` derived from the
+     * authenticated user, never trusted from the request.
+     */
+    protected static function customerIdField(bool $required = true): Select
+    {
+        return Select::make('customer_id')
+            ->relationship('customer', 'company_name', function (Builder $query): Builder {
+                $user = auth()->user();
+
+                if ($user && ! $user->is_platform_user && $user->customer_id) {
+                    $query->where('id', $user->customer_id);
+                }
+
+                return $query;
+            })
+            ->searchable()
+            ->visible(fn (): bool => (bool) auth()->user()?->is_platform_user)
+            ->dehydrated(fn (): bool => (bool) auth()->user()?->is_platform_user)
+            ->required(fn (): bool => $required && (bool) auth()->user()?->is_platform_user);
+    }
 
     /** Actions that modify data; blocked when the license is view-only. */
     protected const WRITE_ACTIONS = [

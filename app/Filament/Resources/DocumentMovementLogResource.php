@@ -30,10 +30,7 @@ class DocumentMovementLogResource extends BaseResource
     {
         return $schema
             ->components([
-                Forms\Components\Select::make('customer_id')
-                    ->relationship('customer', 'company_name')
-                    ->searchable()
-                    ->required(),
+                static::customerIdField(),
                 Forms\Components\TextInput::make('movement_no')->maxLength(100),
                 Forms\Components\TextInput::make('movable_type')->maxLength(150),
                 Forms\Components\TextInput::make('movable_id')->maxLength(100),
