@@ -1,6 +1,24 @@
 # CLAUDE.md
 
-# DMIMS AI Engineering Instructions
+# DMIMS AI Engineering Rules
+
+Before doing any task:
+
+1. Read this file first.
+2. Read `/docs` before editing.
+3. Inspect the existing project before changing code.
+4. Make the smallest safe production-ready change.
+5. Reuse existing components and dependencies.
+6. Do not create unnecessary abstractions.
+7. Preserve security, validation, accessibility, tenant isolation, and error handling.
+8. Do not expose secrets.
+9. Do not break existing working features.
+10. Verify everything before saying done.
+11. Use Playwright for website QA.
+12. Fix bugs found during testing.
+13. Update documentation if behavior changes.
+14. Never say “production ready” unless verified.
+
 
 `/docs` is the source of truth for DMIMS. Before starting any task, read and
 follow these governance documents, in order — they define the engineering

@@ -11,6 +11,23 @@ class Customer extends Model
 {
     use Auditable, HasFactory, SoftDeletes;
 
+    /**
+     * Tenant isolation: a customer user may only ever see their own company.
+     * Without this, any relationship dropdown (e.g. the customer_id Select on
+     * resource forms) would enumerate every company on the platform. Platform
+     * users and unauthenticated contexts (console, queues, seeders) see all.
+     */
+    protected static function booted(): void
+    {
+        static::addGlobalScope('ownCompany', function ($builder): void {
+            $user = auth()->user();
+
+            if ($user && ! $user->is_platform_user && $user->customer_id) {
+                $builder->where($builder->getModel()->getTable().'.id', $user->customer_id);
+            }
+        });
+    }
+
     protected $fillable = [
         'company_name',
         'company_code',

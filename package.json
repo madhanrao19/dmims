@@ -5,11 +5,16 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
-        "dev": "vite"
-        ,"icons:generate": "node tools/convert-icons.js",
-        "build:assets": "vite build && npm run icons:generate"
+        "dev": "vite",
+        "icons:generate": "node tools/convert-icons.js",
+        "build:assets": "vite build && npm run icons:generate",
+        "qa": "playwright test",
+        "qa:headed": "playwright test --headed",
+        "qa:ui": "playwright test --ui",
+        "qa:report": "playwright show-report"
     },
     "devDependencies": {
+        "@playwright/test": "^1.61.1",
         "@tailwindcss/vite": "^4.0.0",
         "concurrently": "^10.0.3",
         "laravel-vite-plugin": "^3.1",
