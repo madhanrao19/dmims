@@ -5,6 +5,18 @@ Security & Access Control Matrix, Database Dictionary, TDD) on 2026-06-14.
 **Status: all identified gaps remediated** (see CHANGELOG.md). Remaining
 divergences are cosmetic (enum naming) or operational config.
 
+> **Re-audit 2026-07-08 (v2.1.14):** browser-level QA (role-based Playwright
+> suite, `tests/playwright/role-qa.spec.js`) found that several layers below,
+> while correctly implemented in code, were **not actually enforced over
+> HTTP**: the Filament panel had no middleware stack (no session/CSRF), the
+> `User` model did not implement `FilamentUser` (production login lockout),
+> Filament v5 authorized pages via Gate policies rather than
+> `BaseResource::can()`, a `Gate::before` bypass gave the view-only
+> Datamation Management role full write access, and customer users could
+> enumerate all companies via `customer_id` dropdowns. All fixed in v2.1.14;
+> the statuses below are accurate again and now verified end-to-end in a
+> browser, not only via PHPUnit.
+
 Legend: ✅ implemented · WIP partial · ❌ missing
 
 ---
@@ -69,6 +81,15 @@ Tracking User, Viewer). Each functional area has a `manage X` (full CRUD) and a
 either and write actions only on `manage X`, so the matrix's view-only roles
 (Management, Viewer) get genuine read access. License `view_only` mode adds a
 second, orthogonal read-only tier.
+
+Since v2.1.14, Filament's page/action authorization is routed through this
+engine via a `BaseResource::getAuthorizationResponse()` override (Filament v5
+consults Gate policies, not `can()`, by default). Platform users have
+platform-wide read scope but writes require the manage permission — enforcing
+the matrix's view-only rule for Datamation Management. The former
+`Gate::before` platform bypass and the per-model `ResourcePolicy` are removed;
+with no policy registered the Gate default-denies model abilities. `Customer`
+carries a tenant scope so customer users can only ever see their own company.
 
 ## 6. Module codes (Dictionary §3) — ✅
 All six dictionary module codes are present (`stock_inventory`,
