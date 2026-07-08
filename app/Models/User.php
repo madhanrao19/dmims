@@ -3,11 +3,14 @@
 namespace App\Models;
 
 use App\Models\Concerns\Auditable;
+use App\Services\AccessControlService;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Filament\Auth\MultiFactor\App\Concerns\InteractsWithAppAuthentication;
 use Filament\Auth\MultiFactor\App\Concerns\InteractsWithAppAuthenticationRecovery;
 use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthentication;
 use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthenticationRecovery;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -15,9 +18,20 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
-class User extends Authenticatable implements HasAppAuthentication, HasAppAuthenticationRecovery
+class User extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery
 {
     use Auditable, HasApiTokens, HasFactory, HasRoles, InteractsWithAppAuthentication, InteractsWithAppAuthenticationRecovery, Notifiable, SoftDeletes;
+
+    /**
+     * Panel access (Filament checks this in every non-local environment —
+     * without implementing FilamentUser, production would deny all logins).
+     * Delegates to the documented layer-1 rule: active user, active company,
+     * license not blocked.
+     */
+    public function canAccessPanel(Panel $panel): bool
+    {
+        return app(AccessControlService::class)->canLogin($this);
+    }
 
     /**
      * The attributes that are mass assignable.

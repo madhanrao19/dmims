@@ -7,8 +7,8 @@ use App\Models\StockMovement;
 use App\Observers\CustomerSubscriptionObserver;
 use App\Observers\StockMovementObserver;
 use Filament\Facades\Filament;
+use Filament\Navigation\MenuItem;
 use Filament\Navigation\NavigationGroup;
-use Filament\Navigation\NavigationItem;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -43,7 +43,8 @@ class AppServiceProvider extends ServiceProvider
                 ]);
 
                 Filament::registerUserMenuItems([
-                    NavigationItem::make('Return to Site')
+                    MenuItem::make()
+                        ->label('Return to Site')
                         ->url(config('app.url'))
                         ->icon('heroicon-o-arrow-left'),
                 ]);
