@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Services\AccessControlService;
 use App\Services\ModuleAccessService;
 use Filament\Resources\Resource;
+use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use UnitEnum;
@@ -42,6 +43,17 @@ abstract class BaseResource extends Resource
         return $query;
     }
 
+    /**
+     * Filament v5 authorises pages and actions through this method (mapped to
+     * Gate policies), NOT through can() — so without this override the layered
+     * access-control engine below never runs for panel requests. Route all
+     * panel authorisation back through can().
+     */
+    public static function getAuthorizationResponse(string|UnitEnum $action, ?Model $record = null): Response
+    {
+        return static::can($action, $record) ? Response::allow() : Response::deny();
+    }
+
     public static function can(string|UnitEnum $action, ?Model $record = null): bool
     {
         if (static::shouldSkipAuthorization()) {
@@ -54,7 +66,29 @@ abstract class BaseResource extends Resource
             return false;
         }
 
+        // Tenant isolation, defence in depth: never authorise a record owned
+        // by another customer (query scoping already hides them; this guards
+        // direct-ID access paths too). Null customer_id = platform-owned.
+        if ($record && ! $user->is_platform_user && $user->customer_id
+            && array_key_exists('customer_id', $record->getAttributes())
+            && $record->customer_id !== null
+            && (int) $record->customer_id !== (int) $user->customer_id) {
+            return false;
+        }
+
         if ($user->is_platform_user) {
+            // Platform users have platform-wide read scope and skip the
+            // module/license layers (those gate customers, not Datamation),
+            // but writes still require the manage permission: the Security &
+            // Access Control Matrix makes Datamation Management view-only.
+            if (! filled(static::$permission)) {
+                return true;
+            }
+
+            if (in_array($action, static::WRITE_ACTIONS, true)) {
+                return $user->can(static::$permission);
+            }
+
             return true;
         }
 

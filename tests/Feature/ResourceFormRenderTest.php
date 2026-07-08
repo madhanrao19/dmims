@@ -21,6 +21,9 @@ class ResourceFormRenderTest extends TestCase
     {
         $this->seed(RolesAndPermissionsSeeder::class);
         $admin = User::factory()->create(['is_platform_user' => true, 'status' => 'active']);
+        // Platform users no longer bypass permissions for writes; a platform
+        // admin is the Super Admin role (all permissions).
+        $admin->assignRole('Datamation Super Admin');
         $this->actingAs($admin);
 
         $panel = Filament::getPanel('admin');
