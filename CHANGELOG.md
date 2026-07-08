@@ -4,6 +4,63 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.14] - 2026-07-08
+
+### Fixed — security & access control (found via role-based Playwright QA)
+- **Panel middleware stack restored (Critical).** `FilamentPanelProvider` never
+  called `->middleware([...])`; Filament panels ship with NO default route
+  middleware, so `/admin` ran without `StartSession`, cookie encryption or
+  CSRF protection — login could not persist a session at all over HTTP. Added
+  the standard Filament middleware stack and switched `authMiddleware` to
+  Filament's `Authenticate`.
+- **`User` now implements `FilamentUser` (Critical).** Without
+  `canAccessPanel()`, Filament denies every login outside `local` env —
+  production would have been a total lockout once the middleware fix landed.
+  Delegates to the existing `AccessControlService::canLogin()` (active user,
+  active company, license not blocked).
+- **Panel authorization re-wired to the layered engine (Critical).** Filament
+  v5 authorizes pages/actions via `getAuthorizationResponse()` (Gate policies),
+  so the documented `BaseResource::can()` seven-layer engine never ran for
+  panel requests — and `ResourcePolicy::viewAny/create` expected a `$model`
+  argument Laravel never passes, denying ALL list/create pages to every
+  non-platform user. `BaseResource` now overrides `getAuthorizationResponse()`
+  to route through `can()`, which also gained a record-level tenant-ownership
+  check.
+- **Platform write bypass removed (High).** `Gate::before` allowed every
+  platform user all abilities, giving the view-only Datamation Management role
+  full write access (Security & Access Control Matrix violation). Removed;
+  platform users keep platform-wide read scope but writes now require the
+  manage permission (Datamation Super Admin holds all permissions via its
+  role, so it is unaffected).
+- **Customer enumeration closed (High).** `Customer` had no tenant scope, so
+  any customer-scoped user could enumerate every company on the platform
+  (e.g. via the `customer_id` Select on 19 resource forms). A global scope now
+  limits non-platform users to their own company.
+- **User menu 500 fixed (High).** `AppServiceProvider` registered a
+  `NavigationItem` as a user-menu item; Filament v5 requires `MenuItem` —
+  every authenticated `/admin` page threw a `TypeError`.
+
+### Removed
+- **`ResourcePolicy` and its 27 model→policy mappings.** Its class-level
+  `viewAny`/`create` methods expected a `$model` argument Laravel never passes
+  (permanently denying), while its record-level methods carried
+  `is_platform_user` allow-shortcuts contradicting the tightened model. It was
+  unreachable from the panel (BaseResource authorizes centrally); with no
+  policy registered the Gate now default-denies model abilities — fail closed.
+- **`package.json` npm-init pollution.** Removed ~35 transitive packages that
+  had been promoted to `dependencies`, npm-init boilerplate (including an
+  incorrect `"license": "ISC"` on a proprietary project), and a duplicate qa
+  script; restored the `shell-quote` security override that had been dropped.
+  Lockfile regenerated (`npm install`: 0 vulnerabilities; build verified).
+
+### Added
+- Role-based Playwright QA suite (`tests/playwright/role-qa.spec.js`): per-role
+  login/logout, dashboard, restricted URLs, tenant-scoped select options, one
+  CRUD + validation flow, mobile viewport smoke. `QASampleUsersSeeder`
+  (local/testing only) seeds one QA user per documented role.
+- `playwright.config.js`: env-overridable `baseURL`, serial workers (single
+  threaded `php artisan serve`).
+
 ## [2.1.13] - 2026-07-03
 
 ### Changed
