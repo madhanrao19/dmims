@@ -6,6 +6,7 @@ use App\Services\AccessControlService;
 use App\Services\ModuleAccessService;
 use Filament\Forms\Components\Select;
 use Filament\Resources\Resource;
+use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use UnitEnum;
@@ -110,6 +111,23 @@ abstract class BaseResource extends Resource
         // Reads are allowed with either the manage or the view permission
         // (role-based view-only access per the Security & Access Control Matrix).
         return $user->can(static::$permission) || $user->can(static::viewPermission());
+    }
+
+    /**
+     * Make {@see can()} the single source of truth for Filament's page and
+     * action authorization. By default Filament routes every authorization
+     * check through the model policy (Gate), which — for the generic
+     * ResourcePolicy — receives no model on the class-level `viewAny`/`create`
+     * abilities and therefore denies every non-platform user, locking tenants
+     * out of every resource. Delegating to `can()` here applies the correct
+     * permission + module + license logic (and the platform-user bypass)
+     * uniformly, for both class-level and record-level actions.
+     */
+    public static function getAuthorizationResponse(string|UnitEnum $action, ?Model $record = null): Response
+    {
+        return static::can($action, $record)
+            ? Response::allow()
+            : Response::deny();
     }
 
     /**

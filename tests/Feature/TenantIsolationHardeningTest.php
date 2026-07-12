@@ -172,6 +172,33 @@ class TenantIsolationHardeningTest extends TestCase
         $this->assertSame('Ops A', Department::first()->name);
     }
 
+    // --- Tenant resource access (Filament authorization) --------------------
+
+    public function test_tenant_role_can_access_resources_its_permission_allows(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+
+        // UserResource has no module gate, so this isolates the authorization
+        // fix from module enablement. Company Admin holds "manage users".
+        $admin = $this->tenantUser($this->customerA);
+        $admin->assignRole('Company Admin');
+        $this->actingAs($admin);
+
+        // Filament page authorization (getAuthorizationResponse -> can()) must
+        // grant a tenant access to resources its role permits — the generic
+        // policy alone denied every non-platform user here (viewAny received no
+        // model and returned false), locking tenants out of the whole panel.
+        $this->assertTrue(UserResource::canViewAny());
+        $this->assertTrue(UserResource::canCreate());
+
+        // A role without the users permission is still correctly denied.
+        $stockUser = $this->tenantUser($this->customerA);
+        $stockUser->assignRole('Stock Inventory User'); // manage inventory only
+        $this->actingAs($stockUser);
+        $this->assertFalse(UserResource::canViewAny());
+        $this->assertFalse(UserResource::canCreate());
+    }
+
     // --- M2: stock-adjustment approval segregation of duties ----------------
 
     public function test_requester_cannot_approve_their_own_adjustment(): void

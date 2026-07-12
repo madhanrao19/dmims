@@ -38,6 +38,15 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
   - Added `tests/Feature/TenantIsolationHardeningTest.php` covering each boundary above.
 
 ### Fixed
+- **Every tenant (non-platform) user was locked out of every resource.** Filament
+  authorizes resource pages through the model policy; the generic `ResourcePolicy`'s
+  class-level `viewAny`/`create` methods expect a model argument, but Laravel never
+  passes one for those abilities, so they returned `false` for all non-platform users —
+  a tenant could log in and see the dashboard but got 403 on every resource. The app's
+  own `BaseResource::can()` already had the correct permission + module + license logic,
+  so `BaseResource::getAuthorizationResponse()` now delegates to it, making `can()` the
+  single authorization authority for both class-level and record-level actions. Surfaced
+  by driving the panel as a seeded tenant role in Playwright.
 - **Admin panel had no session/cookie/CSRF middleware — browser login was broken.**
   `FilamentPanelProvider` was missing its base `->middleware([...])` stack
   (`EncryptCookies`, `AddQueuedCookiesToResponse`, `StartSession`,
