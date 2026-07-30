@@ -17,6 +17,39 @@ divergences are cosmetic (enum naming) or operational config.
 > the statuses below are accurate again and now verified end-to-end in a
 > browser, not only via PHPUnit.
 
+> **Re-audit 2026-07-30 (v2.1.16):** a full production-readiness pass
+> (independent security-reviewer subagent + manual verification) found three
+> more issues in the same "correct-looking code, wrong enforcement point"
+> class — see CHANGELOG.md [2.1.16] for full detail:
+> - **Critical** — `UserResource`'s form let any `manage users` holder
+>   (including the tenant-scoped Company Admin role) grant `is_platform_user`
+>   or a platform-only role to any user in their company. Self-service
+>   platform-wide escalation, closed with a `visible()`/query-scope guard on
+>   the form plus a server-side strip regardless of client input.
+> - **Critical** — because a platform user can share a tenant's `customer_id`
+>   (the seeded `admin@example.com` does), the existing tenant scope alone
+>   let a same-tenant Company Admin open that platform user's edit page —
+>   and, combined with the missing-password bug below, set a **new
+>   password** on it. Full platform takeover without ever touching
+>   `is_platform_user`/`roles`. Closed by denying all writes on
+>   `is_platform_user = true` records to non-platform actors, independent of
+>   `customer_id`.
+> - **High** — Layer 4 (subscription validity) and the user/company-active
+>   and license-blocked checks were registered as *global* Laravel
+>   middleware, which runs before the Filament panel's `StartSession` (and
+>   before `routes/api.php`'s `auth:sanctum`). All six checks read
+>   `auth()->user()`, which was always `null` at that point — they silently
+>   no-op'd on every request. A customer with a lapsed subscription (but a
+>   non-blocked license) kept full access indefinitely. Moved to a named
+>   `business-access` middleware group attached after authentication.
+>
+> Also found, not a security issue but a **Critical functional defect**: the
+> `UserResource` form had no `password` field at all, so creating any user
+> via the admin UI threw a DB `NOT NULL` violation on every attempt — fixed
+> alongside the above, regression-tested for both the create and
+> blank-on-edit-preserves-hash paths. Full suite (122 tests) and `npm run
+> build` pass; statuses below remain accurate.
+
 Legend: ✅ implemented · WIP partial · ❌ missing
 
 ---

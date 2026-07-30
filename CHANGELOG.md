@@ -4,6 +4,80 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.16] - 2026-07-30
+
+### Fixed — security & access control (found via full production-readiness re-audit)
+- **UserResource privilege escalation (Critical).** The Users form exposed an
+  unrestricted `is_platform_user` toggle and an unscoped `roles` Select to
+  anyone holding `manage users` — including the tenant-scoped Company Admin
+  role. A Company Admin could self-service escalate any user in their company
+  to platform-wide read access (`is_platform_user = true`) and/or assign
+  `Datamation Super Admin` / `Datamation Management`, defeating tenant
+  isolation entirely. The `is_platform_user` toggle is now hidden from
+  non-platform actors, the `roles` Select excludes the two platform-only
+  roles for them, and `UserResource::stripDisallowedRoles()` + a
+  `mutateFormDataBeforeCreate` guard enforce this server-side regardless of
+  what the client submits.
+- **Same-tenant platform-user credential takeover (Critical).** A platform
+  user can share a tenant's `customer_id` — `DatabaseSeeder`'s own
+  `admin@example.com` does exactly this — so `BaseResource`'s
+  `customer_id`-based query scope alone let a same-tenant Company Admin open
+  that platform user's edit page. Combined with the new password field
+  (below), this was a full platform-takeover path that never touched
+  `is_platform_user` or `roles`. `UserResource::can()` now denies every write
+  action (`update`, `delete`, …) on a record where `is_platform_user = true`
+  to any actor who is not themselves a platform user, independent of
+  `customer_id`. Reads are unaffected.
+- **Subscription/license/company/user-active checks were not enforced over
+  HTTP (High).** `SetCompanyContext`, `EnsureUserIsActive`,
+  `EnsureCompanyAssigned`, `EnsureCompanyActive`, `EnsureSubscriptionActive`
+  and `EnsureLicenseAllowsAccess` were registered via
+  `$middleware->append()` in `bootstrap/app.php` — the *global* middleware
+  stack, which runs before any route-group middleware, including the
+  Filament panel's own `StartSession` and `routes/api.php`'s `auth:sanctum`.
+  Every one of these checks reads `auth()->user()`, which was always `null`
+  at that point, so they silently no-op'd on every request — the exact
+  "implemented in code but not enforced over HTTP" bug class v2.1.15 was
+  meant to close. Most severely, a customer with a lapsed subscription (but a
+  non-blocked license — subscription and license are orthogonal checks) kept
+  full application access indefinitely. Moved to a named `business-access`
+  middleware group, attached inside `FilamentPanelProvider` (after
+  `StartSession`/`AuthenticateSession`) and `routes/api.php` (after
+  `auth:sanctum`), so `auth()->user()` is populated when they run.
+
+### Fixed — functionality
+- **User creation was completely broken (Critical).** `UserResource`'s form
+  had no `password` field at all — the `users.password` column is `NOT NULL`
+  with no default, so every attempt to create a user via the Filament admin
+  UI (any role holding `manage users`) threw a database integrity-constraint
+  violation. Added a password field, required on create, optional on edit
+  (`dehydrated` only when filled, so leaving it blank preserves the existing
+  hash — regression-tested for both paths).
+
+### Added
+- `bootstrap/app.php`: named `business-access` middleware group (see above).
+- Regression tests: `BusinessAccessMiddlewareTest`,
+  `UserResourcePrivilegeEscalationTest`, `UserResourcePasswordFieldTest`.
+
+### Changed
+- `npm audit fix` applied (postcss, concurrently's `shell-quote` — both
+  dev-only build tooling, no production dependency affected): 3 high
+  severity advisories → 0.
+
+### Known gaps (documented, not blocking)
+- Password policy is `min:8` with no complexity requirement, matching the
+  existing `dmims:create-admin-user` console command — consistent with
+  current behaviour, but weaker than the "Strong password policy" named in
+  the Master Functional Specification. Not changed in this pass (would touch
+  the console command and profile password-change form too); tracked for a
+  dedicated pass.
+- The `business-access` group's `SetCompanyContext` calls the `session()`
+  helper on the (stateless, Sanctum-guarded) API route group. Tests pass
+  under `SESSION_DRIVER=array` (phpunit.xml); the write cost against
+  `SESSION_DRIVER=database` in production has not been separately profiled.
+- Pre-existing, unrelated to this pass: `database/seeders/QASampleUsersSeeder.php`
+  fails `vendor/bin/pint --test` (import ordering / strict-types fixers).
+
 ## [2.1.15] - 2026-07-08
 
 ### Fixed — security & access control (found via role-based Playwright QA)

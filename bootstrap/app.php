@@ -42,14 +42,26 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->append([
+            LogUserActivity::class,
+            InjectPwaScript::class,
+        ]);
+
+        // These all read auth()->user(), so they must run AFTER the request
+        // has been authenticated (session guard on the Filament panel, token
+        // guard on the API). $middleware->append() adds to the GLOBAL stack,
+        // which runs before any route-group middleware — including the
+        // panel's own StartSession and routes/api.php's auth:sanctum — so
+        // placed there they silently no-op on every request (auth()->user()
+        // is always null at that point). Registered as a named group instead
+        // and attached after authentication in FilamentPanelProvider and
+        // routes/api.php.
+        $middleware->group('business-access', [
             SetCompanyContext::class,
             EnsureUserIsActive::class,
             EnsureCompanyAssigned::class,
             EnsureCompanyActive::class,
             EnsureSubscriptionActive::class,
             EnsureLicenseAllowsAccess::class,
-            LogUserActivity::class,
-            InjectPwaScript::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

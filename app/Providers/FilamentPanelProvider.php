@@ -40,6 +40,10 @@ class FilamentPanelProvider extends PanelProvider
                 SubstituteBindings::class,
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
+                // Business-rule access gates (user/company active, subscription,
+                // license). Must run after StartSession/AuthenticateSession above
+                // so auth()->user() is populated — see bootstrap/app.php.
+                'business-access',
             ])
             ->authMiddleware([
                 Authenticate::class,

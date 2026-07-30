@@ -8,6 +8,8 @@ use Filament\Forms;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
+use UnitEnum;
 
 class UserResource extends BaseResource
 {
@@ -16,6 +18,55 @@ class UserResource extends BaseResource
     protected static bool $applyCustomerScope = true;
 
     protected static ?string $permission = 'manage users';
+
+    /**
+     * Platform-only roles. A non-platform user (e.g. Company Admin, who holds
+     * `manage users` for their own tenant) must never be able to grant these
+     * or flip is_platform_user — either would escalate the target account to
+     * platform-wide read/write access across every tenant.
+     */
+    public const PLATFORM_ROLES = ['Datamation Super Admin', 'Datamation Management'];
+
+    /**
+     * Defense in depth against the roles Select above: removes any
+     * platform-only role from $user unless the acting user is themselves a
+     * platform user. Called after create/edit regardless of what the client
+     * submitted, since relationship fields aren't covered by
+     * mutateFormDataBeforeCreate/Save.
+     */
+    public static function stripDisallowedRoles(User $user): void
+    {
+        if (auth()->user()?->is_platform_user) {
+            return;
+        }
+
+        $user->roles()
+            ->whereIn('name', self::PLATFORM_ROLES)
+            ->get()
+            ->each(fn ($role) => $user->removeRole($role));
+    }
+
+    /**
+     * Close the credential-takeover path this resource would otherwise leave
+     * open: a platform user can share a tenant's customer_id (e.g. the
+     * platform admin seeded by DatabaseSeeder), so BaseResource's
+     * customer_id-based scoping alone would let a same-tenant Company Admin
+     * open that platform user's edit page and set a new password —
+     * full platform takeover, without ever touching is_platform_user or
+     * roles. Deny every write action on a platform-user record to any actor
+     * who is not themselves a platform user, regardless of customer_id.
+     */
+    public static function can(string|UnitEnum $action, ?Model $record = null): bool
+    {
+        if ($record instanceof User
+            && $record->is_platform_user
+            && ! auth()->user()?->is_platform_user
+            && in_array($action, static::WRITE_ACTIONS, true)) {
+            return false;
+        }
+
+        return parent::can($action, $record);
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = null;
 
@@ -34,6 +85,15 @@ class UserResource extends BaseResource
             ->components([
                 Forms\Components\TextInput::make('name')->required()->maxLength(255),
                 Forms\Components\TextInput::make('email')->email()->required()->maxLength(255),
+                Forms\Components\TextInput::make('password')
+                    ->password()
+                    ->revealable()
+                    ->required(fn (string $operation): bool => $operation === 'create')
+                    ->minLength(8)
+                    ->maxLength(255)
+                    ->dehydrateStateUsing(fn (?string $state) => filled($state) ? bcrypt($state) : null)
+                    ->dehydrated(fn (?string $state): bool => filled($state))
+                    ->helperText('Leave blank to keep the current password.'),
                 Forms\Components\TextInput::make('username')->maxLength(100),
                 Forms\Components\TextInput::make('employee_id')->maxLength(100),
                 Forms\Components\TextInput::make('phone')->maxLength(50),
@@ -55,9 +115,16 @@ class UserResource extends BaseResource
                         'archived' => 'Archived',
                     ])
                     ->required(),
-                Forms\Components\Toggle::make('is_platform_user'),
+                Forms\Components\Toggle::make('is_platform_user')
+                    ->visible(fn (): bool => (bool) auth()->user()?->is_platform_user),
                 Forms\Components\Select::make('roles')->multiple()
-                    ->relationship('roles', 'name'),
+                    ->relationship(
+                        'roles',
+                        'name',
+                        modifyQueryUsing: fn ($query) => auth()->user()?->is_platform_user
+                            ? $query
+                            : $query->whereNotIn('name', self::PLATFORM_ROLES),
+                    ),
             ]);
     }
 
@@ -116,9 +183,43 @@ class ListUsers extends ListRecords
 class CreateUser extends CreateRecord
 {
     protected static string $resource = UserResource::class;
+
+    protected function mutateFormDataBeforeCreate(array $data): array
+    {
+        if (! auth()->user()?->is_platform_user) {
+            $data['is_platform_user'] = false;
+        }
+
+        return $data;
+    }
+
+    protected function afterCreate(): void
+    {
+        UserResource::stripDisallowedRoles($this->record);
+    }
 }
 
 class EditUser extends EditRecord
 {
     protected static string $resource = UserResource::class;
+
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        // Preserve, don't clobber: UserResource::can() already denies write
+        // access to a platform-user record for a non-platform actor, so this
+        // is unreachable in the normal flow. But forcing false here (rather
+        // than the prior value) would silently downgrade an already-platform
+        // account the moment any other field on it was edited — keep the
+        // record's existing value instead of overwriting it.
+        if (! auth()->user()?->is_platform_user) {
+            $data['is_platform_user'] = $this->record->is_platform_user;
+        }
+
+        return $data;
+    }
+
+    protected function afterSave(): void
+    {
+        UserResource::stripDisallowedRoles($this->record);
+    }
 }
