@@ -9,6 +9,7 @@
 /.cursor/
 /.idea
 /.nova
+/.vs
 /.phpunit.cache
 /.vscode
 /.zed
