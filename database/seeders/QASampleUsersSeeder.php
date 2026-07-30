@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Customer;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -27,7 +28,7 @@ class QASampleUsersSeeder extends Seeder
         // Demo customer, plan, modules and admin come from DatabaseSeeder.
         $this->call(DatabaseSeeder::class);
 
-        $customer = \App\Models\Customer::where('company_code', 'DEMO')->firstOrFail();
+        $customer = Customer::where('company_code', 'DEMO')->firstOrFail();
 
         $roleUsers = [
             'Datamation Super Admin' => ['qa-superadmin@example.com', true],
