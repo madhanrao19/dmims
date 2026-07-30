@@ -4,7 +4,6 @@ namespace App\Models;
 
 use App\Models\Concerns\Auditable;
 use App\Models\Concerns\BelongsToCustomer;
-use App\Models\Concerns\Favoritable;
 use App\Models\Concerns\Taggable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,7 +11,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class DocumentFile extends Model
 {
-    use Auditable, BelongsToCustomer, Favoritable, HasFactory, SoftDeletes, Taggable;
+    use Auditable, BelongsToCustomer, HasFactory, SoftDeletes, Taggable;
 
     protected $fillable = [
         'customer_id',

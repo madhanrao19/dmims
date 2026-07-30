@@ -234,9 +234,17 @@ or tests).
 
 | Item | State | Recommendation |
 |---|---|---|
-| `recently_viewed` table | Model removed; table now orphaned | Add a reversible drop migration in a future release if the "recently viewed" feature is not planned. |
-| `favorites` table + `Favorite` model + `Favoritable` trait | Trait mixed into `Box`/`DocumentFile`, but no UI, tests, or callers | Either surface a "favorites" UI or retire the feature (drop table + trait + model). |
 | `tags` / `taggables` tables + `Tag` model + `Taggable` trait | Functioning and **test-covered** (`TagsTest`) but not surfaced in any Filament resource | Surface tagging in the UI, or leave as a supported-but-headless capability. |
+
+**Removed in v2.1.17:** `favorites` and `recently_viewed` tables (dropped via
+`2026_07_30_000000_drop_favorites_and_recently_viewed_tables.php`, reversible
+`down()` recreates both to the original schema), `Favorite` model,
+`Favoritable` trait, and its `use` in `Box`/`DocumentFile`. `recently_viewed`
+was orphaned since the `RecentlyViewed` model's removal in v2.1.3;
+`favorites` had the trait mixed in but no UI, route, or test ever called
+`toggleFavorite()`/`isFavoritedBy()`. Confirmed zero references before
+dropping. Full suite (122/122), migrate + rollback + re-migrate, and
+`pint` all verified clean.
 
 **Optional / future (not implemented — noted for a later, planned change):**
 - Redis cache/queues, HA, read replicas, object storage — infrastructure

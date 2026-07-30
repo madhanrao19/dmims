@@ -4,6 +4,33 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.17] - 2026-07-30
+
+### Removed
+- **`favorites` and `recently_viewed` tables**, `Favorite` model, `Favoritable`
+  trait (and its use in `Box`/`DocumentFile`). Both were unused scaffolding
+  flagged in the v2.1.3 cleanup report and left in place pending a decision;
+  `recently_viewed` was orphaned since `RecentlyViewed` was removed in v2.1.3,
+  and `favorites`/`Favoritable` were mixed into two models but never called
+  from any UI, route, or test. Dropped via a reversible migration
+  (`2026_07_30_000000_drop_favorites_and_recently_viewed_tables.php`) — its
+  `down()` recreates both tables to their original schema. Confirmed zero
+  code references before dropping; full suite (122/122), `migrate` +
+  `migrate:rollback` + re-`migrate`, and `pint` all verified clean.
+- Also this session: five dead classes with zero references anywhere
+  (`CompanyContextService`, `LocationService`, `SubscriptionService`,
+  `UserSecurityService`, `EnsurePermission` middleware) and one stale
+  commented-out import — see `docs/CONFORMANCE_GAP_ANALYSIS.md`'s Services
+  table for what superseded them.
+
+### Security
+- Patched `dompdf/dompdf` (<3.1.6: chroot bypass, local file read via SVG
+  data-URI, BMP resource-consumption DoS, font-face file-existence oracle)
+  and `guzzlehttp/guzzle` (<7.14.2/<7.15.1: Referer/cookie/proxy-header
+  leakage) transitive dependencies. Neither is a direct `composer.json`
+  requirement; updated within existing constraints. `composer audit` and
+  GitHub Dependabot both report zero open advisories.
+
 ## [2.1.16] - 2026-07-30
 
 ### Fixed — security & access control (found via full production-readiness re-audit)
