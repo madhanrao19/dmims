@@ -78,7 +78,8 @@ fi
 
 function install_packages() {
   apt-get update
-  apt-get install -y apache2 git curl unzip software-properties-common
+  apt-get install -y apache2 git curl unzip software-properties-common cron
+  systemctl enable --now cron
 
   # Ubuntu 24.04 ships PHP 8.3; this app requires PHP 8.4 (Laravel 13 + Filament 5).
   add-apt-repository -y ppa:ondrej/php
@@ -267,6 +268,17 @@ EOF
   systemctl enable --now dmims-worker
 }
 
+function scheduler_cron() {
+  # Notifications generation, nightly backups, weekly restore-verify and
+  # Sanctum token pruning (routes/console.php) all run via the Laravel
+  # scheduler and do nothing unless `schedule:run` fires every minute. Runs
+  # as www-data to match fix_permissions' ownership of $REPO_DIR. Idempotent:
+  # replaces any prior dmims schedule:run line rather than duplicating it.
+  local cron_line="* * * * * cd $REPO_DIR && php artisan schedule:run >> /dev/null 2>&1"
+  (crontab -u www-data -l 2>/dev/null | grep -vF "$REPO_DIR && php artisan schedule:run"; echo "$cron_line") \
+    | crontab -u www-data -
+}
+
 function tunnel_setup() {
   if [[ "$SKIP_TUNNEL" == "true" ]]; then
     echo "Skipping cloudflared install.";
@@ -303,6 +315,7 @@ function main() {
   fix_permissions
   apache_config
   queue_service
+  scheduler_cron
   tunnel_setup
 
   echo "Deployment complete."
