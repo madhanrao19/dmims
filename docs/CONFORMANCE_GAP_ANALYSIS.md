@@ -86,14 +86,27 @@ All required models present (SubscriptionLog, BillingRecord/Payment/Log added).
 ## 3. Services (TDD §11)
 | Required | Status |
 |---|---|
-| CompanyContextService, UserSecurityService, ModuleAccessService | ✅ |
+| ModuleAccessService | ✅ |
 | AccessControlService (TDD §12 — canLogin/canView/canExport/…) | ✅ |
-| SubscriptionService, LicenseService | ✅ |
+| LicenseService | ✅ |
 | BillingService, PaymentService | ✅ |
-| LocationService, StockMovementService, DocumentMovementService | ✅ |
+| StockMovementService, DocumentMovementService | ✅ |
 | BarcodeService, ScannerService | ✅ |
 | AuditService, NotificationService, ImportService, BackupService | ✅ |
 | ReportExportService | ✅ | 14 named reports (CSV; PDF/Excel when lib present) |
+
+**Removed in v2.1.16 (dead code):** `CompanyContextService`, `UserSecurityService`,
+`LocationService`, `SubscriptionService` were named in TDD §11 but had zero
+references anywhere in the codebase — their responsibilities were absorbed
+into `AccessControlService` (login/company/license checks), the
+`BelongsToCustomer` global scope (tenant context), and the `EnsureLicenseAllowsAccess`
+/ `EnsureSubscriptionActive` middleware (subscription checks) during earlier
+hardening passes, leaving the original classes as empty, unreachable shells.
+Confirmed via grep across `app/`, `resources/`, `routes/`, `database/`,
+`tests/`, `config/`, `bootstrap/` before removal. TDD §11/§13 and SAD's
+`CompanyContextService`/`LocationService` sections describe the original
+design intent and are retained as historical record; this row is the
+authoritative current-implementation status.
 
 ## 4. Middleware (TDD §13) / Access layers (SAD §4)
 | Layer | Status |
