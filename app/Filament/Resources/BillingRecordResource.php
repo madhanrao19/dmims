@@ -96,6 +96,7 @@ class BillingRecordResource extends BaseResource
                     ->schema([
                         Forms\Components\TextInput::make('amount')
                             ->numeric()->required()->minValue(0.01)->prefix('RM')
+                            ->maxValue(fn (BillingRecord $record): float => $record->outstandingAmount())
                             ->default(fn (BillingRecord $record): float => $record->outstandingAmount()),
                         Forms\Components\Select::make('payment_method')
                             ->options(['cash' => 'Cash', 'bank_transfer' => 'Bank Transfer', 'cheque' => 'Cheque', 'other' => 'Other'])

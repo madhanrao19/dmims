@@ -75,6 +75,31 @@ class BillingServiceTest extends TestCase
         app(PaymentService::class)->recordPayment($invoice->refresh(), ['amount' => 50]);
     }
 
+    public function test_cannot_pay_an_already_fully_paid_invoice(): void
+    {
+        $invoice = app(BillingService::class)->createInvoice(['customer_id' => $this->customer()->id, 'amount' => 50]);
+        app(PaymentService::class)->recordPayment($invoice, ['amount' => 50]);
+
+        $this->expectException(\RuntimeException::class);
+        app(PaymentService::class)->recordPayment($invoice->refresh(), ['amount' => 10]);
+    }
+
+    public function test_negative_or_zero_payment_amount_is_rejected(): void
+    {
+        $invoice = app(BillingService::class)->createInvoice(['customer_id' => $this->customer()->id, 'amount' => 50]);
+
+        $this->expectException(\RuntimeException::class);
+        app(PaymentService::class)->recordPayment($invoice, ['amount' => -10]);
+    }
+
+    public function test_overpayment_beyond_outstanding_balance_is_rejected(): void
+    {
+        $invoice = app(BillingService::class)->createInvoice(['customer_id' => $this->customer()->id, 'amount' => 50]);
+
+        $this->expectException(\RuntimeException::class);
+        app(PaymentService::class)->recordPayment($invoice, ['amount' => 50.01]);
+    }
+
     public function test_cannot_issue_a_non_draft_invoice(): void
     {
         $invoice = app(BillingService::class)->createInvoice(['customer_id' => $this->customer()->id, 'amount' => 50]);

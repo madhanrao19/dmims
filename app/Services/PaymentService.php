@@ -18,16 +18,32 @@ class PaymentService
     public function recordPayment(BillingRecord $record, array $data): BillingPayment
     {
         // Defence-in-depth behind the UI gate: never record a payment against a
-        // cancelled invoice.
+        // cancelled or already-fully-paid invoice.
         if ($record->billing_status === 'cancelled') {
             throw new RuntimeException("Cannot record a payment against cancelled invoice {$record->invoice_no}.");
+        }
+
+        if ($record->payment_status === 'paid') {
+            throw new RuntimeException("Invoice {$record->invoice_no} is already fully paid.");
+        }
+
+        $amount = round((float) $data['amount'], 2);
+
+        if ($amount <= 0) {
+            throw new RuntimeException("Payment amount must be greater than zero for invoice {$record->invoice_no}.");
+        }
+
+        $outstanding = $record->outstandingAmount();
+
+        if ($amount > $outstanding) {
+            throw new RuntimeException("Payment of {$amount} exceeds the outstanding balance of {$outstanding} on invoice {$record->invoice_no}.");
         }
 
         $payment = BillingPayment::create([
             'customer_id' => $record->customer_id,
             'billing_record_id' => $record->id,
             'payment_no' => $data['payment_no'] ?? $this->generatePaymentNo(),
-            'amount' => round((float) $data['amount'], 2),
+            'amount' => $amount,
             'payment_method' => $data['payment_method'] ?? 'bank_transfer',
             'payment_date' => $data['payment_date'] ?? now()->toDateString(),
             'reference_no' => $data['reference_no'] ?? null,

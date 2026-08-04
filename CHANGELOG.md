@@ -4,6 +4,24 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.19] - 2026-08-05
+
+### Fixed — billing (found during a go-live verification pass)
+- **`PaymentService::recordPayment()` had no guard against overpayment,
+  negative/zero amounts, or paying an already fully-paid invoice.** Only the
+  cancelled-invoice case was guarded. A direct service call, API
+  integration, or a future Filament change would have accepted a negative
+  payment, an amount exceeding the outstanding balance, or a duplicate
+  payment on a settled invoice. Now rejects all three with a
+  `RuntimeException`, matching the existing cancelled-invoice guard's style.
+  `BillingRecordResource`'s payment form gained a matching `maxValue()`
+  (outstanding balance) alongside its existing `minValue(0.01)`, so
+  overpayment fails as inline form validation rather than a thrown
+  exception in the common case. Regression tests added
+  (`test_cannot_pay_an_already_fully_paid_invoice`,
+  `test_negative_or_zero_payment_amount_is_rejected`,
+  `test_overpayment_beyond_outstanding_balance_is_rejected`).
+
 ## [2.1.18] - 2026-08-04
 
 ### Fixed — security (external production-readiness review)
