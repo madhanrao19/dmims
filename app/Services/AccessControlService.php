@@ -126,9 +126,12 @@ class AccessControlService
 
     private function modeFromLicense(?License $license): string
     {
-        // No license issued yet: do not lock the customer out.
+        // No license issued yet: LicenseService::isLicenseValid() already treats
+        // this as invalid. Degrade to view-only (same as Suspended/Expired in
+        // Business Rules §8) rather than granting unrestricted full access —
+        // full access must be earned by an actual license, not its absence.
         if (! $license) {
-            return self::MODE_FULL;
+            return self::MODE_VIEW_ONLY;
         }
 
         if ($license->technical_access_mode === self::MODE_BLOCKED

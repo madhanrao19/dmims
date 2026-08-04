@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Customer;
 use App\Models\CustomerModule;
 use App\Models\CustomerSubscription;
+use App\Models\License;
 use App\Models\Module;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
@@ -92,6 +93,20 @@ class DatabaseSeeder extends Seeder
                 'enabled_modules' => ['stock_inventory', 'document_tracking', 'barcode_scanning', 'reports'],
                 'support_level' => 'standard',
                 'status' => 'active',
+            ]
+        );
+
+        // License (Business Rules §8): without one the customer now degrades to
+        // view-only (AccessControlService::modeFromLicense) — the demo tenant must
+        // stay fully licensed to keep write flows and role-based QA working.
+        License::firstOrCreate(
+            ['customer_id' => $customer->id, 'license_no' => 'LIC-DEMO-0001'],
+            [
+                'valid_from' => now(),
+                'valid_to' => now()->addYear(),
+                'grace_period_days' => 7,
+                'status' => 'active',
+                'technical_access_mode' => 'full',
             ]
         );
 

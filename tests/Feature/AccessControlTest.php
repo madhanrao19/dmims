@@ -90,13 +90,19 @@ class AccessControlTest extends TestCase
         $this->assertFalse($access->canView($user));
     }
 
-    public function test_missing_license_defaults_to_full_access(): void
+    /** A customer with no license row at all must not get unrestricted full
+     *  access — that let any customer skip licensing entirely. It degrades to
+     *  view-only, same as a suspended/expired license (Business Rules §8),
+     *  and can still log in and view/export (not blocked). */
+    public function test_missing_license_degrades_to_view_only(): void
     {
         $user = $this->makeCustomerUser(null);
         $access = app(AccessControlService::class);
 
-        $this->assertSame(AccessControlService::MODE_FULL, $access->getEffectiveAccessMode($user->customer_id));
-        $this->assertTrue($access->canPerformOperationalAction($user));
+        $this->assertSame(AccessControlService::MODE_VIEW_ONLY, $access->getEffectiveAccessMode($user->customer_id));
+        $this->assertFalse($access->canPerformOperationalAction($user));
+        $this->assertTrue($access->canView($user));
+        $this->assertTrue($access->canLogin($user));
     }
 
     public function test_platform_user_is_never_restricted_by_license(): void

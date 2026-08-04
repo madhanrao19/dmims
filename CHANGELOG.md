@@ -4,6 +4,51 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.18] - 2026-08-04
+
+### Fixed — security (external production-readiness review)
+- **Unlicensed customer defaulted to full technical access (Critical).**
+  `AccessControlService::modeFromLicense()` returned `full` access whenever a
+  customer had no `License` row at all — and nothing in the app ever
+  auto-creates one, so a customer stayed fully unrestricted for as long as
+  Datamation staff hadn't issued a license (indefinitely, if forgotten). This
+  contradicted `LicenseService::isLicenseValid()`, which already treats a
+  missing license as invalid, and the Security & Access Control Matrix's
+  "License Allows?" access-decision gate. A missing license now degrades to
+  `view_only` (same behaviour as a suspended/expired license per Business
+  Rules & Functional Specification §8) — login and read/export still work,
+  operational writes do not, until a license is issued. Regression test
+  updated (`AccessControlTest::test_missing_license_degrades_to_view_only`,
+  previously asserted the opposite). Traced every other call site that relies
+  on `AccessControlService`/`BaseResource::can()` for non-platform tenant
+  users without a seeded license and added one where the fix would otherwise
+  have broken a working test (`RbacViewOnlyTest`, `UserResourcePrivilegeEscalationTest`)
+  or the demo/QA tenant (`DatabaseSeeder` now seeds a `full`-mode license for
+  the `DEMO` customer, so `QASampleUsersSeeder` and the role-based Playwright
+  suite keep working — that tenant is meant to represent a fully licensed
+  customer). **Operational impact:** any live customer currently relying on
+  this gap (subscribed but never issued a license) will lose write access on
+  deploy until a license is issued — this is the intended fix, not a
+  regression; flag it before rollout.
+
+### Fixed — code quality
+- Removed a stray `console.log('DMIMS app entry')` from
+  `resources/js/app.js`, left over from scaffolding and prohibited by
+  `docs/DEFINITION_OF_DONE.md`.
+
+### Documentation
+- **Local dev setup was missing `php artisan filament:assets`.** A fresh
+  `composer install` never publishes Filament's vendor CSS/JS to `public/`
+  (production deploys already ran this via `deploy-ubuntu-24.sh` /
+  `DEPLOYMENT_GUIDE.md`; local setup docs didn't). Symptom: the admin panel
+  loads with no visible page errors, but every interactive element (buttons,
+  selects, modals) silently does nothing, because Filament's Alpine.js
+  components (`filamentFormButton`, `selectFormComponent`, etc.) never
+  register — only visible via browser console errors. Found while running
+  the role-based Playwright suite against a fresh clone. Added the missing
+  step and a troubleshooting entry to `README.md` and
+  `docs/DMIMS Developer Getting Started Guide.md`.
+
 ## [2.1.17] - 2026-07-30
 
 ### Removed

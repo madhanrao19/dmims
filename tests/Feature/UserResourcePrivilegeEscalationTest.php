@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Filament\Resources\UserResource;
 use App\Filament\Resources\UserResource\Pages\CreateUser;
 use App\Models\Customer;
+use App\Models\License;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -34,6 +35,14 @@ class UserResourcePrivilegeEscalationTest extends TestCase
     private function companyAdmin(): User
     {
         $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACM', 'status' => 'active']);
+        License::create([
+            'customer_id' => $customer->id,
+            'license_no' => 'LIC-'.$customer->id,
+            'valid_from' => now()->subDay(),
+            'valid_to' => now()->addYear(),
+            'status' => 'active',
+            'technical_access_mode' => 'full',
+        ]);
 
         $user = User::factory()->create([
             'customer_id' => $customer->id,

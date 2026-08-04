@@ -250,6 +250,14 @@ Install frontend packages
 
 npm install
 
+Publish Filament's admin-panel assets (CSS/JS/fonts). Required after every
+fresh `composer install` — without it the admin panel loads with no
+JavaScript errors visible on the page, but interactive elements (buttons,
+selects, modals) silently do nothing because Alpine.js components never
+register.
+
+php artisan filament:assets
+
 ---
 
 # **8\. Environment Configuration**
@@ -568,6 +576,17 @@ php artisan migrate:fresh \--seed
 npm install
 
 npm run dev
+
+---
+
+## **Admin Panel Loads but Buttons/Selects/Modals Don't Work**
+
+No console errors on the page itself, but the browser console shows errors
+like `filamentFormButton is not defined` or `selectFormComponent is not
+defined`. Filament's own vendor JS/CSS was never published to `public/` —
+run:
+
+php artisan filament:assets
 
 ---
 

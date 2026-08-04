@@ -50,6 +50,26 @@ divergences are cosmetic (enum naming) or operational config.
 > blank-on-edit-preserves-hash paths. Full suite (122 tests) and `npm run
 > build` pass; statuses below remain accurate.
 
+> **Re-audit 2026-08-04 (v2.1.18):** an external production-readiness review
+> found one more issue in the same class — see CHANGELOG.md [2.1.18]:
+> - **Critical** — `AccessControlService::modeFromLicense()` granted `full`
+>   technical access whenever a customer had no `License` row at all, and
+>   nothing in the app auto-creates one on customer creation. A customer
+>   stayed fully unrestricted for as long as staff hadn't issued a license —
+>   contradicting `LicenseService::isLicenseValid()`, which already treats a
+>   missing license as invalid. Fixed: a missing license now degrades to
+>   `view_only`, same as a suspended/expired license (Business Rules §8).
+>   `DatabaseSeeder` now seeds a `full`-mode license for the `DEMO` customer
+>   so the demo tenant and role-based QA keep working. **Any live customer
+>   currently relying on this gap loses write access on deploy until a
+>   license is issued — intended, not a regression.**
+>
+> Also removed a stray `console.log()` from `resources/js/app.js`
+> (`docs/DEFINITION_OF_DONE.md` prohibits debug statements in production
+> code). Full suite (122/122), `composer validate`/`audit`, `pint --test`,
+> and `npm run build:assets` all verified clean; statuses below remain
+> accurate.
+
 Legend: ✅ implemented · WIP partial · ❌ missing
 
 ---
@@ -71,7 +91,9 @@ Legend: ✅ implemented · WIP partial · ❌ missing
 **License fields (Dictionary §7):** ✅ `technical_access_mode`
 (full / view_only / blocked) added and enforced. The `status` enum has no
 literal `revoked` value; revocation is handled via `cancelled` +
-`technical_access_mode = blocked` (cosmetic divergence).
+`technical_access_mode = blocked` (cosmetic divergence). A customer with no
+`License` row at all resolves to `view_only` (v2.1.18) — full access is
+never granted by the *absence* of a license.
 
 **Movement-type enum:** ✅ reconciled (docs → code). The implemented enum is
 `opening_balance, stock_in, stock_out, transfer, adjustment, return, disposal`.

@@ -81,6 +81,7 @@ php artisan db:seed --class=RolesAndPermissionsSeeder
 npm install
 npm run build                              # or: npm run dev
 
+php artisan filament:assets                # required after every fresh composer install
 php artisan serve                          # http://localhost/admin
 ```
 

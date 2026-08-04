@@ -6,6 +6,7 @@ use App\Filament\Resources\BoxResource;
 use App\Filament\Resources\ProductResource;
 use App\Models\Customer;
 use App\Models\CustomerModule;
+use App\Models\License;
 use App\Models\Module;
 use App\Models\User;
 use App\Services\AccessControlService;
@@ -27,6 +28,14 @@ class RbacViewOnlyTest extends TestCase
     private function customerUser(string $role): User
     {
         $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACM', 'status' => 'active']);
+        License::create([
+            'customer_id' => $customer->id,
+            'license_no' => 'LIC-'.$customer->id,
+            'valid_from' => now()->subDay(),
+            'valid_to' => now()->addYear(),
+            'status' => 'active',
+            'technical_access_mode' => 'full',
+        ]);
 
         $module = Module::create(['module_code' => 'stock_inventory', 'module_name' => 'Stock', 'status' => 'active']);
         CustomerModule::create([
@@ -79,6 +88,14 @@ class RbacViewOnlyTest extends TestCase
     private function documentUser(string $role): User
     {
         $customer = Customer::create(['company_name' => 'Docs', 'company_code' => 'DOC', 'status' => 'active']);
+        License::create([
+            'customer_id' => $customer->id,
+            'license_no' => 'LIC-'.$customer->id,
+            'valid_from' => now()->subDay(),
+            'valid_to' => now()->addYear(),
+            'status' => 'active',
+            'technical_access_mode' => 'full',
+        ]);
 
         $module = Module::create(['module_code' => 'document_tracking', 'module_name' => 'Documents', 'status' => 'active']);
         CustomerModule::create([
