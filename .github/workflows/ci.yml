@@ -45,6 +45,9 @@ jobs:
           cp .env.example .env
           php artisan key:generate
 
+      - name: Static analysis (PHPStan / Larastan)
+        run: vendor/bin/phpstan analyse
+
       - name: Run PHP test suite
         run: php artisan test
 
