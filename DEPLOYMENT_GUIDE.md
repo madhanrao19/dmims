@@ -220,8 +220,12 @@ sudo -u appuser php artisan migrate --force
 # Seed the roles & permissions the access control depends on (no demo data)
 sudo -u appuser php artisan db:seed --class=RolesAndPermissionsSeeder --force
 
-# Create the first platform administrator (prompts for a password if omitted)
-sudo -u appuser php artisan dmims:create-admin admin@your-domain.com --name="Administrator"
+# Create the first platform administrator (prompts for a password if omitted).
+# Datamation's standard default platform admin identity is
+# dm_it@datamationgroup.com — use it here on every environment (staging,
+# production) unless told otherwise. Choose the password at creation time;
+# never hardcode it in a script, seeder, or commit.
+sudo -u appuser php artisan dmims:create-admin dm_it@datamationgroup.com --name="IT Administrator"
 ```
 
 > The full `php artisan db:seed` also creates a demo customer and a default

@@ -91,6 +91,12 @@ Create a platform administrator:
 php artisan dmims:create-admin admin@example.com --name="Administrator"
 ```
 
+Datamation's own default platform admin account (used across dev/staging/
+production) is `dm_it@datamationgroup.com` — created the same way, once per
+environment, with a password chosen at creation time (interactive prompt or
+`--password=`). Never hardcode that password in a seeder, script, or commit —
+`dmims:create-admin` is the only sanctioned way to provision it.
+
 The seeded demo login (development only) is `admin@example.com` / `password`.
 
 ## Testing
