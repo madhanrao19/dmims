@@ -4,6 +4,33 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.23] - 2026-08-18
+
+### Fixed — database integrity (remaining Low DBA findings)
+- **`stock_movements`, `document_movement_logs`, `audit_logs` had no DB-level
+  immutability (Low).** Documented as append-only, but only application
+  discipline enforced it (confirmed no update/delete call exists anywhere
+  in app code or tests for these three models). Added BEFORE UPDATE /
+  BEFORE DELETE triggers (MySQL/MariaDB `SIGNAL`, SQLite `RAISE(ABORT, ...)`)
+  that reject any write. Functionally verified via tinker that both an
+  UPDATE and a DELETE are now rejected with a clear error. `TRUNCATE`
+  bypasses per-row triggers on both drivers, so this doesn't interfere with
+  `migrate:fresh` or test database resets.
+- **`2026_06_14_000003_make_placement_columns_nullable`'s `down()` wasn't
+  safely reversible once data exists (Low).** Once any box/file has
+  actually been moved out, re-applying `NOT NULL` would fail with a raw DB
+  constraint error. `down()` now checks for existing NULL rows first and
+  fails fast with a clear, actionable message instead — there's no safe
+  automatic choice of location/box to backfill those rows with, so this
+  intentionally stays a guarded one-way migration rather than pretending to
+  auto-resolve a business decision.
+- New migration `2026_08_18_000010_enforce_immutable_log_tables`. Verified
+  migrate → rollback → re-migrate clean, full suite (127/127), Pint, and
+  Larastan.
+
+No DBA findings remain open. See `docs/CONFORMANCE_GAP_ANALYSIS.md` for the
+full review history.
+
 ## [2.1.22] - 2026-08-18
 
 ### Fixed — database integrity (remaining High/Medium DBA findings)

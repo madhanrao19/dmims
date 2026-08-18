@@ -276,11 +276,14 @@ patched).
   active row per customer" via a generated-column unique index. All
   guarded against existing data (skip + log rather than fail); migrate/
   rollback/re-migrate and full suite verified.
-  - **Low, still open** — immutable log tables (`stock_movements`,
-    `document_movement_logs`, `audit_logs`) rely on app-layer discipline
-    only, not a DB-level immutability mechanism;
-    `2026_06_14_000003_make_placement_columns_nullable`'s `down()` isn't
-    safely reversible once any box/file has been moved out.
+- v2.1.23: fixed the remaining Low DBA findings — `stock_movements`,
+  `document_movement_logs`, and `audit_logs` now have DB-level BEFORE
+  UPDATE/DELETE triggers rejecting any write (previously app-discipline
+  only); functionally verified via tinker that both are actually rejected.
+  `2026_06_14_000003_make_placement_columns_nullable`'s `down()` now fails
+  fast with a clear message instead of a raw DB constraint error if any
+  box/file has been moved out, rather than pretending to be safely
+  reversible. **No DBA findings remain open.**
 
 ---
 
