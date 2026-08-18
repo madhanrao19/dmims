@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
+use Spatie\Permission\Models\Role;
 
 class CreateAdminUser extends Command
 {
@@ -17,6 +18,8 @@ class CreateAdminUser extends Command
                             {--password= : Password (generated if omitted)}';
 
     protected $description = 'Create a platform administrator user.';
+
+    private const SUPER_ADMIN_ROLE = 'Datamation Super Admin';
 
     public function handle(): int
     {
@@ -49,6 +52,21 @@ class CreateAdminUser extends Command
             'is_platform_user' => true,
             'status' => 'active',
         ]);
+
+        // is_platform_user alone only grants read access (BaseResource::can());
+        // every write action additionally requires a real permission, which
+        // only comes from an assigned role. Without this, "platform admin"
+        // silently means "read-only" with no error anywhere.
+        if (Role::where('name', self::SUPER_ADMIN_ROLE)->exists()) {
+            $user->assignRole(self::SUPER_ADMIN_ROLE);
+        } else {
+            $this->warn(
+                'Role "'.self::SUPER_ADMIN_ROLE.'" does not exist yet — run '.
+                '`php artisan db:seed --class=RolesAndPermissionsSeeder` first, then '.
+                "assign it manually: php artisan tinker --execute=\"User::where('email','{$email}')->first()->assignRole('".self::SUPER_ADMIN_ROLE."')\""
+            );
+            $this->warn('Until then, this account can view but not create/edit/delete anything.');
+        }
 
         $this->info("Platform admin created: {$user->email}");
 

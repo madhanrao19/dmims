@@ -4,6 +4,31 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.25] - 2026-08-18
+
+### Fixed
+- **`dmims:create-admin` created a "platform administrator" who could view
+  everything but write nothing, silently (High).** The command only set
+  `is_platform_user = true`, never assigning a role. Per
+  `BaseResource::can()`, `is_platform_user` alone only grants read access —
+  every write action (create/edit/delete) additionally requires a real
+  Spatie permission, which only comes from an assigned role. Reported by a
+  user whose staging `dm_it@datamationgroup.com` account couldn't add or
+  manage users, locations, etc. Root-caused: not staging-specific, the
+  command itself never assigned one. Now assigns `Datamation Super Admin`
+  by default when that role exists; if `RolesAndPermissionsSeeder` hasn't
+  run yet, warns clearly with the exact remediation command instead of
+  silently leaving a read-only "admin". Regression test added
+  (`CreateAdminUserCommandTest`) covering both paths.
+
+**If you already created an admin with the old behaviour** (e.g. the
+`dm_it@datamationgroup.com` account on staging), fix it in place — no need
+to recreate the user:
+
+```bash
+php artisan tinker --execute="App\Models\User::where('email','dm_it@datamationgroup.com')->first()->assignRole('Datamation Super Admin')"
+```
+
 ## [2.1.24] - 2026-08-18
 
 ### Fixed — closing the last deferred findings from the full-app review
