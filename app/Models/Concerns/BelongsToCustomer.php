@@ -48,5 +48,16 @@ trait BelongsToCustomer
                 $model->customer_id = $user->customer_id;
             }
         });
+
+        static::updating(function (Model $model): void {
+            $user = auth()->user();
+
+            // Same as creating(): a tenant user editing a record they already own
+            // must not be able to reassign it to another tenant by submitting a
+            // different customer_id on the edit form.
+            if ($user && ! $user->is_platform_user && $user->customer_id) {
+                $model->customer_id = $user->customer_id;
+            }
+        });
     }
 }

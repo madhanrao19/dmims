@@ -117,25 +117,25 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$customer_id\.$#'
 			identifier: property.notFound
-			count: 1
+			count: 2
 			path: app/Models/BarcodeRegistry.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$customer_id\.$#'
 			identifier: property.notFound
-			count: 1
+			count: 2
 			path: app/Models/BarcodeScanLog.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$customer_id\.$#'
 			identifier: property.notFound
-			count: 1
+			count: 2
 			path: app/Models/BillingLog.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$customer_id\.$#'
 			identifier: property.notFound
-			count: 1
+			count: 2
 			path: app/Models/BillingPayment.php
 
 		-
@@ -153,7 +153,7 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$customer_id\.$#'
 			identifier: property.notFound
-			count: 1
+			count: 2
 			path: app/Models/BillingRecord.php
 
 		-
@@ -177,7 +177,7 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$customer_id\.$#'
 			identifier: property.notFound
-			count: 1
+			count: 2
 			path: app/Models/Box.php
 
 		-
@@ -195,7 +195,7 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$customer_id\.$#'
 			identifier: property.notFound
-			count: 1
+			count: 2
 			path: app/Models/Category.php
 
 		-
@@ -245,6 +245,12 @@ parameters:
 			identifier: method.notFound
 			count: 3
 			path: app/Models/CustomerSubscription.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$customer_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Models/Department.php
 
 		-
 			message: '#^Access to an undefined property App\\Models\\DocumentFile\:\:\$currentBox\.$#'
@@ -255,7 +261,7 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$customer_id\.$#'
 			identifier: property.notFound
-			count: 1
+			count: 2
 			path: app/Models/DocumentFile.php
 
 		-
@@ -273,13 +279,13 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$customer_id\.$#'
 			identifier: property.notFound
-			count: 1
+			count: 2
 			path: app/Models/DocumentMovementLog.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$customer_id\.$#'
 			identifier: property.notFound
-			count: 1
+			count: 2
 			path: app/Models/DocumentType.php
 
 		-
@@ -309,7 +315,7 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$customer_id\.$#'
 			identifier: property.notFound
-			count: 1
+			count: 2
 			path: app/Models/Location.php
 
 		-
@@ -327,13 +333,13 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$customer_id\.$#'
 			identifier: property.notFound
-			count: 1
+			count: 2
 			path: app/Models/Notification.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$customer_id\.$#'
 			identifier: property.notFound
-			count: 1
+			count: 2
 			path: app/Models/Product.php
 
 		-
@@ -351,10 +357,16 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$customer_id\.$#'
 			identifier: property.notFound
-			count: 1
+			count: 2
 			path: app/Models/ProductLocationStock.php
 
 		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$customer_id\.$#'
+			identifier: property.notFound
+			count: 2
+			path: app/Models/Setting.php
+
+		-
 			message: '#^Call to an undefined method Illuminate\\Database\\Eloquent\\Model\:\:auditableAttributes\(\)\.$#'
 			identifier: method.notFound
 			count: 3
@@ -369,7 +381,7 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$customer_id\.$#'
 			identifier: property.notFound
-			count: 1
+			count: 2
 			path: app/Models/StockAdjustmentApproval.php
 
 		-
@@ -387,13 +399,13 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$customer_id\.$#'
 			identifier: property.notFound
-			count: 1
+			count: 2
 			path: app/Models/StockAlert.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$customer_id\.$#'
 			identifier: property.notFound
-			count: 1
+			count: 2
 			path: app/Models/StockMovement.php
 
 		-
@@ -411,19 +423,19 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$customer_id\.$#'
 			identifier: property.notFound
-			count: 1
+			count: 2
 			path: app/Models/SubscriptionLog.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$customer_id\.$#'
 			identifier: property.notFound
-			count: 1
+			count: 2
 			path: app/Models/SupportAccessLog.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$customer_id\.$#'
 			identifier: property.notFound
-			count: 1
+			count: 2
 			path: app/Models/Tag.php
 
 		-

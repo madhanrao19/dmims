@@ -27,8 +27,8 @@ class StockAlertResource extends BaseResource
                     ->relationship('customer', 'company_name')
                     ->searchable()
                     ->required(),
-                Forms\Components\TextInput::make('product_id')->numeric()->required(),
-                Forms\Components\TextInput::make('location_id')->numeric()->required(),
+                Forms\Components\TextInput::make('product_id')->numeric()->required()->exists('products', 'id'),
+                Forms\Components\TextInput::make('location_id')->numeric()->required()->exists('locations', 'id'),
                 Forms\Components\Select::make('alert_type')
                     ->options([
                         'low_stock' => 'Low Stock',

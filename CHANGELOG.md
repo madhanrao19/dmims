@@ -4,6 +4,95 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.21] - 2026-08-18
+
+### Fixed — security & database integrity (full-app review: search/filter/upload/download + DBA schema pass)
+- **`Department` model had no tenant scope (Medium).** Unlike every other
+  tenant-owned lookup model, `Department` didn't use `BelongsToCustomer` —
+  the `department_id` Select in `DocumentFileResource`/`UserResource` and
+  the matching table filter showed every tenant's department names, and
+  nothing stopped a tenant user assigning a department belonging to another
+  company. Added the trait (same one-line pattern as `Category`/`Tag`).
+- **Import CSV upload had no size limit (Low).** `ImportResource`'s
+  `FileUpload::make('file')` restricted MIME type but not size; the file is
+  read synchronously in-request. Added `->maxSize(5120)`.
+- **Database schema hardening (DBA review, Critical):**
+  - `users.customer_id` had no FK constraint or index despite being the
+    column every tenant global scope depends on. Added both; guarded by
+    first nulling any `customer_id` that already points at a nonexistent
+    customer (logged), so the constraint can't fail against existing data.
+  - `boxes.box_barcode`/`box_number` and `document_files.file_barcode` were
+    globally unique instead of unique-per-tenant — cross-tenant collisions
+    and a barcode-existence leak. Rescoped to `unique(['customer_id', ...])`;
+    mathematically safe against existing data (global uniqueness implies
+    per-tenant uniqueness).
+  - `billing_records` had no soft delete, yet `billing_payments`/
+    `billing_logs` cascade-deleted off it — a hard delete on a billing
+    record silently destroyed the "immutable, append-only" payment/log
+    history. Added `deleted_at` to `billing_records` (model + migration) and
+    changed both child FKs from cascade to restrict.
+  - New migrations: `2026_08_18_000001_scope_barcode_uniqueness_to_customer`,
+    `2026_08_18_000002_add_customer_fk_and_index_to_users`,
+    `2026_08_18_000003_protect_billing_audit_trail`. All three verified
+    migrate + rollback + re-migrate clean against the local SQLite dev DB,
+    and via the test suite's `RefreshDatabase` (fresh migrate from zero).
+- Remaining DBA findings not fixed this pass (High: unconstrained
+  `created_by`/`updated_by` on 9 tables, inconsistent cascade behaviour
+  between `subscription_logs`/`license_logs`, `users.department_id` missing
+  FK/index; Medium/Low: no DB-level "one active license per customer"
+  constraint, `document_types.type_code` uniqueness, one migration's
+  `down()` not safely reversible once data exists) — see
+  `docs/CONFORMANCE_GAP_ANALYSIS.md` for the full list.
+
+## [2.1.20] - 2026-08-18
+
+### Fixed — security (CRUD/tenant-isolation review across all Filament resources)
+- **`customer_id` was never re-derived on update, only on create (Critical).**
+  `BelongsToCustomer`'s model-boot hook only forced `customer_id` back to the
+  authenticated tenant user's own company in `creating()`. Any tenant user
+  editing a record they already owned (Box, Category, DocumentFile,
+  DocumentMovementLog, Location, Product, ProductLocationStock,
+  StockMovement, StockAlert, StockAdjustmentApproval) could submit a
+  different `customer_id` and silently reassign the record into another
+  tenant. Added a matching `updating()` hook. `User` doesn't use this trait
+  (no tenant-scoped query on the model), so `UserResource`'s
+  `CreateUser`/`EditUser` pages got the same guard directly, alongside the
+  existing `is_platform_user` protection.
+- **`StockMovementService::record()` never checked the product's tenant
+  (Critical).** It deliberately bypasses global scopes to resolve
+  `customer_id` from the product, but never verified the acting user's
+  tenant matched — a Stock Inventory User could move stock for a product
+  belonging to a different company. Now throws `AuthorizationException` on
+  a tenant mismatch for non-platform actors.
+- **Five resources let stock quantities/movement history be edited outside
+  the service/observer layer that keeps them consistent (Critical).**
+  `ProductLocationStockResource` and `StockMovementResource` exposed
+  generic create/edit forms that bypassed `StockMovementService` and
+  `StockMovementObserver` (which only handles `created()`, not `updated()`),
+  letting quantities be overwritten or movement history rewritten with no
+  audit trail and no negative-stock guard. `DocumentMovementLogResource`,
+  `LicenseLogResource`, and `StockAdjustmentApprovalResource` similarly
+  exposed manual CRUD on what are meant to be system-written audit/approval
+  trails (`StockAdjustmentApprovalResource` in particular was found to be
+  fully disconnected — nothing in the app reads or writes it besides the
+  resource itself). All five are now list-only (`ProductLocationStock`,
+  `StockMovement` keep their existing header-action-driven receive/out/
+  transfer/adjust flow, which already routed through the service layer
+  correctly). `SupportAccessLogResource` kept `create` (the only mechanism
+  that logs support access at all) but dropped `edit` (the backdating
+  vector on existing entries).
+- **`Setting` model had no tenant scope (High).** Every other tenant-scoped
+  model uses `BelongsToCustomer`; `Setting` relied solely on
+  `SettingResource`'s query-time scoping. Added the trait for defense in
+  depth.
+- **Raw numeric foreign-key inputs accepted any integer, with no existence
+  check (High).** `NotificationResource.user_id`, `StockAlertResource.
+  product_id`/`location_id`, and `SupportAccessLogResource.support_user_id`/
+  `target_user_id` now validate with `->exists(...)`.
+- `tests/Feature/ResourceFormRenderTest.php`'s floor assertion updated (20 →
+  15) to match the now-smaller, intentional set of resources exposing a
+  create page.
+
 ## [2.1.19] - 2026-08-05
 
 ### Fixed — billing (found during a go-live verification pass)

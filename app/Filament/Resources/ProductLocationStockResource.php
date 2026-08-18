@@ -65,10 +65,14 @@ class ProductLocationStockResource extends BaseResource
 
     public static function getPages(): array
     {
+        // List-only: rows here are computed and maintained exclusively by
+        // StockMovementObserver::applyMovement() (firstOrCreate + quantity
+        // math driven by real movements). A manual create/edit form lets a
+        // user overwrite on-hand/reserved/available quantities directly,
+        // desyncing this table from the movement history that's supposed to
+        // be its source of truth, with no audit trail of the change.
         return [
             'index' => Pages\ListProductLocationStocks::route('/'),
-            'create' => Pages\CreateProductLocationStock::route('/create'),
-            'edit' => Pages\EditProductLocationStock::route('/{record}/edit'),
         ];
     }
 }
@@ -76,21 +80,9 @@ class ProductLocationStockResource extends BaseResource
 namespace App\Filament\Resources\ProductLocationStockResource\Pages;
 
 use App\Filament\Resources\ProductLocationStockResource;
-use Filament\Resources\Pages\CreateRecord;
-use Filament\Resources\Pages\EditRecord;
 use Filament\Resources\Pages\ListRecords;
 
 class ListProductLocationStocks extends ListRecords
-{
-    protected static string $resource = ProductLocationStockResource::class;
-}
-
-class CreateProductLocationStock extends CreateRecord
-{
-    protected static string $resource = ProductLocationStockResource::class;
-}
-
-class EditProductLocationStock extends EditRecord
 {
     protected static string $resource = ProductLocationStockResource::class;
 }

@@ -244,6 +244,41 @@ patched).
   Tracking User / Viewer roles out of a document-tracking resource) → now
   `manage documents`; added billing money-path service guards (issue/cancel/pay
   state checks); removed the dead `RecentlyViewed` model. Regression tests added.
+- v2.1.20: council-style CRUD review across all 28 Filament resources found the
+  v2.1.1 tenant write-protection only covered `creating()`, not `updating()` —
+  a tenant user editing a record they already owned could still reassign its
+  `customer_id` to another tenant. Added the matching `updating()` hook (plus
+  the same guard directly in `UserResource`, which doesn't use the trait).
+  Also closed a cross-tenant stock-write gap in `StockMovementService::record()`,
+  and made `ProductLocationStockResource`, `StockMovementResource`,
+  `DocumentMovementLogResource`, `LicenseLogResource`, and
+  `StockAdjustmentApprovalResource` list-only where their create/edit forms
+  bypassed the service/observer layer or let audit/approval records be
+  fabricated. See CHANGELOG for the full list.
+- v2.1.21: full-app follow-up (search/filter/upload/download + DBA schema
+  review) found `Department` was the one tenant-owned lookup model missing
+  `BelongsToCustomer`, leaking cross-tenant department names through two
+  Select/filter dropdowns — fixed. DBA review of all 22 migrations found
+  three Critical schema gaps, now fixed: `users.customer_id` had no FK/index;
+  `boxes`/`document_files` barcode uniqueness was global instead of
+  per-tenant; `billing_records` had no soft delete despite child tables
+  (`billing_payments`, `billing_logs`) cascading off it, so a hard delete
+  could destroy the immutable billing audit trail. Three still-open DBA
+  findings, deferred pending a dedicated pass:
+  - **High** — `created_by`/`updated_by` unconstrained (no FK) on 9 master
+    tables (`customers`, `departments`, `customer_modules`,
+    `customer_subscriptions`, `licenses`, `locations`, `barcode_registry`,
+    `categories`, `products`); `subscription_logs` cascade-deletes with its
+    parent while the structurally identical `license_logs` restricts;
+    `users.department_id` has no FK/index.
+  - **Medium** — no DB-level constraint enforcing "one active license per
+    customer"; `document_types.type_code` has no uniqueness constraint;
+    `users` table missing the `status`/`last_login_at` indexes the Database
+    Dictionary specifies.
+  - **Low** — immutable log tables (`stock_movements`, `document_movement_logs`,
+    `audit_logs`) rely on app-layer discipline only, not a DB-level
+    immutability mechanism; `2026_06_14_000003_make_placement_columns_nullable`'s
+    `down()` isn't safely reversible once any box/file has been moved out.
 
 ---
 

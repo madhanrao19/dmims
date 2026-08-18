@@ -59,10 +59,15 @@ class StockAdjustmentApprovalResource extends BaseResource
 
     public static function getPages(): array
     {
+        // List-only: no other code in the app reads or writes this table, so
+        // create/edit only let a user fabricate "approved" records that are
+        // never actually checked before a stock adjustment applies — pure
+        // audit theater. Wiring real approval enforcement into
+        // StockMovementService::adjust() is an undocumented business-rule
+        // change, not something to add unprompted; this closes the
+        // fabrication hole without inventing that workflow.
         return [
             'index' => Pages\ListStockAdjustmentApprovals::route('/'),
-            'create' => Pages\CreateStockAdjustmentApproval::route('/create'),
-            'edit' => Pages\EditStockAdjustmentApproval::route('/{record}/edit'),
         ];
     }
 }
@@ -70,21 +75,9 @@ class StockAdjustmentApprovalResource extends BaseResource
 namespace App\Filament\Resources\StockAdjustmentApprovalResource\Pages;
 
 use App\Filament\Resources\StockAdjustmentApprovalResource;
-use Filament\Resources\Pages\CreateRecord;
-use Filament\Resources\Pages\EditRecord;
 use Filament\Resources\Pages\ListRecords;
 
 class ListStockAdjustmentApprovals extends ListRecords
-{
-    protected static string $resource = StockAdjustmentApprovalResource::class;
-}
-
-class CreateStockAdjustmentApproval extends CreateRecord
-{
-    protected static string $resource = StockAdjustmentApprovalResource::class;
-}
-
-class EditStockAdjustmentApproval extends EditRecord
 {
     protected static string $resource = StockAdjustmentApprovalResource::class;
 }

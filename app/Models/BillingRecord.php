@@ -6,10 +6,11 @@ use App\Models\Concerns\Auditable;
 use App\Models\Concerns\BelongsToCustomer;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class BillingRecord extends Model
 {
-    use Auditable, BelongsToCustomer, HasFactory;
+    use Auditable, BelongsToCustomer, HasFactory, SoftDeletes;
 
     protected $fillable = [
         'customer_id',

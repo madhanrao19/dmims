@@ -27,8 +27,8 @@ class SupportAccessLogResource extends BaseResource
                     ->relationship('customer', 'company_name')
                     ->searchable()
                     ->required(),
-                Forms\Components\TextInput::make('support_user_id')->numeric()->required(),
-                Forms\Components\TextInput::make('target_user_id')->numeric()->required(),
+                Forms\Components\TextInput::make('support_user_id')->numeric()->required()->exists('users', 'id'),
+                Forms\Components\TextInput::make('target_user_id')->numeric()->required()->exists('users', 'id'),
                 Forms\Components\Textarea::make('reason')->required()->maxLength(65535),
                 Forms\Components\DateTimePicker::make('started_at')->required(),
                 Forms\Components\DateTimePicker::make('ended_at'),
@@ -53,10 +53,14 @@ class SupportAccessLogResource extends BaseResource
 
     public static function getPages(): array
     {
+        // No edit page: this table is nowhere else in the codebase written
+        // programmatically, so create is the only way support access gets
+        // logged at all — but editing an existing entry (backdating
+        // started_at/ended_at, rewriting reason) would let the exact staff
+        // being tracked erase their own trail. List/create only.
         return [
             'index' => Pages\ListSupportAccessLogs::route('/'),
             'create' => Pages\CreateSupportAccessLog::route('/create'),
-            'edit' => Pages\EditSupportAccessLog::route('/{record}/edit'),
         ];
     }
 }
@@ -65,7 +69,6 @@ namespace App\Filament\Resources\SupportAccessLogResource\Pages;
 
 use App\Filament\Resources\SupportAccessLogResource;
 use Filament\Resources\Pages\CreateRecord;
-use Filament\Resources\Pages\EditRecord;
 use Filament\Resources\Pages\ListRecords;
 
 class ListSupportAccessLogs extends ListRecords
@@ -74,11 +77,6 @@ class ListSupportAccessLogs extends ListRecords
 }
 
 class CreateSupportAccessLog extends CreateRecord
-{
-    protected static string $resource = SupportAccessLogResource::class;
-}
-
-class EditSupportAccessLog extends EditRecord
 {
     protected static string $resource = SupportAccessLogResource::class;
 }

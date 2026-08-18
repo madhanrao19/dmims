@@ -76,10 +76,12 @@ class DocumentMovementLogResource extends BaseResource
 
     public static function getPages(): array
     {
+        // List-only: movement rows are written exclusively by
+        // DocumentMovementService, never through this admin form — a manual
+        // create/edit here would let a user fabricate or backdate chain-of-
+        // custody history.
         return [
             'index' => Pages\ListDocumentMovementLogs::route('/'),
-            'create' => Pages\CreateDocumentMovementLog::route('/create'),
-            'edit' => Pages\EditDocumentMovementLog::route('/{record}/edit'),
         ];
     }
 }
@@ -87,21 +89,9 @@ class DocumentMovementLogResource extends BaseResource
 namespace App\Filament\Resources\DocumentMovementLogResource\Pages;
 
 use App\Filament\Resources\DocumentMovementLogResource;
-use Filament\Resources\Pages\CreateRecord;
-use Filament\Resources\Pages\EditRecord;
 use Filament\Resources\Pages\ListRecords;
 
 class ListDocumentMovementLogs extends ListRecords
-{
-    protected static string $resource = DocumentMovementLogResource::class;
-}
-
-class CreateDocumentMovementLog extends CreateRecord
-{
-    protected static string $resource = DocumentMovementLogResource::class;
-}
-
-class EditDocumentMovementLog extends EditRecord
 {
     protected static string $resource = DocumentMovementLogResource::class;
 }

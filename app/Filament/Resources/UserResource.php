@@ -186,8 +186,18 @@ class CreateUser extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        if (! auth()->user()?->is_platform_user) {
+        $actor = auth()->user();
+
+        if (! $actor?->is_platform_user) {
             $data['is_platform_user'] = false;
+
+            // User has no BelongsToCustomer scope, so nothing else forces
+            // customer_id back to the acting tenant user's own company —
+            // without this, a Company Admin could create a user under
+            // another tenant by submitting a different customer_id.
+            if ($actor?->customer_id) {
+                $data['customer_id'] = $actor->customer_id;
+            }
         }
 
         return $data;
@@ -211,8 +221,17 @@ class EditUser extends EditRecord
         // than the prior value) would silently downgrade an already-platform
         // account the moment any other field on it was edited — keep the
         // record's existing value instead of overwriting it.
-        if (! auth()->user()?->is_platform_user) {
+        $actor = auth()->user();
+
+        if (! $actor?->is_platform_user) {
             $data['is_platform_user'] = $this->record->is_platform_user;
+
+            // Same tenant-hop guard as CreateUser::mutateFormDataBeforeCreate —
+            // User has no BelongsToCustomer scope, so re-force customer_id on
+            // every edit rather than trust whatever the form submitted.
+            if ($actor?->customer_id) {
+                $data['customer_id'] = $actor->customer_id;
+            }
         }
 
         return $data;

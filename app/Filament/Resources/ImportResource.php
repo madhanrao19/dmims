@@ -81,6 +81,7 @@ class ImportResource extends BaseResource
                         Forms\Components\FileUpload::make('file')
                             ->label('CSV file')
                             ->acceptedFileTypes(['text/csv', 'text/plain', 'application/csv'])
+                            ->maxSize(5120)
                             ->disk('local')
                             ->directory('imports')
                             ->storeFileNamesIn('original_name')

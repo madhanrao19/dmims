@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Product;
 use App\Models\StockMovement;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -49,6 +50,17 @@ class StockMovementService
     {
         return DB::transaction(function () use ($productId, $type, $quantity, $fromLocationId, $toLocationId, $data) {
             $product = Product::withoutGlobalScopes()->findOrFail($productId);
+
+            // withoutGlobalScopes() is deliberate (see class docblock) so a
+            // platform user can move stock for any tenant's product, but that
+            // also means a tenant actor's product_id is never checked against
+            // their own customer_id — without this guard a Stock Inventory
+            // User could move another company's stock by submitting a
+            // different product_id.
+            $actor = auth()->user();
+            if ($actor && ! $actor->is_platform_user && $product->customer_id !== $actor->customer_id) {
+                throw new AuthorizationException('You do not have access to this product.');
+            }
 
             return StockMovement::create([
                 'customer_id' => $product->customer_id,

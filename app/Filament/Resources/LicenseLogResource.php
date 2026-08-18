@@ -53,10 +53,10 @@ class LicenseLogResource extends BaseResource
 
     public static function getPages(): array
     {
+        // List-only: license history rows must not be rewritable after the
+        // fact (audit trail), same treatment as AuditLogResource.
         return [
             'index' => Pages\ListLicenseLogs::route('/'),
-            'create' => Pages\CreateLicenseLog::route('/create'),
-            'edit' => Pages\EditLicenseLog::route('/{record}/edit'),
         ];
     }
 }
@@ -64,21 +64,9 @@ class LicenseLogResource extends BaseResource
 namespace App\Filament\Resources\LicenseLogResource\Pages;
 
 use App\Filament\Resources\LicenseLogResource;
-use Filament\Resources\Pages\CreateRecord;
-use Filament\Resources\Pages\EditRecord;
 use Filament\Resources\Pages\ListRecords;
 
 class ListLicenseLogs extends ListRecords
-{
-    protected static string $resource = LicenseLogResource::class;
-}
-
-class CreateLicenseLog extends CreateRecord
-{
-    protected static string $resource = LicenseLogResource::class;
-}
-
-class EditLicenseLog extends EditRecord
 {
     protected static string $resource = LicenseLogResource::class;
 }

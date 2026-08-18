@@ -27,7 +27,7 @@ class NotificationResource extends BaseResource
                     ->relationship('customer', 'company_name')
                     ->searchable()
                     ->required(),
-                Forms\Components\TextInput::make('user_id')->numeric()->required(),
+                Forms\Components\TextInput::make('user_id')->numeric()->required()->exists('users', 'id'),
                 Forms\Components\TextInput::make('notification_type')->required()->maxLength(100),
                 Forms\Components\TextInput::make('title')->required()->maxLength(255),
                 Forms\Components\Textarea::make('message')->required()->maxLength(65535),

@@ -161,10 +161,16 @@ class StockMovementResource extends BaseResource
 
     public static function getPages(): array
     {
+        // No generic create/edit: the header actions above (receiveIn/
+        // stockOut/transfer/adjust) are the only sanctioned way to write a
+        // movement — they route through StockMovementService, which
+        // generates movement numbers and (via StockMovementObserver) keeps
+        // ProductLocationStock in sync. The raw form bypassed both, and
+        // StockMovementObserver has no updated() handler, so editing an
+        // existing movement's quantity/locations left the stock ledger
+        // permanently desynced with no trace.
         return [
             'index' => Pages\ListStockMovements::route('/'),
-            'create' => Pages\CreateStockMovement::route('/create'),
-            'edit' => Pages\EditStockMovement::route('/{record}/edit'),
         ];
     }
 }
@@ -172,21 +178,9 @@ class StockMovementResource extends BaseResource
 namespace App\Filament\Resources\StockMovementResource\Pages;
 
 use App\Filament\Resources\StockMovementResource;
-use Filament\Resources\Pages\CreateRecord;
-use Filament\Resources\Pages\EditRecord;
 use Filament\Resources\Pages\ListRecords;
 
 class ListStockMovements extends ListRecords
-{
-    protected static string $resource = StockMovementResource::class;
-}
-
-class CreateStockMovement extends CreateRecord
-{
-    protected static string $resource = StockMovementResource::class;
-}
-
-class EditStockMovement extends EditRecord
 {
     protected static string $resource = StockMovementResource::class;
 }
