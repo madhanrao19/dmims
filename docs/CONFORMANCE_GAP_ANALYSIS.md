@@ -263,22 +263,24 @@ patched).
   `boxes`/`document_files` barcode uniqueness was global instead of
   per-tenant; `billing_records` had no soft delete despite child tables
   (`billing_payments`, `billing_logs`) cascading off it, so a hard delete
-  could destroy the immutable billing audit trail. Three still-open DBA
-  findings, deferred pending a dedicated pass:
-  - **High** — `created_by`/`updated_by` unconstrained (no FK) on 9 master
-    tables (`customers`, `departments`, `customer_modules`,
-    `customer_subscriptions`, `licenses`, `locations`, `barcode_registry`,
-    `categories`, `products`); `subscription_logs` cascade-deletes with its
-    parent while the structurally identical `license_logs` restricts;
-    `users.department_id` has no FK/index.
-  - **Medium** — no DB-level constraint enforcing "one active license per
-    customer"; `document_types.type_code` has no uniqueness constraint;
-    `users` table missing the `status`/`last_login_at` indexes the Database
-    Dictionary specifies.
-  - **Low** — immutable log tables (`stock_movements`, `document_movement_logs`,
-    `audit_logs`) rely on app-layer discipline only, not a DB-level
-    immutability mechanism; `2026_06_14_000003_make_placement_columns_nullable`'s
-    `down()` isn't safely reversible once any box/file has been moved out.
+  could destroy the immutable billing audit trail. High/Medium findings
+  fixed in v2.1.22 (below); only Low items remain open.
+- v2.1.22: fixed the remaining High/Medium DBA findings from v2.1.21 —
+  `created_by`/`updated_by` now FK-constrained on 9 master tables
+  (`customers`, `departments`, `customer_modules`, `customer_subscriptions`,
+  `licenses`, `locations`, `barcode_registry`, `categories`, `products`);
+  `users.department_id` FK/index added; `subscription_logs` changed
+  cascade→restrict to match `license_logs`; `users` gained `status`/
+  `last_login_at` indexes; `document_types.type_code` is now unique per
+  tenant; `licenses`/`customer_subscriptions` now enforce "at most one
+  active row per customer" via a generated-column unique index. All
+  guarded against existing data (skip + log rather than fail); migrate/
+  rollback/re-migrate and full suite verified.
+  - **Low, still open** — immutable log tables (`stock_movements`,
+    `document_movement_logs`, `audit_logs`) rely on app-layer discipline
+    only, not a DB-level immutability mechanism;
+    `2026_06_14_000003_make_placement_columns_nullable`'s `down()` isn't
+    safely reversible once any box/file has been moved out.
 
 ---
 

@@ -4,6 +4,42 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.22] - 2026-08-18
+
+### Fixed — database integrity (remaining High/Medium DBA findings)
+- **`created_by`/`updated_by` unconstrained on 9 master tables (High).**
+  `customers`, `departments`, `customer_modules`, `customer_subscriptions`,
+  `licenses`, `locations`, `barcode_registry`, `categories`, `products` —
+  unlike every sibling table using the same column pair. Added FKs to
+  `users`, guarded (nulls any value already pointing at a nonexistent user
+  first, logged).
+- **`users.department_id` had no FK/index (High).** Added both, same guard
+  pattern.
+- **`subscription_logs` cascade-deleted with its parent while the
+  structurally identical `license_logs` restricts (High).** Changed
+  `subscription_logs.customer_subscription_id` to restrict, consistent with
+  `license_logs` and the billing audit-trail fix in 2.1.21.
+- **`users` table missing `status`/`last_login_at` indexes (Medium).** Added
+  (purely additive).
+- **`document_types.type_code` had no uniqueness constraint (Medium).**
+  Added `unique(['customer_id', 'type_code'])` — tenant-scoped, matching
+  every other tenant-owned lookup model. Guarded: checks for existing
+  duplicates first; skips and logs instead of failing if any are found.
+- **No DB-level "one active license/subscription per customer" constraint
+  (Medium).** Added a generated column (non-null only when
+  `status = 'active'`) with a unique index on `licenses` and
+  `customer_subscriptions` — MySQL/MariaDB/SQLite all exclude NULLs from a
+  unique index, so this enforces "at most one active row per customer"
+  without touching non-active rows. Guarded: skips and logs if a customer
+  already has more than one active row.
+- New migrations `2026_08_18_00000{4-9}_*`. All verified migrate → rollback
+  → re-migrate clean, plus a full fresh-migrate via the test suite's
+  `RefreshDatabase` (127/127 passing).
+- Remaining Low findings not fixed (immutable log tables rely on app-layer
+  discipline only, not a DB-level immutability mechanism; one earlier
+  migration's `down()` isn't safely reversible once data exists) — see
+  `docs/CONFORMANCE_GAP_ANALYSIS.md`.
+
 ## [2.1.21] - 2026-08-18
 
 ### Fixed — security & database integrity (full-app review: search/filter/upload/download + DBA schema pass)
