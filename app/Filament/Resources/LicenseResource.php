@@ -43,8 +43,12 @@ class LicenseResource extends BaseResource
                 Forms\Components\TextInput::make('max_products')->numeric(),
                 Forms\Components\TextInput::make('max_document_files')->numeric(),
                 Forms\Components\TextInput::make('max_boxes')->numeric(),
-                Forms\Components\Textarea::make('enabled_modules')->helperText('Enter JSON array of enabled module codes.'),
-                Forms\Components\Textarea::make('allowed_reports')->helperText('Enter JSON array of allowed reports.'),
+                Forms\Components\Textarea::make('enabled_modules')
+                    ->helperText('Enter JSON array of enabled module codes.')
+                    ->rule(static::jsonRule()),
+                Forms\Components\Textarea::make('allowed_reports')
+                    ->helperText('Enter JSON array of allowed reports.')
+                    ->rule(static::jsonRule()),
                 Forms\Components\Select::make('status')
                     ->options([
                         'trial' => 'Trial',

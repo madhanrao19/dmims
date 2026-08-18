@@ -182,4 +182,24 @@ abstract class BaseResource extends Resource
         // hide navigation when the resource's module is disabled for this customer
         return static::moduleEnabledForUser($user);
     }
+
+    /**
+     * Validation rule for a free-text field that must be valid JSON when
+     * filled (e.g. license/subscription module-gating textareas), but is
+     * allowed to be left blank.
+     */
+    protected static function jsonRule(): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail): void {
+            if (blank($value)) {
+                return;
+            }
+
+            json_decode($value);
+
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                $fail('The :attribute must be valid JSON.');
+            }
+        };
+    }
 }

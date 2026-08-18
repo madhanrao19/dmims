@@ -26,7 +26,7 @@ class CustomerResource extends BaseResource
         return $schema
             ->components([
                 Forms\Components\TextInput::make('company_name')->required()->maxLength(255),
-                Forms\Components\TextInput::make('company_code')->required()->maxLength(50),
+                Forms\Components\TextInput::make('company_code')->required()->maxLength(50)->unique(ignoreRecord: true),
                 Forms\Components\TextInput::make('contact_person')->maxLength(255),
                 Forms\Components\TextInput::make('email')->email()->maxLength(255),
                 Forms\Components\TextInput::make('phone')->maxLength(50),

@@ -4,6 +4,29 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.24] - 2026-08-18
+
+### Fixed — closing the last deferred findings from the full-app review
+- **`BillingRecordResource` didn't set `$applyCustomerScope = true` (Medium).**
+  The one resource inconsistent with the pattern used everywhere else; not
+  currently exploitable since `BillingRecord` already has the model-level
+  `BelongsToCustomer` trait, but this closes the defense-in-depth gap.
+- **`License`/`CustomerSubscription`'s `enabled_modules`/`allowed_reports`
+  textareas accepted any free text, no JSON validation (Medium).** Since
+  these gate real module/report access, malformed JSON here could silently
+  fail open or closed depending on how the consumer decodes it. Added a
+  shared `BaseResource::jsonRule()` validation closure (valid JSON or
+  blank; used by both fields on both resources) — functionally verified via
+  tinker against blank, valid, and invalid input.
+- **`CustomerResource` had no `->unique()` validation on `company_code`
+  (Low).** The DB already enforces uniqueness; this was a UX gap (raw
+  constraint error instead of a clean form message). Added
+  `->unique(ignoreRecord: true)`.
+
+Full suite (127/127), Pint, and Larastan verified green. No findings remain
+open from the full-app review — see `docs/CONFORMANCE_GAP_ANALYSIS.md` for
+the complete history.
+
 ## [2.1.23] - 2026-08-18
 
 ### Fixed — database integrity (remaining Low DBA findings)

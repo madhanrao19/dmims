@@ -22,6 +22,8 @@ class BillingRecordResource extends BaseResource
 {
     protected static ?string $model = BillingRecord::class;
 
+    protected static bool $applyCustomerScope = true;
+
     protected static string|array $routeMiddleware = [EnsureModuleEnabled::class.':billing_view'];
 
     protected static ?string $permission = 'manage billing';

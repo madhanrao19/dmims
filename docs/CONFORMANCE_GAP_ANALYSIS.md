@@ -284,6 +284,16 @@ patched).
   fast with a clear message instead of a raw DB constraint error if any
   box/file has been moved out, rather than pretending to be safely
   reversible. **No DBA findings remain open.**
+- v2.1.24: closed the last deferred findings from the v2.1.20/21 CRUD
+  review — `BillingRecordResource` now sets `$applyCustomerScope = true`
+  (consistency; not previously exploitable); `License`/
+  `CustomerSubscription`'s `enabled_modules`/`allowed_reports` textareas now
+  validate as JSON via a shared `BaseResource::jsonRule()`;
+  `CustomerResource.company_code` now has form-level `->unique()`
+  validation matching the existing DB constraint. **No findings remain open
+  from the full-app review.** Not yet run: live browser/Playwright QA and
+  an accessibility audit (no disposable environment/credentials available
+  this session).
 
 ---
 

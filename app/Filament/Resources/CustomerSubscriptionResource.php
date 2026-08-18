@@ -42,8 +42,12 @@ class CustomerSubscriptionResource extends BaseResource
                 Forms\Components\TextInput::make('max_products')->numeric(),
                 Forms\Components\TextInput::make('max_document_files')->numeric(),
                 Forms\Components\TextInput::make('max_boxes')->numeric(),
-                Forms\Components\Textarea::make('allowed_reports')->helperText('Enter JSON array of allowed report codes.'),
-                Forms\Components\Textarea::make('enabled_modules')->helperText('Enter JSON array of enabled module codes.'),
+                Forms\Components\Textarea::make('allowed_reports')
+                    ->helperText('Enter JSON array of allowed report codes.')
+                    ->rule(static::jsonRule()),
+                Forms\Components\Textarea::make('enabled_modules')
+                    ->helperText('Enter JSON array of enabled module codes.')
+                    ->rule(static::jsonRule()),
                 Forms\Components\TextInput::make('support_level')->maxLength(100),
                 Forms\Components\Select::make('status')
                     ->options([
