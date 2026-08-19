@@ -108,9 +108,9 @@ class LocationResource extends BaseResource
 namespace App\Filament\Resources\LocationResource\Pages;
 
 use App\Filament\Resources\LocationResource;
+use App\Filament\Resources\Pages\CreateRecord;
 use App\Filament\Resources\Pages\EditRecord;
 use App\Filament\Resources\Pages\ListRecords;
-use Filament\Resources\Pages\CreateRecord;
 
 class ListLocations extends ListRecords
 {

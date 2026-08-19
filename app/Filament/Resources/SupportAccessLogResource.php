@@ -67,9 +67,9 @@ class SupportAccessLogResource extends BaseResource
 
 namespace App\Filament\Resources\SupportAccessLogResource\Pages;
 
+use App\Filament\Resources\Pages\CreateRecord;
 use App\Filament\Resources\Pages\ListRecords;
 use App\Filament\Resources\SupportAccessLogResource;
-use Filament\Resources\Pages\CreateRecord;
 
 class ListSupportAccessLogs extends ListRecords
 {

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Pages;
 
+use App\Filament\Resources\Pages\Concerns\ForcesOwnCustomerId;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord as BaseEditRecord;
 use Illuminate\Database\Eloquent\Model;
@@ -16,9 +17,21 @@ use Illuminate\Database\QueryException;
  * can('delete', $record) — including $deletePermission (Company Admin can
  * edit users but not delete; Company Supervisor/Stock User can edit
  * products but not delete) — automatically.
+ *
+ * Also forces customer_id back to the actor's own tenant on save — see
+ * ForcesOwnCustomerId. A subclass that needs its own mutateFormDataBeforeSave
+ * (e.g. EditBillingRecord recomputing total_amount) must call
+ * parent::mutateFormDataBeforeSave() first to keep this guard.
  */
 abstract class EditRecord extends BaseEditRecord
 {
+    use ForcesOwnCustomerId;
+
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        return $this->forceOwnCustomerId($data);
+    }
+
     protected function getHeaderActions(): array
     {
         return [

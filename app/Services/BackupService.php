@@ -94,8 +94,13 @@ class BackupService
 
         $encrypted = Storage::disk($this->disk)->get($backup->file_path);
 
-        if ($backup->checksum && hash('sha256', $encrypted) !== $backup->checksum) {
-            throw new RuntimeException('Backup checksum mismatch; refusing to restore a possibly corrupted or tampered file.');
+        // Fail closed, not open: every backup written through run() always
+        // gets a checksum via encryptAndVerify(), so a missing one means this
+        // row didn't go through the normal path — treat that the same as a
+        // mismatch rather than silently skipping the tamper check on the
+        // one action capable of overwriting the live database.
+        if (! $backup->checksum || hash('sha256', $encrypted) !== $backup->checksum) {
+            throw new RuntimeException('Backup checksum mismatch or missing; refusing to restore a possibly corrupted or tampered file.');
         }
 
         $plaintext = Crypt::decryptString($encrypted);

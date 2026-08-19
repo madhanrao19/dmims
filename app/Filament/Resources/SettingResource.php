@@ -70,10 +70,10 @@ class SettingResource extends BaseResource
 
 namespace App\Filament\Resources\SettingResource\Pages;
 
+use App\Filament\Resources\Pages\CreateRecord;
 use App\Filament\Resources\Pages\EditRecord;
 use App\Filament\Resources\Pages\ListRecords;
 use App\Filament\Resources\SettingResource;
-use Filament\Resources\Pages\CreateRecord;
 
 class ListSettings extends ListRecords
 {

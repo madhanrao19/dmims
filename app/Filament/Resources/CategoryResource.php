@@ -20,6 +20,12 @@ class CategoryResource extends BaseResource
 
     protected static ?string $permission = 'manage inventory';
 
+    // Security & Access Control Matrix §10: same delete-permission split as
+    // Product — Company Supervisor and Stock Inventory User hold "manage
+    // inventory" for create/update but not "delete inventory", and that
+    // split must cover Categories too, not just Products.
+    protected static ?string $deletePermission = 'delete inventory';
+
     protected static string|\BackedEnum|null $navigationIcon = null;
 
     protected static string|\UnitEnum|null $navigationGroup = 'Stock Inventory';
@@ -70,9 +76,9 @@ class CategoryResource extends BaseResource
 namespace App\Filament\Resources\CategoryResource\Pages;
 
 use App\Filament\Resources\CategoryResource;
+use App\Filament\Resources\Pages\CreateRecord;
 use App\Filament\Resources\Pages\EditRecord;
 use App\Filament\Resources\Pages\ListRecords;
-use Filament\Resources\Pages\CreateRecord;
 
 class ListCategories extends ListRecords
 {

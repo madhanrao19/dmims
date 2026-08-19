@@ -81,7 +81,16 @@ class BackupResource extends BaseResource
                 Action::make('download')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->visible(fn (Backup $record): bool => $record->status === 'success' && filled($record->file_path))
-                    ->authorize(fn (Backup $record): bool => static::can('view', $record))
+                    // 'view' was wrong here: BaseResource::can()'s platform-user
+                    // branch grants unconditional read access regardless of
+                    // $permission, so gating on it let ANY platform user —
+                    // including the view-only Datamation Management role,
+                    // which holds zero permissions — decrypt and download the
+                    // entire database. A backup download is as sensitive as
+                    // restore/run (it's the same decrypted full-DB dump), so
+                    // gate it the same way: 'update' routes through
+                    // WRITE_ACTIONS and actually requires manage settings.
+                    ->authorize(fn (Backup $record): bool => static::can('update', $record))
                     ->action(function (Backup $record): StreamedResponse {
                         // Stored encrypted at rest; decrypt for the downloaded file.
                         $plaintext = Crypt::decryptString(Storage::disk($record->storage_location ?? 'local')->get($record->file_path));

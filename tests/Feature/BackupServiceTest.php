@@ -84,6 +84,25 @@ class BackupServiceTest extends TestCase
         app(BackupService::class)->restoreDatabase($backup->fresh());
     }
 
+    /**
+     * Regression: a null checksum used to skip the tamper check entirely
+     * (`if ($backup->checksum && ...)`) instead of failing closed — found
+     * reviewing the Backups module. Every backup written through run()
+     * always has a checksum, so a null one only happens for a row that
+     * bypassed that path; restore must refuse it, not treat it as trusted.
+     */
+    public function test_restore_refuses_a_backup_with_no_checksum(): void
+    {
+        Customer::create(['company_name' => 'Acme', 'company_code' => 'ACM', 'status' => 'active']);
+        $backup = app(BackupService::class)->backupDatabase();
+        $backup->update(['checksum' => null]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('checksum mismatch or missing');
+
+        app(BackupService::class)->restoreDatabase($backup->fresh());
+    }
+
     public function test_it_restores_a_database_backup(): void
     {
         Customer::create(['company_name' => 'Acme', 'company_code' => 'ACM', 'status' => 'active']);

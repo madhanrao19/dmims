@@ -4,6 +4,80 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.32] - 2026-08-19
+
+### Fixed — module review of Users, Products, Document Files, Billing, Backups
+
+A structured review (security-reviewer + QA pass, per the project's risk-tiered
+review workflow) of these five modules and their List/View/Create/Edit/Delete/
+Search/Filter/custom-action/validation/authorization/tenant-isolation/audit
+workflows found and fixed:
+
+**Critical**
+- **Billing's `recordPayment`/`issue`/`cancel` actions had no `->authorize()`
+  at all** (`BillingRecordResource.php`) — unlike every other custom action in
+  the app. Company Admin/Supervisor hold `view billing` (to see their own
+  invoices, per Security & Access Control Matrix §9) but not `manage billing`
+  (Super-Admin-only); with no authorize closure, any user who could see the
+  Billing list could record a fabricated payment, issue a draft, or cancel any
+  invoice — actions the matrix reserves for Super Admin alone. Fixed by adding
+  `->authorize(fn ($record) => static::can('update', $record))` to all three,
+  matching the pattern already used everywhere else.
+
+**High**
+- **`BackupResource`/`ImportResource`/`ExportResource` downloads used `can('view', ...)`**,
+  which `BaseResource::can()` grants unconditionally to *any* platform user
+  regardless of `$permission` (platform users get unrestricted read access by
+  design). That meant `Datamation Management` — a view-only oversight role
+  holding zero permissions — could decrypt and download a full database
+  backup. Found by the QA pass, not the security review. Changed to
+  `can('update', ...)`, matching `runBackup`/`restore`, so all three now
+  correctly require `manage settings`.
+- **Reports: `view reports` alone let any role download Billing Summary /
+  Payment Summary / Outstanding Balance** (`ReportExportService`), even though
+  the Security & Access Control Matrix §9 restricts billing data to SA/
+  Management/Company Admin/Company Supervisor — Stock Inventory User, Document
+  Tracking User, and Viewer all hold `view reports` and could pull full
+  billing/payment exports. Fixed by adding an optional `permission` key to
+  report definitions, checked in `availableTo()` for non-platform users.
+- **13 resources' Create pages had no server-side re-assertion of `customer_id`**
+  (Billing, Boxes, Categories, Customer Modules, Customer Subscriptions,
+  Document Files, Licenses, Locations, Notifications, Products, Settings,
+  Stock Alerts, Support Access Logs) — the `customer_id` Select is only ever
+  hidden via `->visible()` for a tenant actor, never disabled or excluded from
+  dehydration. In practice every affected model already carries `BelongsToCustomer`
+  (whose `creating`/`updating` hooks force `customer_id` unconditionally) or,
+  for the three that don't (License, CustomerSubscription, CustomerModule),
+  only Super Admin can reach the form at all today — so this was not a live
+  exploit, but a missing second layer. Closed once via a new shared
+  `App\Filament\Resources\Pages\CreateRecord` base (mirroring the existing
+  `ListRecords`/`EditRecord` pattern) plus the same hook added to the shared
+  `EditRecord` base, rather than duplicating the fix in every resource.
+
+**Medium**
+- `CategoryResource` had no `$deletePermission` split — Stock Inventory User
+  and Company Supervisor (who hold `manage inventory` but not `delete inventory`)
+  could delete a Category even though they can't delete a Product. Added the
+  same `delete inventory` split Product already has.
+- `BackupService::restoreDatabase()` skipped the checksum tamper-check entirely
+  when `checksum` was null (`if ($backup->checksum && ...)`) instead of
+  failing closed. Every backup written through the normal path always has a
+  checksum, so a null one means the row didn't go through it — now refused.
+
+**Investigated and confirmed not exploitable** (verified with a new regression
+test, not just re-reading the code): a security-reviewer finding claimed
+`Box`/`Location` carry no tenant scoping, so the Transfer/Return action
+dropdowns in `DocumentFileResource`/`BoxResource` could leak another
+company's boxes/locations. Both models do carry `BelongsToCustomer`, whose
+global scope applies to any `Box::query()`/`Location::query()` call —
+confirmed with `tests/Feature/DocumentTenantIsolationTest.php`, which fails
+if that scope is ever removed.
+
+Regression tests added: `BillingActionAuthorizationTest`,
+`DocumentTenantIsolationTest`, plus additions to `BackupServiceTest` and
+`ReportExportServiceTest`. Full suite (152/152), Pint, Larastan, and
+`npm run build` all verified clean.
+
 ## [2.1.31] - 2026-08-19
 
 ### Fixed — deleting a record with restricted history crashed instead of failing gracefully

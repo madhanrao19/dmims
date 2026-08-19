@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\ProductLocationStock;
 use App\Models\User;
 use App\Services\ReportExportService;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -106,5 +107,36 @@ class ReportExportServiceTest extends TestCase
         $this->assertArrayNotHasKey('customer_summary', $customerReports);
         $this->assertArrayHasKey('inventory_summary', $customerReports);
         $this->assertArrayHasKey('customer_summary', $platformReports);
+    }
+
+    /**
+     * Regression: "view reports" (held by Stock Inventory User, Document
+     * Tracking User, and Viewer) used to be sufficient on its own to pull
+     * Billing Summary / Payment Summary / Outstanding Balance — Security &
+     * Access Control Matrix §9 restricts those to SA/Management/Company
+     * Admin/Company Supervisor only. Found reviewing the Billing module.
+     */
+    public function test_billing_reports_require_view_billing_not_just_view_reports(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACM', 'status' => 'active']);
+
+        $stockUser = User::factory()->create(['is_platform_user' => false, 'customer_id' => $customer->id, 'status' => 'active']);
+        $stockUser->assignRole('Stock Inventory User');
+
+        $companyAdmin = User::factory()->create(['is_platform_user' => false, 'customer_id' => $customer->id, 'status' => 'active']);
+        $companyAdmin->assignRole('Company Admin');
+
+        $stockReports = ReportExportService::availableTo($stockUser);
+        $adminReports = ReportExportService::availableTo($companyAdmin);
+
+        $this->assertArrayHasKey('inventory_summary', $stockReports, 'Stock Inventory User should still see inventory reports');
+        $this->assertArrayNotHasKey('billing_summary', $stockReports);
+        $this->assertArrayNotHasKey('payment_summary', $stockReports);
+        $this->assertArrayNotHasKey('outstanding_balance', $stockReports);
+
+        $this->assertArrayHasKey('billing_summary', $adminReports);
+        $this->assertArrayHasKey('payment_summary', $adminReports);
+        $this->assertArrayHasKey('outstanding_balance', $adminReports);
     }
 }

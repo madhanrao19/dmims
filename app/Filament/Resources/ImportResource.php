@@ -126,7 +126,10 @@ class ImportResource extends BaseResource
                     ->icon('heroicon-o-arrow-down-tray')
                     ->color('danger')
                     ->visible(fn (Import $record): bool => $record->failed_rows > 0)
-                    ->authorize(fn (Import $record): bool => static::can('view', $record))
+                    // Same fix as BackupResource::download — 'view' is
+                    // unconditionally true for any platform user in
+                    // BaseResource::can(), bypassing manage settings entirely.
+                    ->authorize(fn (Import $record): bool => static::can('update', $record))
                     ->action(fn (Import $record) => app(ImportService::class)->errorFileResponse($record)),
                 DeleteAction::make(),
             ])

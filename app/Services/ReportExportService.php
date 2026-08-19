@@ -33,7 +33,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class ReportExportService
 {
     /**
-     * @return array<string, array{label: string, group: string, platform: bool}>
+     * @return array<string, array{label: string, group: string, platform: bool, permission?: string}>
      */
     public static function definitions(): array
     {
@@ -42,9 +42,9 @@ class ReportExportService
             'customer_summary' => ['label' => 'Customer Summary', 'group' => 'Platform', 'platform' => true],
             'subscription_summary' => ['label' => 'Subscription Summary', 'group' => 'Platform', 'platform' => true],
             'license_summary' => ['label' => 'License Summary', 'group' => 'Platform', 'platform' => true],
-            'billing_summary' => ['label' => 'Billing Summary', 'group' => 'Platform', 'platform' => false],
-            'payment_summary' => ['label' => 'Payment Summary', 'group' => 'Platform', 'platform' => false],
-            'outstanding_balance' => ['label' => 'Outstanding Balance', 'group' => 'Platform', 'platform' => false],
+            'billing_summary' => ['label' => 'Billing Summary', 'group' => 'Platform', 'platform' => false, 'permission' => 'view billing'],
+            'payment_summary' => ['label' => 'Payment Summary', 'group' => 'Platform', 'platform' => false, 'permission' => 'view billing'],
+            'outstanding_balance' => ['label' => 'Outstanding Balance', 'group' => 'Platform', 'platform' => false, 'permission' => 'view billing'],
             'audit_summary' => ['label' => 'Audit Report', 'group' => 'Platform', 'platform' => true],
             'module_usage' => ['label' => 'Module Usage', 'group' => 'Platform', 'platform' => true],
             // Inventory reports
@@ -64,15 +64,30 @@ class ReportExportService
     }
 
     /**
-     * Reports a user may run: platform-only reports require a platform user.
+     * Reports a user may run: platform-only reports require a platform user;
+     * a report with a 'permission' key (e.g. billing) additionally requires
+     * that permission for non-platform users — Security & Access Control
+     * Matrix §9 restricts billing data to SA/Management/Company Admin/
+     * Company Supervisor, not every role holding the generic "view reports"
+     * permission that gates this screen itself.
      *
-     * @return array<string, array{label: string, group: string, platform: bool}>
+     * @return array<string, array{label: string, group: string, platform: bool, permission?: string}>
      */
     public static function availableTo($user): array
     {
         return array_filter(
             static::definitions(),
-            fn (array $def) => ! $def['platform'] || (bool) $user?->is_platform_user,
+            function (array $def) use ($user) {
+                if ($def['platform']) {
+                    return (bool) $user?->is_platform_user;
+                }
+
+                if ($user?->is_platform_user) {
+                    return true;
+                }
+
+                return ! isset($def['permission']) || (bool) $user?->can($def['permission']);
+            },
         );
     }
 

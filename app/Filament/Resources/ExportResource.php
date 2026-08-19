@@ -86,7 +86,10 @@ class ExportResource extends BaseResource
                 Action::make('download')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->visible(fn (Export $record): bool => $record->status === 'completed' && filled($record->file_path))
-                    ->authorize(fn (Export $record): bool => static::can('view', $record))
+                    // Same fix as BackupResource::download — 'view' is
+                    // unconditionally true for any platform user in
+                    // BaseResource::can(), bypassing manage settings entirely.
+                    ->authorize(fn (Export $record): bool => static::can('update', $record))
                     ->action(fn (Export $record): StreamedResponse => Storage::disk('local')->download($record->file_path, $record->file_name)),
                 DeleteAction::make(),
             ])

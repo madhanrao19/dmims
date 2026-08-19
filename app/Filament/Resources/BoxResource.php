@@ -203,10 +203,10 @@ class BoxResource extends BaseResource
 namespace App\Filament\Resources\BoxResource\Pages;
 
 use App\Filament\Resources\BoxResource;
+use App\Filament\Resources\Pages\CreateRecord;
 use App\Filament\Resources\Pages\EditRecord;
 use App\Filament\Resources\Pages\ListRecords;
 use App\Services\DocumentMovementService;
-use Filament\Resources\Pages\CreateRecord;
 
 class ListBoxes extends ListRecords
 {

@@ -95,6 +95,7 @@ class BillingRecordResource extends BaseResource
                     ->icon('heroicon-o-banknotes')
                     ->color('success')
                     ->visible(fn (BillingRecord $record): bool => $record->billing_status !== 'cancelled' && $record->payment_status !== 'paid')
+                    ->authorize(fn (BillingRecord $record): bool => static::can('update', $record))
                     ->schema([
                         Forms\Components\TextInput::make('amount')
                             ->numeric()->required()->minValue(0.01)->prefix('RM')
@@ -114,6 +115,7 @@ class BillingRecordResource extends BaseResource
                 Action::make('issue')
                     ->icon('heroicon-o-paper-airplane')
                     ->visible(fn (BillingRecord $record): bool => $record->billing_status === 'draft')
+                    ->authorize(fn (BillingRecord $record): bool => static::can('update', $record))
                     ->requiresConfirmation()
                     ->action(function (BillingRecord $record): void {
                         app(BillingService::class)->issue($record);
@@ -123,6 +125,7 @@ class BillingRecordResource extends BaseResource
                     ->icon('heroicon-o-x-circle')
                     ->color('danger')
                     ->visible(fn (BillingRecord $record): bool => $record->billing_status !== 'cancelled')
+                    ->authorize(fn (BillingRecord $record): bool => static::can('update', $record))
                     ->requiresConfirmation()
                     ->action(function (BillingRecord $record): void {
                         app(BillingService::class)->cancel($record);
@@ -153,10 +156,10 @@ class BillingRecordResource extends BaseResource
 namespace App\Filament\Resources\BillingRecordResource\Pages;
 
 use App\Filament\Resources\BillingRecordResource;
+use App\Filament\Resources\Pages\CreateRecord;
 use App\Filament\Resources\Pages\EditRecord;
 use App\Filament\Resources\Pages\ListRecords;
 use App\Services\BillingService;
-use Filament\Resources\Pages\CreateRecord;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Database\Eloquent\Model;
 
@@ -186,6 +189,8 @@ class EditBillingRecord extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        $data = parent::mutateFormDataBeforeSave($data);
+
         // total_amount is always derived; never trust a submitted value.
         $data['total_amount'] = round((float) ($data['amount'] ?? 0) + (float) ($data['tax_amount'] ?? 0), 2);
 

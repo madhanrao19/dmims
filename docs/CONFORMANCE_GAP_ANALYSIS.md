@@ -94,6 +94,40 @@ divergences are cosmetic (enum naming) or operational config.
 > Full suite (143/143), Pint, and Larastan verified clean; statuses below
 > remain accurate.
 
+> **Re-audit 2026-08-19 (v2.1.32):** a structured module review (security
+> reviewer + QA agent, per the project's risk-tiered review workflow) of
+> Users, Products, Document Files, Billing, and Backups — see CHANGELOG.md
+> [2.1.32]:
+> - **Critical** — Billing's `recordPayment`/`issue`/`cancel` had no
+>   `->authorize()` at all; any user who could view an invoice (Company
+>   Admin/Supervisor's `view billing`) could act on it, though the matrix
+>   reserves those actions for Super Admin.
+> - **High** — Backup/Import/Export downloads gated on `can('view', ...)`,
+>   which `BaseResource::can()` grants unconditionally to any platform user;
+>   `Datamation Management` (view-only, zero permissions) could download and
+>   decrypt a full database backup. Changed to `can('update', ...)`.
+> - **High** — Billing Summary/Payment Summary/Outstanding Balance reports
+>   were reachable by any role holding the generic `view reports` permission
+>   (Stock Inventory User, Document Tracking User, Viewer), not just the
+>   roles Security & Access Control Matrix §9 allows. `ReportExportService`
+>   report definitions now carry an optional required permission.
+> - **High** — 13 resources' Create pages had no server-side re-assertion of
+>   `customer_id` (only `->visible()` hiding the field for tenant actors).
+>   Closed once via a new shared `CreateRecord` base page, mirroring the
+>   existing `ListRecords`/`EditRecord` pattern, plus the same hook added to
+>   `EditRecord`.
+> - **Medium** — `CategoryResource` missing the `delete inventory` permission
+>   split Product already has; `BackupService::restoreDatabase()` skipped its
+>   tamper check on a null checksum instead of failing closed.
+> - A security-review claim that `Box`/`Location` had no tenant scoping (so
+>   Document Files/Boxes' Transfer/Return dropdowns could leak cross-tenant
+>   rows) was investigated and found **not exploitable** — both models carry
+>   `BelongsToCustomer`'s global scope. Confirmed with a new regression test
+>   rather than left as an assumption.
+>
+> Full suite (152/152), Pint, Larastan, and `npm run build` verified clean;
+> statuses below remain accurate.
+
 Legend: ✅ implemented · WIP partial · ❌ missing
 
 ---
