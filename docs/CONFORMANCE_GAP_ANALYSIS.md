@@ -70,6 +70,30 @@ divergences are cosmetic (enum naming) or operational config.
 > and `npm run build:assets` all verified clean; statuses below remain
 > accurate.
 
+> **Re-audit 2026-08-19 (v2.1.29):** a 3-agent council audit (user-requested,
+> covering every resource's Create/Edit/Delete/Print/Download actions) found
+> two more issues in the same "correct-looking code, wrong enforcement point"
+> class — see CHANGELOG.md [2.1.29]:
+> - **Critical (functional, not security)** — no `ListRecords` page anywhere
+>   had a working Create button and no `EditRecord` page anywhere had a
+>   working Delete button, across the app's entire history. Filament never
+>   auto-adds `getHeaderActions()`; every page class must declare it. Fixed
+>   via two shared base classes under `App\Filament\Resources\Pages`.
+> - **Critical/High (security)** — custom `Action`/`BulkAction` instances
+>   (as opposed to Filament's built-in `CreateAction`/`EditAction`/
+>   `DeleteAction`) are never auto-authorized against the resource's `can()`
+>   — they need an explicit `->authorize()`, which no resource had. Worst
+>   case: `BackupResource`'s `restore` action could overwrite the live
+>   production database, reachable by any platform user regardless of role.
+>   Also open on Import/Export/Barcode-batch actions (platform-reachable)
+>   and Stock-movement/Box/DocumentFile transfer-move-return actions and the
+>   shared barcode row action (tenant-Viewer-reachable). Fixed with
+>   `->authorize()` closures mirroring `BaseResource::can()`'s read/write
+>   split.
+>
+> Full suite (143/143), Pint, and Larastan verified clean; statuses below
+> remain accurate.
+
 Legend: ✅ implemented · WIP partial · ❌ missing
 
 ---

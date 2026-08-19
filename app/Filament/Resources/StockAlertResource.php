@@ -84,10 +84,10 @@ class StockAlertResource extends BaseResource
 
 namespace App\Filament\Resources\StockAlertResource\Pages;
 
+use App\Filament\Resources\Pages\EditRecord;
+use App\Filament\Resources\Pages\ListRecords;
 use App\Filament\Resources\StockAlertResource;
 use Filament\Resources\Pages\CreateRecord;
-use Filament\Resources\Pages\EditRecord;
-use Filament\Resources\Pages\ListRecords;
 
 class ListStockAlerts extends ListRecords
 {

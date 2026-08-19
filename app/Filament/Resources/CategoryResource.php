@@ -70,9 +70,9 @@ class CategoryResource extends BaseResource
 namespace App\Filament\Resources\CategoryResource\Pages;
 
 use App\Filament\Resources\CategoryResource;
+use App\Filament\Resources\Pages\EditRecord;
+use App\Filament\Resources\Pages\ListRecords;
 use Filament\Resources\Pages\CreateRecord;
-use Filament\Resources\Pages\EditRecord;
-use Filament\Resources\Pages\ListRecords;
 
 class ListCategories extends ListRecords
 {

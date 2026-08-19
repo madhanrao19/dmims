@@ -19,6 +19,7 @@ trait HasBarcodeAction
         return Action::make('barcode')
             ->label('Barcode')
             ->icon('heroicon-o-qr-code')
+            ->authorize(fn (Model $record): bool => static::can('update', $record))
             ->modalHeading('Barcode label')
             ->modalSubmitActionLabel('Mark as printed')
             ->modalContent(function (Model $record) {

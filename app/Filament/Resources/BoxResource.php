@@ -136,6 +136,7 @@ class BoxResource extends BaseResource
                     ->label('Transfer')
                     ->icon('heroicon-o-arrows-right-left')
                     ->visible(fn (Box $record): bool => $record->status !== 'moved_out')
+                    ->authorize(fn (Box $record): bool => static::can('update', $record))
                     ->schema([
                         Forms\Components\Select::make('to_location_id')->label('To location')
                             ->options(fn () => Location::query()->pluck('location_name', 'id')->all())->searchable()->required(),
@@ -150,6 +151,7 @@ class BoxResource extends BaseResource
                     ->icon('heroicon-o-arrow-up-tray')
                     ->color('danger')
                     ->visible(fn (Box $record): bool => $record->status !== 'moved_out')
+                    ->authorize(fn (Box $record): bool => static::can('update', $record))
                     ->schema([
                         Forms\Components\TextInput::make('destination')->label('External destination')->required(),
                         Forms\Components\Textarea::make('remarks'),
@@ -163,6 +165,7 @@ class BoxResource extends BaseResource
                     ->icon('heroicon-o-arrow-uturn-left')
                     ->color('success')
                     ->visible(fn (Box $record): bool => $record->status === 'moved_out')
+                    ->authorize(fn (Box $record): bool => static::can('update', $record))
                     ->schema([
                         Forms\Components\Select::make('to_location_id')->label('Return to location')
                             ->options(fn () => Location::query()->pluck('location_name', 'id')->all())->searchable()->required(),
@@ -200,10 +203,10 @@ class BoxResource extends BaseResource
 namespace App\Filament\Resources\BoxResource\Pages;
 
 use App\Filament\Resources\BoxResource;
+use App\Filament\Resources\Pages\EditRecord;
+use App\Filament\Resources\Pages\ListRecords;
 use App\Services\DocumentMovementService;
 use Filament\Resources\Pages\CreateRecord;
-use Filament\Resources\Pages\EditRecord;
-use Filament\Resources\Pages\ListRecords;
 
 class ListBoxes extends ListRecords
 {

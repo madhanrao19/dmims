@@ -82,6 +82,7 @@ class StockMovementResource extends BaseResource
                     ->label('Receive In')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->color('success')
+                    ->authorize(fn (): bool => static::can('create'))
                     ->schema([
                         static::productSelect(),
                         Forms\Components\Select::make('to_location_id')->label('To location')->options(static::locationOptions())->searchable()->required(),
@@ -96,6 +97,7 @@ class StockMovementResource extends BaseResource
                     ->label('Stock Out')
                     ->icon('heroicon-o-arrow-up-tray')
                     ->color('danger')
+                    ->authorize(fn (): bool => static::can('create'))
                     ->schema([
                         static::productSelect(),
                         Forms\Components\Select::make('from_location_id')->label('From location')->options(static::locationOptions())->searchable()->required(),
@@ -109,6 +111,7 @@ class StockMovementResource extends BaseResource
                 Action::make('transfer')
                     ->label('Transfer')
                     ->icon('heroicon-o-arrows-right-left')
+                    ->authorize(fn (): bool => static::can('create'))
                     ->schema([
                         static::productSelect(),
                         Forms\Components\Select::make('from_location_id')->label('From location')->options(static::locationOptions())->searchable()->required(),
@@ -124,6 +127,7 @@ class StockMovementResource extends BaseResource
                     ->label('Adjust')
                     ->icon('heroicon-o-adjustments-horizontal')
                     ->color('warning')
+                    ->authorize(fn (): bool => static::can('create'))
                     ->schema([
                         static::productSelect(),
                         Forms\Components\Select::make('location_id')->label('Location')->options(static::locationOptions())->searchable()->required(),

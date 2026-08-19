@@ -174,6 +174,7 @@ class DocumentFileResource extends BaseResource
                     ->label('Transfer')
                     ->icon('heroicon-o-arrows-right-left')
                     ->visible(fn (DocumentFile $record): bool => $record->current_status !== 'moved_out')
+                    ->authorize(fn (DocumentFile $record): bool => static::can('update', $record))
                     ->schema([
                         Forms\Components\Select::make('to_box_id')->label('To box')
                             ->options(fn () => Box::query()->pluck('box_number', 'id')->all())->searchable()->required(),
@@ -188,6 +189,7 @@ class DocumentFileResource extends BaseResource
                     ->icon('heroicon-o-arrow-up-tray')
                     ->color('danger')
                     ->visible(fn (DocumentFile $record): bool => $record->current_status !== 'moved_out')
+                    ->authorize(fn (DocumentFile $record): bool => static::can('update', $record))
                     ->schema([
                         Forms\Components\TextInput::make('destination')->label('External destination')->required(),
                         Forms\Components\TextInput::make('borrowed_by')->label('Borrowed by'),
@@ -203,6 +205,7 @@ class DocumentFileResource extends BaseResource
                     ->icon('heroicon-o-arrow-uturn-left')
                     ->color('success')
                     ->visible(fn (DocumentFile $record): bool => $record->current_status === 'moved_out')
+                    ->authorize(fn (DocumentFile $record): bool => static::can('update', $record))
                     ->schema([
                         Forms\Components\Select::make('to_box_id')->label('Return to box')
                             ->options(fn () => Box::query()->pluck('box_number', 'id')->all())->searchable()->required(),
@@ -240,10 +243,10 @@ class DocumentFileResource extends BaseResource
 namespace App\Filament\Resources\DocumentFileResource\Pages;
 
 use App\Filament\Resources\DocumentFileResource;
+use App\Filament\Resources\Pages\EditRecord;
+use App\Filament\Resources\Pages\ListRecords;
 use App\Services\DocumentMovementService;
 use Filament\Resources\Pages\CreateRecord;
-use Filament\Resources\Pages\EditRecord;
-use Filament\Resources\Pages\ListRecords;
 
 class ListDocumentFiles extends ListRecords
 {

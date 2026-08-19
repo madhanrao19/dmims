@@ -66,9 +66,9 @@ class LocationTypeResource extends BaseResource
 namespace App\Filament\Resources\LocationTypeResource\Pages;
 
 use App\Filament\Resources\LocationTypeResource;
+use App\Filament\Resources\Pages\EditRecord;
+use App\Filament\Resources\Pages\ListRecords;
 use Filament\Resources\Pages\CreateRecord;
-use Filament\Resources\Pages\EditRecord;
-use Filament\Resources\Pages\ListRecords;
 
 class ListLocationTypes extends ListRecords
 {

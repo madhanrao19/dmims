@@ -73,9 +73,9 @@ class NotificationResource extends BaseResource
 namespace App\Filament\Resources\NotificationResource\Pages;
 
 use App\Filament\Resources\NotificationResource;
+use App\Filament\Resources\Pages\EditRecord;
+use App\Filament\Resources\Pages\ListRecords;
 use Filament\Resources\Pages\CreateRecord;
-use Filament\Resources\Pages\EditRecord;
-use Filament\Resources\Pages\ListRecords;
 
 class ListNotifications extends ListRecords
 {

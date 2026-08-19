@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\BarcodeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
 
 class BarcodeCenterTest extends TestCase
@@ -22,6 +23,7 @@ class BarcodeCenterTest extends TestCase
         $product = Product::create(['customer_id' => $customer->id, 'sku' => 'SKU1', 'product_name' => 'Widget', 'status' => 'active']);
         $registry = app(BarcodeService::class)->registerFor($product);
         $admin = User::factory()->create(['is_platform_user' => true, 'status' => 'active']);
+        $admin->givePermissionTo(Permission::findOrCreate('manage barcode'));
 
         Livewire::actingAs($admin)
             ->test(ListBarcodeRegistries::class)
@@ -38,6 +40,7 @@ class BarcodeCenterTest extends TestCase
         $productA = Product::create(['customer_id' => $customer->id, 'sku' => 'SKU1', 'product_name' => 'Widget A', 'status' => 'active']);
         $productB = Product::create(['customer_id' => $customer->id, 'sku' => 'SKU2', 'product_name' => 'Widget B', 'status' => 'active']);
         $admin = User::factory()->create(['is_platform_user' => true, 'status' => 'active']);
+        $admin->givePermissionTo(Permission::findOrCreate('manage barcode'));
 
         Livewire::actingAs($admin)
             ->test(ListBarcodeRegistries::class)
@@ -49,5 +52,21 @@ class BarcodeCenterTest extends TestCase
 
         $this->assertNotNull($productA->fresh()->barcode);
         $this->assertNotNull($productB->fresh()->barcode);
+    }
+
+    public function test_platform_user_without_manage_barcode_cannot_run_mutating_actions(): void
+    {
+        // Regression for the gap where custom table actions had no
+        // ->authorize(), so any platform user (even view-only) could batch
+        // generate or replace barcodes regardless of permissions.
+        $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACM', 'status' => 'active']);
+        $product = Product::create(['customer_id' => $customer->id, 'sku' => 'SKU1', 'product_name' => 'Widget', 'status' => 'active']);
+        $registry = app(BarcodeService::class)->registerFor($product);
+        $viewOnly = User::factory()->create(['is_platform_user' => true, 'status' => 'active']);
+
+        Livewire::actingAs($viewOnly)
+            ->test(ListBarcodeRegistries::class)
+            ->assertTableActionHidden('replace', $registry)
+            ->assertTableActionHidden('batchGenerate');
     }
 }

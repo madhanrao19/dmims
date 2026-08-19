@@ -59,6 +59,7 @@ class ExportResource extends BaseResource
                 Action::make('newExport')
                     ->label('New Export')
                     ->icon('heroicon-o-plus')
+                    ->authorize(fn (): bool => static::can('create'))
                     ->schema([
                         Forms\Components\Select::make('export_type')
                             ->label('Data to export')
@@ -85,6 +86,7 @@ class ExportResource extends BaseResource
                 Action::make('download')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->visible(fn (Export $record): bool => $record->status === 'completed' && filled($record->file_path))
+                    ->authorize(fn (Export $record): bool => static::can('view', $record))
                     ->action(fn (Export $record): StreamedResponse => Storage::disk('local')->download($record->file_path, $record->file_name)),
                 DeleteAction::make(),
             ])

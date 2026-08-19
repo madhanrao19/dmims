@@ -4,6 +4,54 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.29] - 2026-08-19
+
+### Fixed — Critical: Create/Delete buttons missing app-wide + custom-action authorization gap
+
+**Critical/High (found via a full council audit of every resource's Create/
+Edit/Delete/Print/Download actions)**
+
+- **No List page anywhere had a working Create button, no Edit page anywhere
+  had a working Delete button.** Filament never auto-adds `getHeaderActions()`
+  — every page class must declare it explicitly, and this app never did,
+  across its entire history. Root-caused against Filament's own
+  `make:filament-resource` generator templates, not a regression from the
+  5.6.8→5.7.6 bump. Fixed via two new shared base classes,
+  `App\Filament\Resources\Pages\{ListRecords,EditRecord}`, each declaring
+  `getHeaderActions()` (`CreateAction`/`DeleteAction`, which auto-authorize
+  against the resource's own `can()`), and swapping the base-class import in
+  19 resources' `ListRecords`/`EditRecord` subclasses to point at them.
+  `BarcodeRegistryResource` (no create page) and `SupportAccessLogResource`
+  (no edit page, by design — see 2.1.x history) each got only the one import
+  swap that applies to them.
+- **Custom table actions (`Action`/`BulkAction` registered via
+  `->headerActions()`/`->recordActions()`/`->bulkActions()`) were never
+  authorized at all** — only Filament's built-in `CreateAction`/`EditAction`/
+  `DeleteAction` auto-check `can()`; hand-rolled actions need an explicit
+  `->authorize()`, which was missing everywhere. Most severe:
+  `BackupResource`'s `restore` action could overwrite the live production
+  database, reachable by any platform user regardless of role (only a
+  confirmation modal stood in the way). Also unguarded: `BackupResource::
+  runBackup`/`download`; `ImportResource::newImport`/`downloadErrors`;
+  `ExportResource::newExport`/`download`; `BarcodeRegistryResource::
+  batchGenerate`/`preview`/`replace`/`batchPrint`; `StockMovementResource::
+  receiveIn`/`stockOut`/`transfer`/`adjust`; `BoxResource`/
+  `DocumentFileResource`'s transfer/moveOut/return actions; and the shared
+  `HasBarcodeAction` trait's `barcode` row action (Product/Box/DocumentFile).
+  Fixed by adding `->authorize()` closures mirroring `BaseResource::can()`'s
+  read/write split — mutating actions require `can('create')`/`can('update',
+  $record)`, pure-read actions require `can('view', $record)` — so a
+  platform "view-only" role or tenant "Viewer" role can no longer trigger
+  them.
+
+Found and fixed via a 3-agent council audit spanning all ~28 resources.
+Regression test added (`BarcodeCenterTest::
+test_platform_user_without_manage_barcode_cannot_run_mutating_actions`); the
+pre-existing `BarcodeCenterTest` fixtures were updated to grant the
+`manage barcode` permission they'd always needed but never had (the
+vulnerability had been masking that gap). Full suite (143/143), Pint, and
+Larastan verified green.
+
 ## [2.1.28] - 2026-08-19
 
 ### Added

@@ -110,6 +110,7 @@ class BarcodeRegistryResource extends BaseResource
                 Action::make('batchGenerate')
                     ->label('Batch Generate')
                     ->icon('heroicon-o-squares-plus')
+                    ->authorize(fn (): bool => static::can('create'))
                     ->schema([
                         Forms\Components\Select::make('type')
                             ->label('Record type')
@@ -158,6 +159,7 @@ class BarcodeRegistryResource extends BaseResource
                 Action::make('preview')
                     ->label('Preview / Print')
                     ->icon('heroicon-o-eye')
+                    ->authorize(fn (BarcodeRegistry $record): bool => static::can('update', $record))
                     ->modalHeading('Barcode label')
                     ->schema([
                         Forms\Components\Select::make('size')
@@ -181,6 +183,7 @@ class BarcodeRegistryResource extends BaseResource
                     ->icon('heroicon-o-arrow-path')
                     ->color('danger')
                     ->visible(fn (BarcodeRegistry $record): bool => $record->status === 'active')
+                    ->authorize(fn (BarcodeRegistry $record): bool => static::can('update', $record))
                     ->requiresConfirmation()
                     ->modalDescription('Retires this barcode and issues a new one for the same record. The old code is kept in history.')
                     ->action(function (BarcodeRegistry $record): void {
@@ -196,6 +199,7 @@ class BarcodeRegistryResource extends BaseResource
                 BulkAction::make('batchPrint')
                     ->label('Batch Print')
                     ->icon('heroicon-o-printer')
+                    ->authorize(fn (): bool => static::can('update'))
                     ->schema([
                         Forms\Components\Select::make('size')
                             ->label('Label size')
@@ -250,7 +254,7 @@ class BarcodeRegistryResource extends BaseResource
 namespace App\Filament\Resources\BarcodeRegistryResource\Pages;
 
 use App\Filament\Resources\BarcodeRegistryResource;
-use Filament\Resources\Pages\EditRecord;
+use App\Filament\Resources\Pages\EditRecord;
 use Filament\Resources\Pages\ListRecords;
 
 class ListBarcodeRegistries extends ListRecords

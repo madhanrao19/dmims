@@ -63,9 +63,9 @@ class ModuleResource extends BaseResource
 namespace App\Filament\Resources\ModuleResource\Pages;
 
 use App\Filament\Resources\ModuleResource;
+use App\Filament\Resources\Pages\EditRecord;
+use App\Filament\Resources\Pages\ListRecords;
 use Filament\Resources\Pages\CreateRecord;
-use Filament\Resources\Pages\EditRecord;
-use Filament\Resources\Pages\ListRecords;
 
 class ListModules extends ListRecords
 {

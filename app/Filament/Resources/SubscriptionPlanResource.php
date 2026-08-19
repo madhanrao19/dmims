@@ -80,10 +80,10 @@ class SubscriptionPlanResource extends BaseResource
 
 namespace App\Filament\Resources\SubscriptionPlanResource\Pages;
 
+use App\Filament\Resources\Pages\EditRecord;
+use App\Filament\Resources\Pages\ListRecords;
 use App\Filament\Resources\SubscriptionPlanResource;
 use Filament\Resources\Pages\CreateRecord;
-use Filament\Resources\Pages\EditRecord;
-use Filament\Resources\Pages\ListRecords;
 
 class ListSubscriptionPlans extends ListRecords
 {

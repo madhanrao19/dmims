@@ -66,9 +66,9 @@ class DocumentTypeResource extends BaseResource
 namespace App\Filament\Resources\DocumentTypeResource\Pages;
 
 use App\Filament\Resources\DocumentTypeResource;
+use App\Filament\Resources\Pages\EditRecord;
+use App\Filament\Resources\Pages\ListRecords;
 use Filament\Resources\Pages\CreateRecord;
-use Filament\Resources\Pages\EditRecord;
-use Filament\Resources\Pages\ListRecords;
 
 class ListDocumentTypes extends ListRecords
 {

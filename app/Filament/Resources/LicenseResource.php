@@ -91,9 +91,9 @@ class LicenseResource extends BaseResource
 namespace App\Filament\Resources\LicenseResource\Pages;
 
 use App\Filament\Resources\LicenseResource;
+use App\Filament\Resources\Pages\EditRecord;
+use App\Filament\Resources\Pages\ListRecords;
 use Filament\Resources\Pages\CreateRecord;
-use Filament\Resources\Pages\EditRecord;
-use Filament\Resources\Pages\ListRecords;
 
 class ListLicenses extends ListRecords
 {

@@ -67,9 +67,9 @@ class CustomerModuleResource extends BaseResource
 namespace App\Filament\Resources\CustomerModuleResource\Pages;
 
 use App\Filament\Resources\CustomerModuleResource;
+use App\Filament\Resources\Pages\EditRecord;
+use App\Filament\Resources\Pages\ListRecords;
 use Filament\Resources\Pages\CreateRecord;
-use Filament\Resources\Pages\EditRecord;
-use Filament\Resources\Pages\ListRecords;
 
 class ListCustomerModules extends ListRecords
 {

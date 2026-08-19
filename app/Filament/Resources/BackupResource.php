@@ -63,6 +63,7 @@ class BackupResource extends BaseResource
                 Action::make('runBackup')
                     ->label('Run Database Backup')
                     ->icon('heroicon-o-play')
+                    ->authorize(fn (): bool => static::can('update'))
                     ->requiresConfirmation()
                     ->modalDescription('This will create a full backup of the application database.')
                     ->action(function (): void {
@@ -80,6 +81,7 @@ class BackupResource extends BaseResource
                 Action::make('download')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->visible(fn (Backup $record): bool => $record->status === 'success' && filled($record->file_path))
+                    ->authorize(fn (Backup $record): bool => static::can('view', $record))
                     ->action(function (Backup $record): StreamedResponse {
                         // Stored encrypted at rest; decrypt for the downloaded file.
                         $plaintext = Crypt::decryptString(Storage::disk($record->storage_location ?? 'local')->get($record->file_path));
@@ -91,6 +93,7 @@ class BackupResource extends BaseResource
                     ->icon('heroicon-o-arrow-uturn-left')
                     ->color('danger')
                     ->visible(fn (Backup $record): bool => in_array($record->status, ['success', 'restored'], true) && filled($record->file_path))
+                    ->authorize(fn (Backup $record): bool => static::can('update', $record))
                     ->requiresConfirmation()
                     ->modalHeading('Restore database from backup')
                     ->modalDescription('This will OVERWRITE the current database with the contents of this backup. This cannot be undone.')

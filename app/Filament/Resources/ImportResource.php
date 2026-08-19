@@ -60,6 +60,7 @@ class ImportResource extends BaseResource
                 Action::make('newImport')
                     ->label('New Import')
                     ->icon('heroicon-o-plus')
+                    ->authorize(fn (): bool => static::can('create'))
                     ->schema([
                         Forms\Components\Select::make('import_type')
                             ->label('Data to import')
@@ -125,6 +126,7 @@ class ImportResource extends BaseResource
                     ->icon('heroicon-o-arrow-down-tray')
                     ->color('danger')
                     ->visible(fn (Import $record): bool => $record->failed_rows > 0)
+                    ->authorize(fn (Import $record): bool => static::can('view', $record))
                     ->action(fn (Import $record) => app(ImportService::class)->errorFileResponse($record)),
                 DeleteAction::make(),
             ])
