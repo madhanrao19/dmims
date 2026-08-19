@@ -585,11 +585,35 @@ parameters:
 		-
 			message: '#^Access to an undefined property App\\Models\\BillingRecord\:\:\$customer\.$#'
 			identifier: property.notFound
+			count: 2
+			path: app/Services/ReportExportService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\Box\:\:\$currentLocation\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/ReportExportService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\CustomerModule\:\:\$customer\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/ReportExportService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\CustomerModule\:\:\$module\.$#'
+			identifier: property.notFound
 			count: 1
 			path: app/Services/ReportExportService.php
 
 		-
 			message: '#^Access to an undefined property App\\Models\\CustomerSubscription\:\:\$customer\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Services/ReportExportService.php
+
+		-
+			message: '#^Access to an undefined property App\\Models\\DocumentFile\:\:\$currentBox\.$#'
 			identifier: property.notFound
 			count: 1
 			path: app/Services/ReportExportService.php
@@ -607,7 +631,25 @@ parameters:
 			path: app/Services/ReportExportService.php
 
 		-
+			message: '#^Relation ''currentBox'' is not found in App\\Models\\DocumentFile model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Services/ReportExportService.php
+
+		-
+			message: '#^Relation ''currentLocation'' is not found in App\\Models\\Box model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Services/ReportExportService.php
+
+		-
 			message: '#^Relation ''customer'' is not found in App\\Models\\BillingRecord model\.$#'
+			identifier: larastan.relationExistence
+			count: 2
+			path: app/Services/ReportExportService.php
+
+		-
+			message: '#^Relation ''customer'' is not found in App\\Models\\CustomerModule model\.$#'
 			identifier: larastan.relationExistence
 			count: 1
 			path: app/Services/ReportExportService.php
@@ -625,9 +667,15 @@ parameters:
 			path: app/Services/ReportExportService.php
 
 		-
+			message: '#^Relation ''module'' is not found in App\\Models\\CustomerModule model\.$#'
+			identifier: larastan.relationExistence
+			count: 1
+			path: app/Services/ReportExportService.php
+
+		-
 			message: '#^Ternary operator condition is always true\.$#'
 			identifier: ternary.alwaysTrue
-			count: 1
+			count: 2
 			path: app/Services/ReportExportService.php
 
 		-

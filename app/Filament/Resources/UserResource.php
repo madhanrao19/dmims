@@ -23,6 +23,8 @@ class UserResource extends BaseResource
     // user — Company Admin can create/update but not delete.
     protected static ?string $deletePermission = 'delete users';
 
+    protected static ?string $usageLimitKey = 'max_users';
+
     /**
      * Platform-only roles. A non-platform user (e.g. Company Admin, who holds
      * `manage users` for their own tenant) must never be able to grant these

@@ -5,8 +5,10 @@ namespace Tests\Feature;
 use App\Filament\Resources\ProductResource;
 use App\Models\Customer;
 use App\Models\CustomerModule;
+use App\Models\CustomerSubscription;
 use App\Models\License;
 use App\Models\Module;
+use App\Models\Product;
 use App\Models\User;
 use App\Services\AccessControlService;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -66,6 +68,41 @@ class AccessControlTest extends TestCase
         $this->assertTrue(ProductResource::can('viewAny'));
         $this->assertTrue(ProductResource::can('create'));
         $this->assertTrue(ProductResource::can('update'));
+    }
+
+    /** Business Rules §7's "Limit Rule": creation must be blocked once the
+     *  subscription's usage limit is reached, existing records stay
+     *  accessible. getEffectiveLimits() previously had zero call sites —
+     *  this was computed but never actually enforced anywhere. */
+    public function test_create_is_blocked_once_usage_limit_is_reached(): void
+    {
+        $user = $this->makeCustomerUser('full');
+
+        CustomerSubscription::create([
+            'customer_id' => $user->customer_id,
+            'subscription_no' => 'SUB-'.$user->customer_id,
+            'valid_from' => now()->subMonth(),
+            'valid_to' => now()->addMonth(),
+            'status' => 'active',
+            'max_products' => 1,
+            // CustomerSubscriptionObserver::syncEnabledModules() disables
+            // every CustomerModule not listed here — must include the
+            // module makeCustomerUser() already enabled.
+            'enabled_modules' => ['stock_inventory'],
+        ]);
+
+        Product::create([
+            'customer_id' => $user->customer_id,
+            'sku' => 'SKU1',
+            'product_name' => 'Widget',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($user);
+
+        $this->assertFalse(ProductResource::can('create'), 'Limit of 1 already reached — create must be blocked');
+        $this->assertTrue(ProductResource::can('viewAny'), 'Existing records must remain accessible');
+        $this->assertTrue(ProductResource::can('update'), 'Existing records must remain editable');
     }
 
     public function test_view_only_license_allows_read_but_blocks_write(): void

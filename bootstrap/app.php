@@ -67,5 +67,20 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // Explicit rather than left to Laravel's built-in default (which
+        // already covers 'password'/'password_confirmation') — extends it
+        // to the API-token/2FA fields this app also collects, so validation
+        // failures on those forms never flash the value back into the
+        // session (and from there, potentially into a session-inspecting
+        // log or debug tool).
+        $exceptions->dontFlash([
+            'current_password', 'password', 'password_confirmation',
+            'app_authentication_secret', 'api_token',
+        ]);
+
+        // No external error-tracking sink (Sentry/Bugsnag) — deliberate,
+        // not an oversight: none is configured for this deployment, and
+        // exceptions already log to storage/logs via the default 'stack'
+        // channel (see LOG_LEVEL/LOG_CHANNEL in .env). Add one here if a
+        // sink is ever provisioned.
     })->create();

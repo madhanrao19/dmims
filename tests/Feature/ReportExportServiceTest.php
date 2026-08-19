@@ -72,6 +72,29 @@ class ReportExportServiceTest extends TestCase
         $this->assertStringContainsString('application/pdf', $pdf->headers->get('Content-Type'));
     }
 
+    /** Every report definition must actually build without error — this
+     *  would have caught the 5 documented reports (Outstanding Balance,
+     *  Module Usage, Files by Box, Boxes by Location, External Movement)
+     *  that existed in MFS §13 but had no build() case at all. */
+    public function test_every_defined_report_builds_successfully(): void
+    {
+        $this->seedInventory();
+
+        foreach (array_keys(ReportExportService::definitions()) as $key) {
+            [$headers, $rows] = app(ReportExportService::class)->build($key);
+
+            $this->assertNotEmpty($headers, "Report '{$key}' returned empty headers");
+            $this->assertIsIterable($rows, "Report '{$key}' did not return an iterable of rows");
+            // Force evaluation of the (possibly lazy) collection to catch
+            // errors in the row-mapping closures, not just the headers.
+            iterator_to_array((function () use ($rows) {
+                foreach ($rows as $row) {
+                    yield $row;
+                }
+            })());
+        }
+    }
+
     public function test_platform_reports_are_hidden_from_customer_users(): void
     {
         $customerUser = User::factory()->create(['is_platform_user' => false, 'status' => 'active']);

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\BillingRecord;
 use App\Models\Customer;
+use App\Models\DocumentFile;
 use App\Models\Location;
 use App\Models\Notification;
 use App\Models\Product;
@@ -109,5 +110,42 @@ class NotificationGenerationTest extends TestCase
         $this->artisan('dmims:generate-notifications')->assertSuccessful();
 
         $this->assertSame(0, Notification::where('notification_type', 'low_stock')->count());
+    }
+
+    /** Business Rules §25: "Overdue returns" — a moved-out file past its
+     *  due_date must generate a notification. */
+    public function test_it_generates_an_overdue_return_notification_once(): void
+    {
+        $customer = $this->customer();
+        DocumentFile::create([
+            'customer_id' => $customer->id,
+            'file_barcode' => 'DOC-OVERDUE-1',
+            'title' => 'Lease Agreement',
+            'current_status' => 'moved_out',
+            'borrowed_by' => 'Legal',
+            'due_date' => now()->subDays(3)->toDateString(),
+        ]);
+
+        $this->artisan('dmims:generate-notifications')->assertSuccessful();
+        $this->artisan('dmims:generate-notifications')->assertSuccessful(); // must not duplicate
+
+        $this->assertSame(1, Notification::where('notification_type', 'overdue_return')->count());
+    }
+
+    public function test_file_not_yet_due_creates_no_overdue_notification(): void
+    {
+        $customer = $this->customer();
+        DocumentFile::create([
+            'customer_id' => $customer->id,
+            'file_barcode' => 'DOC-ONTIME-1',
+            'title' => 'Contract',
+            'current_status' => 'moved_out',
+            'borrowed_by' => 'Legal',
+            'due_date' => now()->addDays(3)->toDateString(),
+        ]);
+
+        $this->artisan('dmims:generate-notifications')->assertSuccessful();
+
+        $this->assertSame(0, Notification::where('notification_type', 'overdue_return')->count());
     }
 }

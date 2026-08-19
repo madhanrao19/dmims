@@ -14,6 +14,7 @@ class SecurityHeadersTest extends TestCase
         $response->assertHeader('X-Frame-Options', 'SAMEORIGIN');
         $response->assertHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
         $response->assertHeader('Permissions-Policy');
+        $response->assertHeader('Content-Security-Policy');
     }
 
     public function test_hsts_is_not_sent_over_plain_http(): void

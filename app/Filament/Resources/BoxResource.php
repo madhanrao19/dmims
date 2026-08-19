@@ -33,6 +33,8 @@ class BoxResource extends BaseResource
     // roles (which hold manage/view documents, not inventory) were locked out.
     protected static ?string $permission = 'manage documents';
 
+    protected static ?string $usageLimitKey = 'max_boxes';
+
     protected static string|\BackedEnum|null $navigationIcon = null;
 
     protected static string|\UnitEnum|null $navigationGroup = 'Document Tracking';

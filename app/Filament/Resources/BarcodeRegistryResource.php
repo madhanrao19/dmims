@@ -33,7 +33,10 @@ class BarcodeRegistryResource extends BaseResource
 
     protected static bool $applyCustomerScope = true;
 
-    protected static ?string $permission = 'manage inventory';
+    // Security & Access Control Matrix §12: View Registry is granted to
+    // every role, including Document Tracking User (who previously had no
+    // inventory permission at all and was fully blocked) and Viewer.
+    protected static ?string $permission = 'manage barcode';
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-qr-code';
 

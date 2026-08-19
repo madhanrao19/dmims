@@ -425,6 +425,22 @@ sudo supervisorctl update
 sudo supervisorctl start dmims-queue-worker:*
 ```
 
+### 10.3 Failed jobs (backups/exports can fail silently otherwise)
+`--tries=3` above means a queued backup or export job gets retried twice
+before landing in the `failed_jobs` table — nothing pages anyone when that
+happens, so check periodically (or wire into your monitoring, Part 11):
+```bash
+# List failed jobs
+php artisan queue:failed
+
+# Retry a specific failed job (or all of them)
+php artisan queue:retry <uuid>
+php artisan queue:retry all
+
+# Clear the failed-jobs table once resolved (does not touch queued jobs)
+php artisan queue:flush
+```
+
 ---
 
 ## **PART 11: SETUP MONITORING & LOGGING**

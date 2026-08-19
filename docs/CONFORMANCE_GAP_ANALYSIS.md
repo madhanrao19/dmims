@@ -332,11 +332,39 @@ patched).
   - **Deliberately not implemented (ambiguous in the doc, not guessed at)**
     — "Update User: Limited" for Company Supervisor (§6) doesn't specify
     which fields are restricted; Supervisor currently gets `view users`
-    only (no update at all) rather than a fabricated field-level rule. A
-    Content-Security-Policy header was not added alongside the other
-    security headers — a naive CSP is a common way to silently break
-    Livewire/Alpine's inline scripts; needs a tested, nonce-based policy
-    rather than a guess.
+    only (no update at all) rather than a fabricated field-level rule.
+- v2.1.27: closed the remaining Medium/Low findings from v2.1.26, and found
+  one more Critical while verifying the "Access Decision Flow" finding:
+  `EnsureCompanyActive` middleware had the identical `status='active'`-only
+  bug already fixed in `AccessControlService::companyActive()`, but in the
+  per-request middleware, not just the login gate — re-blocking every page
+  load for trial/suspended companies even after that earlier fix. Also
+  found usage-limit enforcement (`getEffectiveLimits()`) was completely
+  unimplemented (zero call sites) — added `BaseResource::$usageLimitKey`
+  and wired it into the four resources with documented limits.
+
+  Corrected two things in the v2.1.26 audit itself: the "8-step Access
+  Decision Flow" finding was largely wrong (per-request re-validation
+  already existed via the `business-access` middleware group — only usage
+  limits were actually missing), and 2 of the 5 "missing" notification
+  triggers were false positives (Import Failure/Export Completion were
+  already implemented in `ImportService`/`ExportService`, just not in the
+  scheduled command the audit checked).
+
+  Fixed: Barcode Registry permission (dedicated `manage/view barcode`
+  permissions), Payment updates + Overdue returns notifications, all 5
+  missing reports (Outstanding Balance, Module Usage, Files by Box, Boxes
+  by Location, External Movement), dead-letter/failed-job docs, explicit
+  exception-handling `dontFlash` list, dependency updates within existing
+  majors. Also implemented and **live-verified** (not guessed) a
+  Content-Security-Policy header — logged into a disposable admin panel
+  instance and exercised login/dashboard/CRUD-create/Livewire-AJAX-search
+  with zero console CSP violations before shipping it.
+
+  **No findings remain open** from the full-app doc-conformance audit
+  except "Update User: Limited" for Company Supervisor, still deliberately
+  unimplemented — the doc doesn't specify which fields, and a fabricated
+  field-level rule would be guessing, not fixing.
 
 ---
 

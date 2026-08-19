@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\BillingRecord;
 use App\Models\CustomerSubscription;
+use App\Models\DocumentFile;
 use App\Models\License;
 use App\Models\Product;
 use App\Models\ProductLocationStock;
@@ -13,15 +14,19 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 
 /**
- * Generates proactive operational alerts (PRD §16 / TDD §24): low stock,
- * subscription/license expiry and overdue billing. Idempotent — uses
- * notifyOnce so repeated runs do not duplicate open alerts.
+ * Generates proactive operational alerts (PRD §16 / TDD §24; Business Rules
+ * §25): low stock, subscription/license expiry, overdue billing, and
+ * overdue returns. Idempotent — uses notifyOnce so repeated runs do not
+ * duplicate open alerts. ("Payment updates" and "Import failures"/"Export
+ * completion" from the same doc section are event-driven instead — fired
+ * from PaymentService/ImportService/ExportService at the point of the
+ * event, not scanned for here.)
  */
 class GenerateNotifications extends Command
 {
     protected $signature = 'dmims:generate-notifications {--expiry-days=14 : Days ahead to warn about expiries}';
 
-    protected $description = 'Generate operational notifications (low stock, expiries, overdue billing).';
+    protected $description = 'Generate operational notifications (low stock, expiries, overdue billing/returns).';
 
     public function handle(NotificationService $notifications): int
     {
@@ -30,7 +35,8 @@ class GenerateNotifications extends Command
         $created = $this->lowStock($notifications)
             + $this->subscriptionExpiry($notifications, $days)
             + $this->licenseExpiry($notifications, $days)
-            + $this->billingOverdue($notifications);
+            + $this->billingOverdue($notifications)
+            + $this->overdueReturns($notifications);
 
         $this->info("Generated {$created} notification(s).");
 
@@ -153,6 +159,33 @@ class GenerateNotifications extends Command
                     "Invoice {$invoice->invoice_no} was due on ".Carbon::parse($invoice->due_date)->toDateString().
                     " and has an outstanding balance of {$invoice->outstandingAmount()}.",
                     $invoice->customer_id,
+                );
+                $count += $made ? 1 : 0;
+            });
+
+        return $count;
+    }
+
+    /** Business Rules §25: "Overdue returns" — a moved-out file whose
+     *  due_date has passed and hasn't been returned. Boxes have no
+     *  borrow/due_date concept in the schema, only files do. */
+    private function overdueReturns(NotificationService $n): int
+    {
+        $count = 0;
+
+        DocumentFile::withoutGlobalScopes()
+            ->where('current_status', 'moved_out')
+            ->whereNotNull('due_date')
+            ->whereDate('due_date', '<', Carbon::today())
+            ->get()
+            ->each(function ($file) use ($n, &$count) {
+                $date = Carbon::parse($file->due_date)->toDateString();
+                $made = $n->notifyOnce(
+                    'overdue_return',
+                    "Overdue return: {$file->title}",
+                    "File {$file->file_barcode} was due back on {$date}".
+                    ($file->borrowed_by ? " (borrowed by {$file->borrowed_by})" : '').'.',
+                    $file->customer_id,
                 );
                 $count += $made ? 1 : 0;
             });

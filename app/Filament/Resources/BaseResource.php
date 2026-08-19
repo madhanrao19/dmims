@@ -25,6 +25,15 @@ abstract class BaseResource extends Resource
      */
     protected static ?string $deletePermission = null;
 
+    /**
+     * Key into AccessControlService::getEffectiveLimits() (e.g. 'max_users',
+     * 'max_products') that caps how many rows a tenant may create for this
+     * resource. Business Rules §7's "Limit Rule" requires this — it existed
+     * as a computed value but was never actually enforced anywhere. Left
+     * null for resources with no documented limit.
+     */
+    protected static ?string $usageLimitKey = null;
+
     /** Actions that modify data; blocked when the license is view-only. */
     protected const WRITE_ACTIONS = [
         'create', 'update', 'delete', 'deleteAny',
@@ -42,6 +51,32 @@ abstract class BaseResource extends Resource
         }
 
         return static::$permission;
+    }
+
+    /**
+     * Whether creating another row would exceed the tenant's subscription
+     * limit for this resource (Business Rules §7's "Limit Rule": prevent
+     * new records once the limit is reached, existing records stay
+     * accessible). No-op for resources without $usageLimitKey set.
+     */
+    protected static function usageLimitReached($user): bool
+    {
+        if (! static::$usageLimitKey || ! $user->customer_id) {
+            return false;
+        }
+
+        $limit = app(AccessControlService::class)
+            ->getEffectiveLimits($user->customer_id)[static::$usageLimitKey] ?? null;
+
+        if ($limit === null) {
+            return false;
+        }
+
+        $current = static::getModel()::withoutGlobalScopes()
+            ->where('customer_id', $user->customer_id)
+            ->count();
+
+        return $current >= $limit;
     }
 
     public static function getEloquentQuery(): Builder
@@ -130,6 +165,10 @@ abstract class BaseResource extends Resource
             // Writes require the manage permission (or the stricter delete
             // permission, when set) and a non-view-only license.
             if (! $user->can(static::permissionFor($action))) {
+                return false;
+            }
+
+            if ($action === 'create' && static::usageLimitReached($user)) {
                 return false;
             }
 

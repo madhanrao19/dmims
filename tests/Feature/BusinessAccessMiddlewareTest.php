@@ -77,6 +77,44 @@ class BusinessAccessMiddlewareTest extends TestCase
         }
     }
 
+    /** Business Rules §4: same reasoning as EnsureCompanyActive's fix — only
+     *  Cancelled/Archived companies are blocked; Trial/Active/Near
+     *  Expiry/Expired/Suspended all get through this middleware (further
+     *  restriction, if any, happens via the license layer). This previously
+     *  hard-blocked every non-'active' company status on every request. */
+    public function test_user_access_across_company_statuses(): void
+    {
+        $allowed = ['trial', 'active', 'near_expiry', 'expired', 'suspended'];
+        $blocked = ['cancelled', 'archived'];
+
+        foreach ([...$allowed, ...$blocked] as $status) {
+            $customer = Customer::create([
+                'company_name' => "Co-{$status}",
+                'company_code' => strtoupper(substr($status, 0, 3)).rand(100, 999),
+                'status' => $status,
+            ]);
+
+            CustomerSubscription::create([
+                'customer_id' => $customer->id,
+                'subscription_no' => "SUB-{$status}",
+                'valid_from' => now()->subMonth(),
+                'valid_to' => now()->addMonth(),
+                'status' => 'active',
+            ]);
+
+            $user = User::factory()->create([
+                'customer_id' => $customer->id,
+                'is_platform_user' => false,
+                'status' => 'active',
+            ]);
+
+            $response = $this->actingAs($user)->get('/admin');
+
+            $expected = in_array($status, $allowed, true) ? 200 : 403;
+            $response->assertStatus($expected, "Expected {$expected} for company status '{$status}'");
+        }
+    }
+
     public function test_user_with_active_subscription_is_not_blocked(): void
     {
         $customer = Customer::create(['company_name' => 'Active Co', 'company_code' => 'ACT', 'status' => 'active']);

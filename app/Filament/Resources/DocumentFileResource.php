@@ -30,6 +30,8 @@ class DocumentFileResource extends BaseResource
 
     protected static ?string $permission = 'manage documents';
 
+    protected static ?string $usageLimitKey = 'max_document_files';
+
     protected static string|\BackedEnum|null $navigationIcon = null;
 
     protected static string|\UnitEnum|null $navigationGroup = 'Documents';

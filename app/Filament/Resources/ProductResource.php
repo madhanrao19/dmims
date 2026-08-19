@@ -29,6 +29,8 @@ class ProductResource extends BaseResource
     // hold "manage inventory" for create/update — may not.
     protected static ?string $deletePermission = 'delete inventory';
 
+    protected static ?string $usageLimitKey = 'max_products';
+
     protected static string|\BackedEnum|null $navigationIcon = null;
 
     protected static string|\UnitEnum|null $navigationGroup = 'Stock Inventory';

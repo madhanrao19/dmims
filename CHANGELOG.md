@@ -4,6 +4,90 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.27] - 2026-08-19
+
+### Fixed — remaining Medium/Low findings + one newly-discovered Critical
+
+**Critical (found while verifying finding #17, not in the original audit)**
+- **`EnsureCompanyActive` middleware had the exact same bug as
+  `AccessControlService::companyActive()`** — only allowed company
+  `status='active'`, re-blocking every request for trial/suspended
+  companies on every page load even after the earlier login fix. This
+  middleware runs on every admin/API request via the `business-access`
+  group; the earlier fix only covered the login gate, not this one. Same
+  fix applied: only `cancelled`/`archived` block.
+- **Usage-limit enforcement was completely unimplemented.**
+  `AccessControlService::getEffectiveLimits()` had zero call sites
+  anywhere — Business Rules §7's "Limit Rule" (block creation once a
+  subscription's max_users/max_products/max_document_files/max_boxes is
+  reached) was computed but never enforced. Added
+  `BaseResource::$usageLimitKey` (mirrors `$deletePermission`) and wired it
+  into `UserResource`, `ProductResource`, `DocumentFileResource`,
+  `BoxResource`.
+
+**Corrections to the original audit** (verified, not assumed)
+- Finding #17 ("8-step Access Decision Flow not fully re-validated per
+  request") was largely wrong — `EnsureUserIsActive`/`EnsureCompanyActive`/
+  `EnsureSubscriptionActive` already re-check per request via the
+  `business-access` middleware group. Only usage limits were genuinely
+  missing (now fixed above).
+- 2 of the 5 "missing notification triggers" were false positives — Import
+  Failure and Export Completion were already implemented directly in
+  `ImportService`/`ExportService`, just not in the scheduled
+  `GenerateNotifications` command the earlier audit only checked. Real gap
+  was Payment updates and Overdue returns, both fixed below.
+
+**Medium**
+- Barcode Registry unreachable for Document Tracking User: added dedicated
+  `manage barcode`/`view barcode` permissions (previously folded into
+  `manage inventory`, which Document Tracking User never held) matching
+  the doc's near-universal View Registry grant.
+- "Payment updates" notification: `PaymentService::recordPayment()` now
+  fires one, event-driven (not scanned for).
+- "Overdue returns" notification: new `GenerateNotifications::overdueReturns()`
+  — a moved-out file past its due_date.
+- 5 of 19 documented reports were missing entirely (no `build()` case):
+  added Outstanding Balance, Module Usage, Files by Box, Boxes by
+  Location, External Movement to `ReportExportService`.
+- Documented dead-letter/failed-job handling in `DEPLOYMENT_GUIDE.md`
+  (`queue:failed` / `queue:retry` / `queue:flush`).
+- `bootstrap/app.php`'s exception handling: explicit `dontFlash` list
+  (extends Laravel's password default to API-token/2FA fields) and a
+  comment recording the deliberate decision not to add an external
+  error-tracking sink.
+
+**Low**
+- Updated composer/npm dependencies within existing major versions
+  (Filament 5.6→5.7, Laravel 13.18→13.26, Sanctum, Pint, PHPUnit,
+  spatie/laravel-permission, Vite, Tailwind, Playwright, etc.). Left
+  `openspout/openspout` (4→5) alone — a major bump, evaluated separately
+  rather than bundled into routine hygiene.
+
+**Deliberately deferred item resolved**
+- Added a Content-Security-Policy header — same-origin scripts/styles/
+  connections, no framing. Not nonce-based (Filament 5's Livewire/Alpine
+  stack needs inline script/style support throughout), but genuinely
+  restrictive compared to no CSP at all. **Verified live**, not guessed:
+  logged into a disposable admin panel instance, exercised login,
+  dashboard, and a CRUD create page with Livewire's AJAX search, checked
+  the browser console — zero CSP violations.
+
+**Still deliberately unimplemented** — Company Supervisor's "Update User:
+Limited" (§6): the doc doesn't specify which fields are restricted, so this
+stays `view users`-only rather than a fabricated field-level rule.
+
+Regression tests added for every fix (usage limits, company-status access
+across all 7 statuses, both new notification triggers, a
+build-every-defined-report test that would have caught the 5 missing
+reports, updated CSP assertion). Full suite (141/141), Pint, and Larastan
+verified green throughout — including catching and fixing a genuine test
+bug of my own (a `CustomerSubscriptionObserver` side effect that disables
+unlisted `CustomerModule` rows, which broke my first attempt at the
+usage-limit test in a way that had nothing to do with the feature itself).
+
+No findings remain open from the full-app doc-conformance audit except the
+one deliberately-ambiguous item above.
+
 ## [2.1.26] - 2026-08-19
 
 ### Fixed — full-app doc-conformance audit (Critical + High findings)

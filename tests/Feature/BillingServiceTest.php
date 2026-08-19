@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Customer;
+use App\Models\Notification;
 use App\Services\BillingService;
 use App\Services\PaymentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -52,6 +53,10 @@ class BillingServiceTest extends TestCase
         $this->assertSame('paid', $invoice->payment_status);
         $this->assertEqualsWithDelta(0.0, $invoice->outstandingAmount(), 0.001);
         $this->assertDatabaseHas('billing_logs', ['billing_record_id' => $invoice->id, 'action' => 'payment_recorded']);
+
+        // Business Rules §25: "Payment updates" is a documented notification
+        // trigger — event-driven from PaymentService, not a scheduled scan.
+        $this->assertSame(2, Notification::where('notification_type', 'payment_recorded')->count());
     }
 
     public function test_issue_and_cancel_transitions(): void

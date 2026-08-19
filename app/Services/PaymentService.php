@@ -13,7 +13,10 @@ use RuntimeException;
  */
 class PaymentService
 {
-    public function __construct(private BillingService $billing) {}
+    public function __construct(
+        private BillingService $billing,
+        private NotificationService $notifications,
+    ) {}
 
     public function recordPayment(BillingRecord $record, array $data): BillingPayment
     {
@@ -57,6 +60,16 @@ class PaymentService
             'amount' => $payment->amount,
             'method' => $payment->payment_method,
         ]);
+
+        // Business Rules §25: "Payment updates" is one of the documented
+        // notification triggers. Event-driven (not a scheduled scan like
+        // low-stock/expiry) since a payment is a discrete, one-off event.
+        $this->notifications->notify(
+            'payment_recorded',
+            "Payment received: {$record->invoice_no}",
+            "Payment {$payment->payment_no} of {$payment->amount} recorded against invoice {$record->invoice_no}.",
+            $record->customer_id,
+        );
 
         return $payment;
     }

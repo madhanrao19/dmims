@@ -19,13 +19,27 @@ use Symfony\Component\HttpFoundation\Response;
  * browsers to force HTTPS for the LAN host too, breaking that documented
  * access path.
  *
- * No Content-Security-Policy here deliberately — Livewire/Alpine's inline
- * script usage needs a carefully tested nonce-based policy to avoid breaking
- * the admin panel; a naive CSP is a common way to silently break a Filament
- * app, so this is left as a follow-up rather than shipped unverified.
+ * Content-Security-Policy is intentionally NOT nonce-based/strict: Filament
+ * 5's Livewire/Alpine stack relies on inline <script>/<style> and eval-like
+ * Alpine expression evaluation throughout the admin panel, and a strict
+ * policy without wiring nonces through every Blade/Livewire render breaks
+ * it outright. This is the pragmatic middle ground — same-origin only for
+ * scripts/styles/connections, no framing, no plugins — verified against a
+ * live admin panel session (login, dashboard, CRUD create/edit, search) with
+ * zero CSP violations in the browser console before being added here.
  */
 class SecurityHeaders
 {
+    private const CSP = "default-src 'self'; ".
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; ".
+        "style-src 'self' 'unsafe-inline'; ".
+        "img-src 'self' data:; ".
+        "font-src 'self' data:; ".
+        "connect-src 'self'; ".
+        "object-src 'none'; ".
+        "base-uri 'self'; ".
+        "frame-ancestors 'self'";
+
     public function handle(Request $request, Closure $next): Response
     {
         $response = $next($request);
@@ -34,6 +48,7 @@ class SecurityHeaders
         $response->headers->set('X-Frame-Options', 'SAMEORIGIN');
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
         $response->headers->set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+        $response->headers->set('Content-Security-Policy', self::CSP);
 
         if ($request->secure()) {
             $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');

@@ -32,6 +32,7 @@ class RolesAndPermissionsSeeder extends Seeder
         'manage billing',
         'manage settings',
         'manage modules',
+        'manage barcode',
     ];
 
     public const VIEW_PERMISSIONS = [
@@ -46,6 +47,7 @@ class RolesAndPermissionsSeeder extends Seeder
         'view modules',
         'view reports',
         'view audit logs',
+        'view barcode',
     ];
 
     /**
@@ -71,20 +73,21 @@ class RolesAndPermissionsSeeder extends Seeder
         'Datamation Management' => [
             'view customers', 'view users', 'view subscriptions',
             'view licensing', 'view billing', 'view reports', 'view audit logs',
+            'view barcode',
         ],
         'Company Admin' => [
             'manage users', 'delete inventory', 'manage inventory', 'manage documents',
-            'view billing', 'view subscriptions', 'view licensing', 'view reports',
-            'view customers', 'view audit logs',
+            'manage barcode', 'view billing', 'view subscriptions', 'view licensing',
+            'view reports', 'view customers', 'view audit logs',
         ],
         'Company Supervisor' => [
-            'manage inventory', 'manage documents',
+            'manage inventory', 'manage documents', 'manage barcode',
             'view billing', 'view subscriptions', 'view licensing', 'view reports',
             'view customers', 'view users',
         ],
-        'Stock Inventory User' => ['manage inventory', 'view reports'],
-        'Document Tracking User' => ['manage documents', 'view reports'],
-        'Viewer' => ['view inventory', 'view documents', 'view reports'],
+        'Stock Inventory User' => ['manage inventory', 'manage barcode', 'view reports'],
+        'Document Tracking User' => ['manage documents', 'manage barcode', 'view reports'],
+        'Viewer' => ['view inventory', 'view documents', 'view reports', 'view barcode'],
     ];
 
     public function run(): void
