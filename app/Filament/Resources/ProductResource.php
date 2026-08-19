@@ -24,6 +24,11 @@ class ProductResource extends BaseResource
 
     protected static ?string $permission = 'manage inventory';
 
+    // Security & Access Control Matrix §10: Company Admin and SA may delete
+    // a product, but Company Supervisor and Stock Inventory User — who both
+    // hold "manage inventory" for create/update — may not.
+    protected static ?string $deletePermission = 'delete inventory';
+
     protected static string|\BackedEnum|null $navigationIcon = null;
 
     protected static string|\UnitEnum|null $navigationGroup = 'Stock Inventory';

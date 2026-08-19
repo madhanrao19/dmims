@@ -158,10 +158,18 @@ class AccessControlService
         return self::MODE_FULL;
     }
 
+    /**
+     * Whether the company is in a status that permits login at all. Trial,
+     * Active, and Near Expiry get normal access (Business Rules §4); Expired
+     * is "controlled by subscription grace period and license" and Suspended
+     * gets "view-only access if permitted by license" — both are meant to
+     * degrade via the license/subscription layers (getEffectiveAccessMode),
+     * not be hard-blocked here. Only Cancelled and Archived are terminal.
+     */
     private function companyActive(int $customerId): bool
     {
         return Customer::whereKey($customerId)
-            ->where('status', 'active')
+            ->whereNotIn('status', ['cancelled', 'archived'])
             ->exists();
     }
 

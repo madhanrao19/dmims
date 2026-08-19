@@ -45,9 +45,22 @@ class RolesAndPermissionsSeeder extends Seeder
         'view settings',
         'view modules',
         'view reports',
+        'view audit logs',
     ];
 
-    public const PERMISSIONS = [...self::MANAGE_PERMISSIONS, ...self::VIEW_PERMISSIONS];
+    /**
+     * Stricter than the matching `manage X` — some roles may create/update a
+     * resource but not delete it (Security & Access Control Matrix §10, §6).
+     * BaseResource::permissionFor() checks these for delete actions instead
+     * of the resource's `manage X` permission, when the resource sets
+     * $deletePermission.
+     */
+    public const DELETE_PERMISSIONS = [
+        'delete users',
+        'delete inventory',
+    ];
+
+    public const PERMISSIONS = [...self::MANAGE_PERMISSIONS, ...self::VIEW_PERMISSIONS, ...self::DELETE_PERMISSIONS];
 
     /**
      * Role => permissions. '*' grants everything. "View-only" roles
@@ -57,15 +70,17 @@ class RolesAndPermissionsSeeder extends Seeder
         'Datamation Super Admin' => '*',
         'Datamation Management' => [
             'view customers', 'view users', 'view subscriptions',
-            'view licensing', 'view billing', 'view reports',
+            'view licensing', 'view billing', 'view reports', 'view audit logs',
         ],
         'Company Admin' => [
-            'manage users', 'manage inventory', 'manage documents', 'manage billing',
-            'view subscriptions', 'view licensing', 'view reports',
+            'manage users', 'delete inventory', 'manage inventory', 'manage documents',
+            'view billing', 'view subscriptions', 'view licensing', 'view reports',
+            'view customers', 'view audit logs',
         ],
         'Company Supervisor' => [
             'manage inventory', 'manage documents',
             'view billing', 'view subscriptions', 'view licensing', 'view reports',
+            'view customers', 'view users',
         ],
         'Stock Inventory User' => ['manage inventory', 'view reports'],
         'Document Tracking User' => ['manage documents', 'view reports'],

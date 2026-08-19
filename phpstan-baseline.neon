@@ -67,6 +67,24 @@ parameters:
 			path: app/Filament/Resources/BoxResource.php
 
 		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$current_location_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Resources/BoxResource.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$source_origin\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Resources/BoxResource.php
+
+		-
+			message: '#^Parameter \#1 \$box of method App\\Services\\DocumentMovementService\:\:receiveInBox\(\) expects App\\Models\\Box, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
+			count: 1
+			path: app/Filament/Resources/BoxResource.php
+
+		-
 			message: '#^Using nullsafe property access "\?\-\>color" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
 			count: 1
@@ -75,6 +93,18 @@ parameters:
 		-
 			message: '#^Access to an undefined property App\\Models\\DocumentFile\:\:\$tags\.$#'
 			identifier: property.notFound
+			count: 1
+			path: app/Filament/Resources/DocumentFileResource.php
+
+		-
+			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$current_box_id\.$#'
+			identifier: property.notFound
+			count: 1
+			path: app/Filament/Resources/DocumentFileResource.php
+
+		-
+			message: '#^Parameter \#1 \$file of method App\\Services\\DocumentMovementService\:\:receiveInFile\(\) expects App\\Models\\DocumentFile, Illuminate\\Database\\Eloquent\\Model\|null given\.$#'
+			identifier: argument.type
 			count: 1
 			path: app/Filament/Resources/DocumentFileResource.php
 

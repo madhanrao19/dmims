@@ -238,6 +238,7 @@ class DocumentFileResource extends BaseResource
 namespace App\Filament\Resources\DocumentFileResource\Pages;
 
 use App\Filament\Resources\DocumentFileResource;
+use App\Services\DocumentMovementService;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Resources\Pages\ListRecords;
@@ -250,6 +251,17 @@ class ListDocumentFiles extends ListRecords
 class CreateDocumentFile extends CreateRecord
 {
     protected static string $resource = DocumentFileResource::class;
+
+    /**
+     * Route creation through the same guided-workflow logging as every other
+     * document movement (DocumentMovementService::receiveInFile), rather
+     * than leaving the file's first event unlogged and the containing box's
+     * current_file_count un-incremented.
+     */
+    protected function afterCreate(): void
+    {
+        app(DocumentMovementService::class)->receiveInFile($this->record, $this->record->current_box_id);
+    }
 }
 
 class EditDocumentFile extends EditRecord

@@ -7,6 +7,7 @@ use App\Models\CustomerSubscription;
 use App\Models\License;
 use App\Models\Product;
 use App\Models\ProductLocationStock;
+use App\Models\StockAlert;
 use App\Services\NotificationService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
@@ -56,6 +57,32 @@ class GenerateNotifications extends Command
                             $product->customer_id,
                         );
                         $count += $made ? 1 : 0;
+
+                        // The StockAlertResource admin screen reads this table
+                        // directly — it was never written to (dead feature),
+                        // only the generic Notification above fired.
+                        StockAlert::withoutGlobalScopes()->updateOrCreate(
+                            [
+                                'customer_id' => $product->customer_id,
+                                'product_id' => $product->id,
+                                'alert_type' => 'low_stock',
+                                'status' => 'open',
+                            ],
+                            [
+                                'threshold_quantity' => $product->reorder_level,
+                                'current_quantity' => $available,
+                            ],
+                        );
+                    } else {
+                        // Stock recovered above the reorder level — close any
+                        // open alert for this product rather than leaving it
+                        // stale forever.
+                        StockAlert::withoutGlobalScopes()
+                            ->where('customer_id', $product->customer_id)
+                            ->where('product_id', $product->id)
+                            ->where('alert_type', 'low_stock')
+                            ->where('status', 'open')
+                            ->update(['status' => 'closed', 'current_quantity' => $available]);
                     }
                 }
             });

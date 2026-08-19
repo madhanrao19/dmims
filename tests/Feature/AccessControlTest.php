@@ -105,6 +105,37 @@ class AccessControlTest extends TestCase
         $this->assertTrue($access->canLogin($user));
     }
 
+    /** Business Rules §4: Trial/Active/Near Expiry/Expired/Suspended companies
+     *  all permit login (degrading via the license layer where applicable);
+     *  only Cancelled/Archived are terminal. */
+    public function test_can_login_across_company_statuses(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $access = app(AccessControlService::class);
+
+        $allowed = ['trial', 'active', 'near_expiry', 'expired', 'suspended'];
+        $blocked = ['cancelled', 'archived'];
+
+        foreach ([...$allowed, ...$blocked] as $status) {
+            $customer = Customer::create([
+                'company_name' => "Co-{$status}",
+                'company_code' => strtoupper(substr($status, 0, 3)).rand(100, 999),
+                'status' => $status,
+            ]);
+            $user = User::factory()->create([
+                'customer_id' => $customer->id,
+                'is_platform_user' => false,
+                'status' => 'active',
+            ]);
+
+            $this->assertSame(
+                in_array($status, $allowed, true),
+                $access->canLogin($user),
+                "canLogin() mismatch for company status '{$status}'"
+            );
+        }
+    }
+
     public function test_platform_user_is_never_restricted_by_license(): void
     {
         $access = app(AccessControlService::class);

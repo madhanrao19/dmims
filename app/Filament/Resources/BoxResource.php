@@ -198,6 +198,7 @@ class BoxResource extends BaseResource
 namespace App\Filament\Resources\BoxResource\Pages;
 
 use App\Filament\Resources\BoxResource;
+use App\Services\DocumentMovementService;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Resources\Pages\ListRecords;
@@ -210,6 +211,17 @@ class ListBoxes extends ListRecords
 class CreateBox extends CreateRecord
 {
     protected static string $resource = BoxResource::class;
+
+    /** Same reasoning as CreateDocumentFile::afterCreate() — log the box's
+     *  first event through DocumentMovementService::receiveInBox(). */
+    protected function afterCreate(): void
+    {
+        app(DocumentMovementService::class)->receiveInBox(
+            $this->record,
+            $this->record->current_location_id,
+            $this->record->source_origin,
+        );
+    }
 }
 
 class EditBox extends EditRecord

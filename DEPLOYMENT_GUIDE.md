@@ -148,6 +148,11 @@ APP_ENV=production
 APP_DEBUG=false
 APP_URL=https://your-domain.com
 
+# Debug-level logging writes verbose/sensitive request data to
+# storage/logs/laravel.log indefinitely — never leave this at the
+# .env.example default of "debug" in production.
+LOG_LEVEL=error
+
 # Database (MariaDB — use the mysql driver; it is wire-compatible)
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1

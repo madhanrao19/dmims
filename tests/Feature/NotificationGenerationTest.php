@@ -8,6 +8,7 @@ use App\Models\Location;
 use App\Models\Notification;
 use App\Models\Product;
 use App\Models\ProductLocationStock;
+use App\Models\StockAlert;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -55,6 +56,17 @@ class NotificationGenerationTest extends TestCase
             'notification_type' => 'low_stock',
             'customer_id' => $customer->id,
         ]);
+
+        // StockAlertResource reads this table directly — must actually be
+        // written, not just the generic Notification above.
+        $this->assertSame(1, StockAlert::where('status', 'open')->where('product_id', $product->id)->count());
+
+        // Stock recovers above the reorder level — the open alert must close.
+        ProductLocationStock::where('product_id', $product->id)->update(['available_quantity' => 100]);
+        $this->artisan('dmims:generate-notifications')->assertSuccessful();
+
+        $this->assertSame(0, StockAlert::where('status', 'open')->where('product_id', $product->id)->count());
+        $this->assertSame(1, StockAlert::where('status', 'closed')->where('product_id', $product->id)->count());
     }
 
     public function test_it_generates_a_billing_overdue_notification(): void

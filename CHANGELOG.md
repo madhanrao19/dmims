@@ -4,6 +4,89 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.26] - 2026-08-19
+
+### Fixed — full-app doc-conformance audit (Critical + High findings)
+
+A 3-agent council audit cross-checked every module and role against
+`docs/DMIMS Business Rules & Functional Specification.md`,
+`docs/DMIMS Master Functional Specification (MFS).md`, and
+`docs/DMIMS Security & Access Control Matrix.md`. 12 Critical/High findings
+fixed; Medium/Low findings and two ambiguous doc gaps are tracked in
+`docs/CONFORMANCE_GAP_ANALYSIS.md`.
+
+**Critical**
+- **Trial customers could not log in at all.**
+  `AccessControlService::companyActive()` only accepted `status='active'`,
+  but new customers default to `'trial'` and Business Rules §4 says Trial
+  gets normal access. Now only `cancelled`/`archived` (the two genuinely
+  terminal statuses) block login; `expired`/`suspended` correctly defer to
+  the license layer's grace/view-only handling, per the same rule.
+- **Every request 403'd for trial/expired_grace subscriptions.**
+  `EnsureSubscriptionActive` only allowed `active`/`near_expiry`. Business
+  Rules §7 is explicit that "a subscription does not directly determine
+  whether the customer can technically use the system" — that's the
+  license's job. Now only `cancelled` blocks.
+- **`StockAlert` was a fully dead feature.** Table and admin resource
+  existed; nothing ever wrote to it. `dmims:generate-notifications` now
+  opens/updates a `StockAlert` row alongside the existing generic
+  `Notification`, and closes it when stock recovers above the reorder
+  level.
+- **Company Admin could delete users** (doc: SA-only). Added a
+  `BaseResource::$deletePermission` concept — a resource can require a
+  stricter permission for delete specifically instead of reusing `$permission`
+  for every write. `UserResource` now requires the new `delete users`
+  permission (SA only) for delete actions.
+- **Company Admin could create/edit/cancel billing records** (doc: SA-only;
+  Admin gets View + Export only). Removed `manage billing` from Company
+  Admin's seeded permissions, replaced with `view billing`.
+- **Audit logs were visible to Supervisor/Stock/Document/Viewer** (doc: only
+  SA/Management/Company-Admin-own-company). `AuditLogResource` was gated on
+  the generic `view reports` permission every role holds; now gated on a
+  new `view audit logs` permission held only by those three.
+- **Company Supervisor and Stock Inventory User could delete Products**
+  (doc: Admin/SA only). `ProductResource` now requires the new
+  `delete inventory` permission for delete actions.
+
+**High**
+- **Box/File creation bypassed the guided Receive-In workflow.**
+  `DocumentMovementService::receiveInFile()`/`receiveInBox()` were dead
+  code — nothing called them, so a new box/file's first event was never
+  logged and the containing box's `current_file_count` was never
+  incremented. `CreateBox`/`CreateDocumentFile` now call them from
+  `afterCreate()`.
+- **Company Admin/Supervisor had no way to view their own company
+  record** (doc: "View Customers: Own Company"). `CustomerResource` was
+  Super-Admin-only. Added `view customers` to both roles and a
+  primary-key-based tenant scope on `CustomerResource` (Customer has no
+  `customer_id` column of its own, so `BaseResource`'s standard scoping
+  mechanism doesn't apply — scoped by `whereKey($user->customer_id)`
+  instead, plus a matching `can()` override for direct-URL access).
+- **Company Supervisor had zero user-management access** (doc: View =
+  Own). Added `view users` to Company Supervisor. ("Update User: Limited"
+  is left unimplemented — the doc doesn't specify which fields are
+  restricted; flagged rather than guessed, see gap analysis.)
+- **No security headers anywhere** (documented as required in the Ops
+  guide and `DEFINITION_OF_DONE.md`). Added `SecurityHeaders` middleware:
+  `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`,
+  `Permissions-Policy` unconditionally; `Strict-Transport-Security` only
+  when the request is actually HTTPS (this server is intentionally
+  reachable via plain HTTP on the LAN too — see `SESSION_SECURE_COOKIE`'s
+  comment in `DEPLOYMENT_GUIDE.md`). No CSP — a naive policy is a common
+  way to silently break Livewire/Alpine's inline scripts; left as a
+  deliberate follow-up rather than shipped unverified.
+- **`LOG_LEVEL=debug` had no production override documented.** Added to
+  `DEPLOYMENT_GUIDE.md`'s environment-config checklist and commented in
+  `.env.example`.
+
+Regression tests added: `AccessControlTest::test_can_login_across_company_statuses`,
+`BusinessAccessMiddlewareTest::test_user_with_trial_or_expired_grace_subscription_is_not_blocked`,
+`NotificationGenerationTest` (StockAlert open/close assertions),
+`DocumentOperationsTest::test_creating_a_box_logs_a_movement` /
+`test_creating_a_document_file_logs_a_movement_and_increments_box_count`,
+`SecurityHeadersTest`. Full suite (136/136), Pint, and Larastan verified
+green throughout.
+
 ## [2.1.25] - 2026-08-18
 
 ### Fixed

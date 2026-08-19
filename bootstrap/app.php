@@ -8,6 +8,7 @@ use App\Http\Middleware\EnsureSubscriptionActive;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\InjectPwaScript;
 use App\Http\Middleware\LogUserActivity;
+use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetCompanyContext;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -42,6 +43,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->append([
+            SecurityHeaders::class,
             LogUserActivity::class,
             InjectPwaScript::class,
         ]);

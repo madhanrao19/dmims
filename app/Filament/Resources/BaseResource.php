@@ -16,12 +16,33 @@ abstract class BaseResource extends Resource
 
     protected static ?string $permission = null;
 
+    /**
+     * Optional stricter permission required for delete actions specifically.
+     * The Security & Access Control Matrix sometimes allows a role to
+     * create/update a resource but not delete it (e.g. Company Supervisor can
+     * manage inventory but not delete products) — $permission alone can't
+     * express that distinction. Falls back to $permission when null.
+     */
+    protected static ?string $deletePermission = null;
+
     /** Actions that modify data; blocked when the license is view-only. */
     protected const WRITE_ACTIONS = [
         'create', 'update', 'delete', 'deleteAny',
         'restore', 'restoreAny', 'forceDelete', 'forceDeleteAny',
         'reorder', 'replicate',
     ];
+
+    protected const DELETE_ACTIONS = ['delete', 'deleteAny', 'forceDelete', 'forceDeleteAny'];
+
+    /** The permission that gates $action, honouring $deletePermission for deletes. */
+    protected static function permissionFor(string|UnitEnum $action): string
+    {
+        if (in_array($action, static::DELETE_ACTIONS, true) && filled(static::$deletePermission)) {
+            return static::$deletePermission;
+        }
+
+        return static::$permission;
+    }
 
     public static function getEloquentQuery(): Builder
     {
@@ -86,7 +107,7 @@ abstract class BaseResource extends Resource
             }
 
             if (in_array($action, static::WRITE_ACTIONS, true)) {
-                return $user->can(static::$permission);
+                return $user->can(static::permissionFor($action));
             }
 
             return true;
@@ -106,8 +127,9 @@ abstract class BaseResource extends Resource
         $isWrite = in_array($action, static::WRITE_ACTIONS, true);
 
         if ($isWrite) {
-            // Writes require the manage permission and a non-view-only license.
-            if (! $user->can(static::$permission)) {
+            // Writes require the manage permission (or the stricter delete
+            // permission, when set) and a non-view-only license.
+            if (! $user->can(static::permissionFor($action))) {
                 return false;
             }
 

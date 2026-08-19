@@ -294,6 +294,49 @@ patched).
   from the full-app review.** Not yet run: live browser/Playwright QA and
   an accessibility audit (no disposable environment/credentials available
   this session).
+- v2.1.26: a fresh, deeper 3-agent council audit — this time cross-checking
+  every module/role against the actual Business Rules, MFS, and Security &
+  Access Control Matrix docs (not just CRUD/tenant-isolation mechanics) —
+  found 7 Critical and 5 High findings the earlier passes hadn't covered:
+  two customer/subscription-status bugs that blocked trial-tier customers
+  from using the system at all, a fully dead `StockAlert` feature, three
+  cases where Filament's single `manage X` permission couldn't express the
+  doc's finer-grained role distinctions (delete-vs-write, audit-log
+  visibility), a bypassed guided Receive-In workflow for new boxes/files,
+  missing "own company" visibility for Company Admin/Supervisor, and
+  missing security headers / production log-level guidance. All fixed —
+  see CHANGELOG for the full list and regression tests added.
+
+  **Still open from this pass (Medium/Low, and two deliberately unimplemented
+  ambiguous items):**
+  - **Medium** — 5 of 19 documented reports missing (Outstanding Balance,
+    Module Usage, Files by Box, Boxes by Location, External Movement); 5 of
+    9 documented notification triggers missing (Payment Recorded, File/Box
+    Return Overdue, Import Failure, Export Completion); Barcode Registry
+    unreachable for Document Tracking User (doc says all roles get view
+    access); no barcode-specific permission exists in the seeder (folded
+    into `manage inventory`); the doc's 8-step "Access Decision Flow" isn't
+    fully re-validated on every request (User Active/Company
+    Active/Subscription Validity/Usage Limits are checked at login or
+    elsewhere, not per-authorization-check); Import/Export/Settings/Backup
+    are Super-Admin-only with no direct doc contradiction but narrower than
+    likely operational need; no documented dead-letter/failed-job handling
+    (`failed_jobs` table exists, no runbook mentions `queue:retry` or
+    alerting); `bootstrap/app.php`'s exception-handling customization is
+    empty (relies on Laravel defaults — no external error tracking, no
+    sensitive-field scrubbing).
+  - **Low** — minor dependency drift (Filament/Laravel/Sanctum patch
+    versions; one major-version gap on `openspout/openspout`); usage-limit
+    enforcement (`getEffectiveLimits()`) wasn't traced to every creation
+    path (flagged unverified, not confirmed broken).
+  - **Deliberately not implemented (ambiguous in the doc, not guessed at)**
+    — "Update User: Limited" for Company Supervisor (§6) doesn't specify
+    which fields are restricted; Supervisor currently gets `view users`
+    only (no update at all) rather than a fabricated field-level rule. A
+    Content-Security-Policy header was not added alongside the other
+    security headers — a naive CSP is a common way to silently break
+    Livewire/Alpine's inline scripts; needs a tested, nonce-based policy
+    rather than a guess.
 
 ---
 

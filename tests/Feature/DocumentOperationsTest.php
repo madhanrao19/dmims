@@ -2,12 +2,17 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Resources\BoxResource\Pages\CreateBox;
+use App\Filament\Resources\DocumentFileResource\Pages\CreateDocumentFile;
 use App\Models\Box;
 use App\Models\Customer;
 use App\Models\DocumentFile;
 use App\Models\Location;
+use App\Models\User;
 use App\Services\DocumentMovementService;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class DocumentOperationsTest extends TestCase
@@ -178,5 +183,74 @@ class DocumentOperationsTest extends TestCase
         $file->refresh();
         $this->assertFalse($file->is_overdue);
         $this->assertNotNull($file->returned_at);
+    }
+
+    private function platformAdmin(): User
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $admin = User::factory()->create(['is_platform_user' => true, 'status' => 'active']);
+        $admin->assignRole('Datamation Super Admin');
+
+        return $admin;
+    }
+
+    /** Creating a box through the admin form must log its first event and
+     *  route through DocumentMovementService, not bypass it (regression:
+     *  receiveInBox was previously dead code, so a new box's first movement
+     *  was never logged). */
+    public function test_creating_a_box_logs_a_movement(): void
+    {
+        $this->actingAs($this->platformAdmin());
+        $location = $this->location();
+
+        Livewire::test(CreateBox::class)
+            ->fillForm([
+                'customer_id' => $this->customer->id,
+                'box_barcode' => 'BC-NEW1',
+                'box_number' => 'NEW1',
+                'current_location_id' => $location->id,
+                'source_origin' => 'Legal dept archive',
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $box = Box::where('box_number', 'NEW1')->firstOrFail();
+
+        $this->assertDatabaseHas('document_movement_logs', [
+            'movable_type' => 'box',
+            'movable_id' => $box->id,
+            'action_type' => 'create',
+            'to_location_id' => $location->id,
+        ]);
+    }
+
+    /** Same regression, for files: creating a document file must log its
+     *  first event (receiveInFile) and increment the containing box's
+     *  current_file_count, not just insert the row directly. */
+    public function test_creating_a_document_file_logs_a_movement_and_increments_box_count(): void
+    {
+        $this->actingAs($this->platformAdmin());
+        $box = $this->box();
+        $this->assertSame(0, $box->fresh()->current_file_count);
+
+        Livewire::test(CreateDocumentFile::class)
+            ->fillForm([
+                'customer_id' => $this->customer->id,
+                'file_barcode' => 'DOC-NEW1',
+                'title' => 'New Contract',
+                'current_box_id' => $box->id,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $file = DocumentFile::where('file_barcode', 'DOC-NEW1')->firstOrFail();
+
+        $this->assertDatabaseHas('document_movement_logs', [
+            'movable_type' => 'document_file',
+            'movable_id' => $file->id,
+            'action_type' => 'create',
+            'to_box_id' => $box->id,
+        ]);
+        $this->assertSame(1, $box->fresh()->current_file_count);
     }
 }

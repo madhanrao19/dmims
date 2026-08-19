@@ -19,6 +19,10 @@ class UserResource extends BaseResource
 
     protected static ?string $permission = 'manage users';
 
+    // Security & Access Control Matrix §6: only Super Admin may delete a
+    // user — Company Admin can create/update but not delete.
+    protected static ?string $deletePermission = 'delete users';
+
     /**
      * Platform-only roles. A non-platform user (e.g. Company Admin, who holds
      * `manage users` for their own tenant) must never be able to grant these

@@ -14,7 +14,11 @@ class AuditLogResource extends BaseResource
 
     protected static bool $applyCustomerScope = true;
 
-    protected static ?string $permission = 'view reports';
+    // Security & Access Control Matrix §14: only SA (all), Management
+    // (summarized), and Company Admin (own company) may view audit logs —
+    // not Supervisor/Stock/Document/Viewer, who all hold the generic
+    // "view reports" permission this used to be gated on.
+    protected static ?string $permission = 'view audit logs';
 
     protected static string|\BackedEnum|null $navigationIcon = null;
 

@@ -45,6 +45,38 @@ class BusinessAccessMiddlewareTest extends TestCase
         $response->assertStatus(403);
     }
 
+    /** Business Rules §7: "A subscription does not directly determine whether
+     *  the customer can technically use the system" — trial and expired_grace
+     *  are legitimate operating states and must not be hard-blocked here. */
+    public function test_user_with_trial_or_expired_grace_subscription_is_not_blocked(): void
+    {
+        foreach (['trial', 'expired_grace'] as $status) {
+            $customer = Customer::create([
+                'company_name' => "Co-{$status}",
+                'company_code' => strtoupper(substr($status, 0, 3)).rand(100, 999),
+                'status' => 'active',
+            ]);
+
+            CustomerSubscription::create([
+                'customer_id' => $customer->id,
+                'subscription_no' => "SUB-{$status}",
+                'valid_from' => now()->subMonth(),
+                'valid_to' => now()->addMonth(),
+                'status' => $status,
+            ]);
+
+            $user = User::factory()->create([
+                'customer_id' => $customer->id,
+                'is_platform_user' => false,
+                'status' => 'active',
+            ]);
+
+            $response = $this->actingAs($user)->get('/admin');
+
+            $response->assertStatus(200, "Expected status 200 for subscription status '{$status}'");
+        }
+    }
+
     public function test_user_with_active_subscription_is_not_blocked(): void
     {
         $customer = Customer::create(['company_name' => 'Active Co', 'company_code' => 'ACT', 'status' => 'active']);

@@ -23,15 +23,24 @@ class EnsureSubscriptionActive
     }
 
     /**
-     * Whether the customer has an active subscription. Cached briefly so this
-     * does not run a database query on every single request (this middleware
-     * is in the global web group). A short TTL keeps revocation near-real-time.
+     * Whether the customer has a subscription that isn't cancelled. Business
+     * Rules §7 is explicit: "A subscription does not directly determine
+     * whether the customer can technically use the system" — that's the
+     * license's job (AccessControlService::getEffectiveAccessMode, already
+     * degrades to view-only/blocked correctly). This gate previously only
+     * allowed status IN ('active', 'near_expiry'), which 403'd every request
+     * for trial and expired_grace subscriptions — both legitimate operating
+     * states per the doc. Only the terminal 'cancelled' status blocks here.
+     *
+     * Cached briefly so this does not run a database query on every single
+     * request (this middleware is in the global web group). A short TTL
+     * keeps revocation near-real-time.
      */
     protected function hasActiveSubscription(int $customerId): bool
     {
         return Cache::remember("subscription_active:{$customerId}", now()->addSeconds(60), function () use ($customerId) {
             return CustomerSubscription::where('customer_id', $customerId)
-                ->whereIn('status', ['active', 'near_expiry'])
+                ->where('status', '!=', 'cancelled')
                 ->where(function ($query) {
                     $query->whereNull('valid_to')
                         ->orWhereDate('valid_to', '>=', Carbon::now());

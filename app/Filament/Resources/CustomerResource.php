@@ -8,6 +8,9 @@ use Filament\Forms;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use UnitEnum;
 
 class CustomerResource extends BaseResource
 {
@@ -20,6 +23,41 @@ class CustomerResource extends BaseResource
     protected static string|\UnitEnum|null $navigationGroup = 'Platform';
 
     protected static ?int $navigationSort = 1;
+
+    /**
+     * Security & Access Control Matrix §5: Company Admin/Supervisor get
+     * "View Customers: Own Company" — read-only access to their own
+     * company's record. Customer IS the tenant entity (no customer_id
+     * column of its own), so this can't use BaseResource's standard
+     * $applyCustomerScope mechanism — scope by primary key instead.
+     */
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery();
+        $user = auth()->user();
+
+        if ($user && ! $user->is_platform_user && $user->customer_id) {
+            return $query->whereKey($user->customer_id);
+        }
+
+        return $query;
+    }
+
+    /** Same reasoning as getEloquentQuery(): deny direct-URL access to a
+     *  different company's record, since BaseResource's generic customer_id
+     *  record check doesn't apply to the Customer model itself. */
+    public static function can(string|UnitEnum $action, ?Model $record = null): bool
+    {
+        $user = auth()->user();
+
+        if ($record instanceof Customer
+            && $user && ! $user->is_platform_user
+            && (int) $record->getKey() !== (int) $user->customer_id) {
+            return false;
+        }
+
+        return parent::can($action, $record);
+    }
 
     public static function form(Schema $schema): Schema
     {
