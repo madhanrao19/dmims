@@ -34,6 +34,19 @@ abstract class BaseResource extends Resource
      */
     protected static ?string $usageLimitKey = null;
 
+    /**
+     * Optional weaker alternative to $permission for the update action only
+     * — a role that may edit an existing record but not create or delete
+     * one (e.g. Company Supervisor's "Update User: Limited" per Security &
+     * Access Control Matrix §6). Holding this permission is enough to reach
+     * the update action; it does NOT imply $permission, so create/delete
+     * stay gated on $permission/$deletePermission as normal. Which fields
+     * are actually editable under this weaker grant is up to the resource's
+     * own form/mutateFormDataBeforeSave — this only controls whether the
+     * update action is reachable at all.
+     */
+    protected static ?string $limitedUpdatePermission = null;
+
     /** Actions that modify data; blocked when the license is view-only. */
     protected const WRITE_ACTIONS = [
         'create', 'update', 'delete', 'deleteAny',
@@ -163,8 +176,14 @@ abstract class BaseResource extends Resource
 
         if ($isWrite) {
             // Writes require the manage permission (or the stricter delete
-            // permission, when set) and a non-view-only license.
-            if (! $user->can(static::permissionFor($action))) {
+            // permission, when set) and a non-view-only license. Update
+            // additionally accepts the weaker $limitedUpdatePermission —
+            // a role that may edit but not create/delete (e.g. Company
+            // Supervisor's "Update User: Limited").
+            $hasPermission = $user->can(static::permissionFor($action))
+                || ($action === 'update' && filled(static::$limitedUpdatePermission) && $user->can(static::$limitedUpdatePermission));
+
+            if (! $hasPermission) {
                 return false;
             }
 

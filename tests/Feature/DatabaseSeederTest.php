@@ -20,9 +20,9 @@ class DatabaseSeederTest extends TestCase
     {
         $this->seed(DatabaseSeeder::class);
 
-        // 10 manage + 12 view (incl. "view audit logs", "view barcode") + 2 delete
+        // 10 manage + 12 view (incl. "view audit logs", "view barcode") + 2 delete + 1 limited-update
         // ("delete users", "delete inventory") — see RolesAndPermissionsSeeder.
-        $this->assertSame(24, Permission::count());
+        $this->assertSame(25, Permission::count());
         $this->assertEqualsCanonicalizing([
             'Datamation Super Admin',
             'Datamation Management',
@@ -61,8 +61,8 @@ class DatabaseSeederTest extends TestCase
 
         $this->assertSame(1, Customer::where('company_code', 'DEMO')->count());
         $this->assertSame(1, User::where('email', 'admin@example.com')->count());
-        // 10 manage + 12 view (incl. "view audit logs", "view barcode") + 2 delete
+        // 10 manage + 12 view (incl. "view audit logs", "view barcode") + 2 delete + 1 limited-update
         // ("delete users", "delete inventory") — see RolesAndPermissionsSeeder.
-        $this->assertSame(24, Permission::count());
+        $this->assertSame(25, Permission::count());
     }
 }

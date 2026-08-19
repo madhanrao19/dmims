@@ -62,7 +62,25 @@ class RolesAndPermissionsSeeder extends Seeder
         'delete inventory',
     ];
 
-    public const PERMISSIONS = [...self::MANAGE_PERMISSIONS, ...self::VIEW_PERMISSIONS, ...self::DELETE_PERMISSIONS];
+    /**
+     * Weaker than `manage X` — reaches the update action only, never
+     * create/delete. BaseResource::$limitedUpdatePermission checks these as
+     * an alternative to `manage X` for the update action specifically.
+     * "update users limited" is Company Supervisor's "Update User: Limited"
+     * (Security & Access Control Matrix §6) — profile/operational fields
+     * only (name, phone, job_title, department_id, employee_id); identity,
+     * security, and privilege fields (email, username, password, status,
+     * roles, customer_id) stay locked even under this grant. See
+     * UserResource::form()/EditUser::mutateFormDataBeforeSave().
+     */
+    public const LIMITED_UPDATE_PERMISSIONS = [
+        'update users limited',
+    ];
+
+    public const PERMISSIONS = [
+        ...self::MANAGE_PERMISSIONS, ...self::VIEW_PERMISSIONS,
+        ...self::DELETE_PERMISSIONS, ...self::LIMITED_UPDATE_PERMISSIONS,
+    ];
 
     /**
      * Role => permissions. '*' grants everything. "View-only" roles
@@ -83,7 +101,7 @@ class RolesAndPermissionsSeeder extends Seeder
         'Company Supervisor' => [
             'manage inventory', 'manage documents', 'manage barcode',
             'view billing', 'view subscriptions', 'view licensing', 'view reports',
-            'view customers', 'view users',
+            'view customers', 'view users', 'update users limited',
         ],
         'Stock Inventory User' => ['manage inventory', 'manage barcode', 'view reports'],
         'Document Tracking User' => ['manage documents', 'manage barcode', 'view reports'],

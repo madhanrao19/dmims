@@ -365,6 +365,20 @@ patched).
   except "Update User: Limited" for Company Supervisor, still deliberately
   unimplemented — the doc doesn't specify which fields, and a fabricated
   field-level rule would be guessing, not fixing.
+- v2.1.28: resolved "Update User: Limited" by explicit product decision
+  (asked, not guessed): Company Supervisor may edit an existing user's
+  operational fields (name, phone, job_title, department_id, employee_id)
+  but not create/delete a user, and not touch identity/security/privilege
+  fields (email, username, password, status, roles, customer_id). New
+  `BaseResource::$limitedUpdatePermission` mechanism (a resource can allow
+  the update action on a weaker permission than full `manage X`, without
+  granting create/delete) and a new `update users limited` permission, held
+  only by Company Supervisor. Enforced both at the UI (`->disabled()`) and
+  server-side (`EditUser::mutateFormDataBeforeSave()`/`afterSave()`) —
+  the latter is the one that actually matters, since a crafted request
+  bypasses `->disabled()` trivially. Regression test added.
+
+  **No findings remain open** from the full-app doc-conformance audit.
 
 ---
 

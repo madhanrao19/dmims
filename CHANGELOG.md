@@ -4,6 +4,32 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.28] - 2026-08-19
+
+### Added
+- **Company Supervisor's "Update User: Limited"** (Security & Access
+  Control Matrix §6), resolved by product decision rather than left
+  ambiguous: Supervisor may edit an existing user's operational fields
+  (name, phone, job_title, department_id, employee_id) but not create or
+  delete a user, and not touch identity/security/privilege fields (email,
+  username, password, status, roles, customer_id) — enforced twice: UI-level
+  `->disabled()` on those fields, and server-side in
+  `EditUser::mutateFormDataBeforeSave()`/`afterSave()` (roles is a
+  relationship, restored from a pre-save snapshot since Filament syncs it
+  automatically before `afterSave()` runs).
+- New `BaseResource::$limitedUpdatePermission` — a weaker alternative to
+  `$permission` for the update action only, so a resource can express
+  "may edit, not create/delete" without granting full manage rights. New
+  `update users limited` permission, held only by Company Supervisor.
+
+Regression test added (`UserResourcePrivilegeEscalationTest::test_company_supervisor_has_limited_update_access`)
+covering both the allowed operational-field path and a crafted-request
+attempt at the locked fields (including a role-escalation attempt via the
+roles relationship). Full suite (142/142), Pint, and Larastan verified
+green.
+
+**No findings remain open** from the full-app doc-conformance audit.
+
 ## [2.1.27] - 2026-08-19
 
 ### Fixed — remaining Medium/Low findings + one newly-discovered Critical

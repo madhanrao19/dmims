@@ -25,6 +25,21 @@ class UserResource extends BaseResource
 
     protected static ?string $usageLimitKey = 'max_users';
 
+    // Security & Access Control Matrix §6: Company Supervisor gets
+    // "Update User: Limited" — may edit an existing user's operational
+    // fields but not create/delete one. Field-level restriction happens in
+    // form() and EditUser::mutateFormDataBeforeSave().
+    protected static ?string $limitedUpdatePermission = 'update users limited';
+
+    /** Whether the acting user holds full manage rights (vs. only the
+     *  limited-update permission), for gating individual form fields. */
+    public static function actorCanFullyManage(): bool
+    {
+        $user = auth()->user();
+
+        return (bool) ($user?->is_platform_user || $user?->can('manage users'));
+    }
+
     /**
      * Platform-only roles. A non-platform user (e.g. Company Admin, who holds
      * `manage users` for their own tenant) must never be able to grant these
@@ -90,7 +105,8 @@ class UserResource extends BaseResource
         return $schema
             ->components([
                 Forms\Components\TextInput::make('name')->required()->maxLength(255),
-                Forms\Components\TextInput::make('email')->email()->required()->maxLength(255),
+                Forms\Components\TextInput::make('email')->email()->required()->maxLength(255)
+                    ->disabled(fn (): bool => ! static::actorCanFullyManage()),
                 Forms\Components\TextInput::make('password')
                     ->password()
                     ->revealable()
@@ -99,13 +115,16 @@ class UserResource extends BaseResource
                     ->maxLength(255)
                     ->dehydrateStateUsing(fn (?string $state) => filled($state) ? bcrypt($state) : null)
                     ->dehydrated(fn (?string $state): bool => filled($state))
-                    ->helperText('Leave blank to keep the current password.'),
-                Forms\Components\TextInput::make('username')->maxLength(100),
+                    ->helperText('Leave blank to keep the current password.')
+                    ->disabled(fn (): bool => ! static::actorCanFullyManage()),
+                Forms\Components\TextInput::make('username')->maxLength(100)
+                    ->disabled(fn (): bool => ! static::actorCanFullyManage()),
                 Forms\Components\TextInput::make('employee_id')->maxLength(100),
                 Forms\Components\TextInput::make('phone')->maxLength(50),
                 Forms\Components\Select::make('customer_id')
                     ->relationship('customer', 'company_name')
-                    ->searchable(),
+                    ->searchable()
+                    ->disabled(fn (): bool => ! static::actorCanFullyManage()),
                 Forms\Components\Select::make('department_id')
                     ->relationship('department', 'name')
                     ->searchable(),
@@ -120,7 +139,8 @@ class UserResource extends BaseResource
                         'password_expired' => 'Password Expired',
                         'archived' => 'Archived',
                     ])
-                    ->required(),
+                    ->required()
+                    ->disabled(fn (): bool => ! static::actorCanFullyManage()),
                 Forms\Components\Toggle::make('is_platform_user')
                     ->visible(fn (): bool => (bool) auth()->user()?->is_platform_user),
                 Forms\Components\Select::make('roles')->multiple()
@@ -130,7 +150,8 @@ class UserResource extends BaseResource
                         modifyQueryUsing: fn ($query) => auth()->user()?->is_platform_user
                             ? $query
                             : $query->whereNotIn('name', self::PLATFORM_ROLES),
-                    ),
+                    )
+                    ->disabled(fn (): bool => ! static::actorCanFullyManage()),
             ]);
     }
 
@@ -219,8 +240,15 @@ class EditUser extends EditRecord
 {
     protected static string $resource = UserResource::class;
 
+    /** @var array<int, int>|null Captured before save, since roles is a
+     *  relationship Filament syncs automatically — by afterSave() it's
+     *  already mutated, too late to read as "the original". */
+    private ?array $originalRoleIds = null;
+
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        $this->originalRoleIds = $this->record->roles()->pluck('roles.id')->all();
+
         // Preserve, don't clobber: UserResource::can() already denies write
         // access to a platform-user record for a non-platform actor, so this
         // is unreachable in the normal flow. But forcing false here (rather
@@ -238,6 +266,21 @@ class EditUser extends EditRecord
             if ($actor?->customer_id) {
                 $data['customer_id'] = $actor->customer_id;
             }
+
+            // "Update User: Limited" (Security Matrix §6) — an actor holding
+            // only update-users-limited (Company Supervisor), not full
+            // manage users, may change operational fields (name, phone,
+            // job_title, department_id, employee_id) but not identity/
+            // security/privilege fields. form()'s ->disabled() only stops
+            // the UI from submitting changes; force these back to the
+            // record's existing values server-side too, since a crafted
+            // request could otherwise still include them.
+            if (! UserResource::actorCanFullyManage()) {
+                foreach (['email', 'username', 'status', 'customer_id'] as $field) {
+                    $data[$field] = $this->record->{$field};
+                }
+                unset($data['password']);
+            }
         }
 
         return $data;
@@ -246,5 +289,12 @@ class EditUser extends EditRecord
     protected function afterSave(): void
     {
         UserResource::stripDisallowedRoles($this->record);
+
+        // Same reasoning as the field reset above: roles is a relationship,
+        // not covered by mutateFormDataBeforeSave — restore the pre-save
+        // snapshot if a limited actor's request tried to change it.
+        if (! UserResource::actorCanFullyManage() && $this->originalRoleIds !== null) {
+            $this->record->roles()->sync($this->originalRoleIds);
+        }
     }
 }

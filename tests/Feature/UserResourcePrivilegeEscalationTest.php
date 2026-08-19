@@ -4,12 +4,14 @@ namespace Tests\Feature;
 
 use App\Filament\Resources\UserResource;
 use App\Filament\Resources\UserResource\Pages\CreateUser;
+use App\Filament\Resources\UserResource\Pages\EditUser;
 use App\Models\Customer;
 use App\Models\License;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
@@ -50,6 +52,18 @@ class UserResourcePrivilegeEscalationTest extends TestCase
             'status' => 'active',
         ]);
         $user->assignRole('Company Admin');
+
+        return $user;
+    }
+
+    private function companySupervisor(int $customerId): User
+    {
+        $user = User::factory()->create([
+            'customer_id' => $customerId,
+            'is_platform_user' => false,
+            'status' => 'active',
+        ]);
+        $user->assignRole('Company Supervisor');
 
         return $user;
     }
@@ -124,5 +138,66 @@ class UserResourcePrivilegeEscalationTest extends TestCase
         $this->assertFalse(UserResource::can('delete', $platformUser));
         // Reads (list/view) are unaffected — only writes are denied.
         $this->assertTrue(UserResource::can('view', $platformUser));
+    }
+
+    /** Security & Access Control Matrix §6: "Update User: Limited" for
+     *  Company Supervisor — may reach the update action (unlike Create/
+     *  Delete, both denied) and edit operational fields, but identity/
+     *  security/privilege fields must stay locked even if a crafted
+     *  request submits different values for them. */
+    public function test_company_supervisor_has_limited_update_access(): void
+    {
+        $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACM', 'status' => 'active']);
+        License::create([
+            'customer_id' => $customer->id,
+            'license_no' => 'LIC-'.$customer->id,
+            'valid_from' => now()->subDay(),
+            'valid_to' => now()->addYear(),
+            'status' => 'active',
+            'technical_access_mode' => 'full',
+        ]);
+        $supervisor = $this->companySupervisor($customer->id);
+
+        $target = User::factory()->create([
+            'customer_id' => $customer->id,
+            'is_platform_user' => false,
+            'status' => 'active',
+            'email' => 'original@example.com',
+            'username' => 'original',
+        ]);
+        $target->assignRole('Viewer');
+
+        $this->actingAs($supervisor);
+
+        // Create and delete stay denied — only update is reachable.
+        $this->assertFalse(UserResource::can('create'));
+        $this->assertFalse(UserResource::can('delete', $target));
+        $this->assertTrue(UserResource::can('update', $target));
+
+        Livewire::test(EditUser::class, ['record' => $target->getRouteKey()])
+            ->fillForm([
+                'name' => 'Updated Name',
+                'phone' => '555-0100',
+                'job_title' => 'Lead Clerk',
+                'email' => 'escalated@example.com',
+                'username' => 'escalated',
+                'status' => 'suspended',
+                'roles' => [Role::findByName('Company Admin')->id],
+            ])
+            ->call('save');
+
+        $target->refresh();
+
+        // Operational fields: allowed through.
+        $this->assertSame('Updated Name', $target->name);
+        $this->assertSame('555-0100', $target->phone);
+        $this->assertSame('Lead Clerk', $target->job_title);
+
+        // Identity/security/privilege fields: unchanged despite submission.
+        $this->assertSame('original@example.com', $target->email);
+        $this->assertSame('original', $target->username);
+        $this->assertSame('active', $target->status);
+        $this->assertTrue($target->hasRole('Viewer'));
+        $this->assertFalse($target->hasRole('Company Admin'));
     }
 }

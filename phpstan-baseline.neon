@@ -115,9 +115,39 @@ parameters:
 			path: app/Filament/Resources/DocumentFileResource.php
 
 		-
+			message: '#^Cannot access property \$customer_id on Illuminate\\Database\\Eloquent\\Model\|int\|string\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Filament/Resources/UserResource.php
+
+		-
+			message: '#^Cannot access property \$email on Illuminate\\Database\\Eloquent\\Model\|int\|string\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Filament/Resources/UserResource.php
+
+		-
 			message: '#^Cannot access property \$is_platform_user on Illuminate\\Database\\Eloquent\\Model\|int\|string\.$#'
 			identifier: property.nonObject
 			count: 1
+			path: app/Filament/Resources/UserResource.php
+
+		-
+			message: '#^Cannot access property \$status on Illuminate\\Database\\Eloquent\\Model\|int\|string\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Filament/Resources/UserResource.php
+
+		-
+			message: '#^Cannot access property \$username on Illuminate\\Database\\Eloquent\\Model\|int\|string\.$#'
+			identifier: property.nonObject
+			count: 1
+			path: app/Filament/Resources/UserResource.php
+
+		-
+			message: '#^Cannot call method roles\(\) on Illuminate\\Database\\Eloquent\\Model\|int\|string\.$#'
+			identifier: method.nonObject
+			count: 2
 			path: app/Filament/Resources/UserResource.php
 
 		-
