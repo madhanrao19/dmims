@@ -4,6 +4,29 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.33] - 2026-08-19
+
+### Changed — deploy-ubuntu-24.sh: single script for staging and production
+
+`deploy-ubuntu-24.sh` and `DEPLOYMENT_GUIDE.md` now cover staging and
+production deploys with one script instead of documenting production only:
+
+- New required `--env staging|production` flag; sets `APP_ENV` accordingly.
+- `RolesAndPermissionsSeeder` now runs automatically (previously required a
+  manual step after the script finished) — safe on every environment, no
+  demo data.
+- New `--seed-qa-users` flag seeds `QASampleUsersSeeder`, **only accepted with
+  `--env staging`** — refused at argument parsing and again inside the
+  seeding step if somehow reached with `--env production`. The bare
+  `php artisan db:seed` (which creates a demo customer and an
+  `admin@example.com`/`password` login) is never invoked by the script.
+- New `--admin-email`/`--admin-password` flags create the first platform
+  admin via `dmims:create-admin`; idempotent, so re-running the script for a
+  code update doesn't fail if the account already exists.
+- `clone_repo` now updates an existing `--repo-dir` in place (`git fetch` +
+  `git pull --ff-only`) instead of only supporting a first-time clone, so the
+  same command redeploys an update.
+
 ## [2.1.32] - 2026-08-19
 
 ### Fixed — module review of Users, Products, Document Files, Billing, Backups

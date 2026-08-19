@@ -1,9 +1,10 @@
-# Production Deployment Guide — Ubuntu 24 Server
+# Deployment Guide — Ubuntu 24 Server (Staging & Production)
 
-Complete step-by-step instructions to deploy the DMIMS (Laravel 13 + Filament 5) application on
+Complete instructions to deploy the DMIMS (Laravel 13 + Filament 5) application on
 **Ubuntu 24.04 LTS** with **PHP 8.4**, **MariaDB**, **Apache**, and a **Cloudflare Tunnel** (no
 public IP / port-forwarding required, no Let's Encrypt needed — Cloudflare terminates TLS at the
-edge). This is the reference production stack and matches the tested DMIMS deployment.
+edge). This is the reference stack and matches the tested DMIMS deployment, for **both** the
+staging and production environments.
 
 > MariaDB is MySQL wire-compatible, so Laravel's `DB_CONNECTION=mysql` driver and the `mysql` /
 > `mysqldump` client binaries are used throughout — "MySQL" in commands below refers to those
@@ -11,6 +12,53 @@ edge). This is the reference production stack and matches the tested DMIMS deplo
 >
 > **Read the [Deployment Lessons Learned](#deployment-lessons-learned) section at the end before
 > you start** — it captures the mistakes that break a fresh install.
+
+## Staging vs. production — the one rule that matters
+
+Staging and production are deployed with the **same script** (`deploy-ubuntu-24.sh`), pointed at
+different `--repo-dir` / `--domain` / `--db-*` values and an explicit `--env staging` or
+`--env production` flag. The flag does two things:
+
+1. Sets `APP_ENV` in `.env` to match.
+2. Gates test data: `--seed-qa-users` (which seeds the `QASampleUsersSeeder` demo/QA accounts) is
+   **only accepted with `--env staging`** — the script refuses it outright with `--env production`,
+   twice over (once at argument parsing, once again inside the seeding step). There is no flag,
+   override, or manual step that puts QA sample accounts or demo data on the production database.
+
+Never run the bare `php artisan db:seed` (no `--class`) against staging or production — it invokes
+`DatabaseSeeder`, which creates a demo customer and an `admin@example.com` / `password` login
+intended for local evaluation only. Both the script and this guide only ever call the specific
+`RolesAndPermissionsSeeder` (safe everywhere, no demo data) and, on staging only,
+`QASampleUsersSeeder`.
+
+---
+
+## **QUICK START: AUTOMATED SCRIPT (RECOMMENDED)**
+
+`deploy-ubuntu-24.sh` at the repo root runs everything in Parts 1–10 below in one pass, and is
+safe to re-run later to deploy an update (it fast-forward pulls the repo and skips admin creation
+if the account already exists, instead of re-cloning/failing).
+
+```bash
+# Production
+sudo ./deploy-ubuntu-24.sh --env production \
+  --repo-dir /var/www/dmims --repo-url https://github.com/your-org/dmims.git \
+  --domain your-domain.com \
+  --db-database dmims_production --db-username dmims_user --db-password 'your_secure_password' \
+  --admin-email dm_it@datamationgroup.com
+
+# Staging (separate directory, domain and database from production;
+# --seed-qa-users is only valid here)
+sudo ./deploy-ubuntu-24.sh --env staging \
+  --repo-dir /var/www/dmims-staging --repo-url https://github.com/your-org/dmims.git \
+  --domain staging.your-domain.com \
+  --db-database dmims_staging --db-username dmims_user --db-password 'your_secure_password' \
+  --admin-email dm_it@datamationgroup.com --seed-qa-users
+```
+
+Run `sudo ./deploy-ubuntu-24.sh --help` for the full option list (branch selection, skipping
+Apache/queue/tunnel setup, admin password, etc.). Everything in Parts 1–10 below documents what
+the script does step by step, for manual runs or troubleshooting a failed step.
 
 ---
 
@@ -61,12 +109,28 @@ sudo usermod -aG www-data appuser
 
 ## **PART 2: DATABASE SETUP (MariaDB)**
 
+Use a **separate database** per environment — never point staging at the production database, and
+never restore a production backup into staging without first deciding whether QA accounts get
+seeded there. `dmims_production` and `dmims_staging` below are separate MariaDB databases on the
+same server; adjust names if staging lives on a different host entirely.
+
 ```bash
 # `sudo mysql` uses the MariaDB client shipped with mariadb-server
+
+# Production
 sudo mysql -u root << EOF
 CREATE DATABASE dmims_production;
 CREATE USER 'dmims_user'@'localhost' IDENTIFIED BY 'your_secure_password_here';
 GRANT ALL PRIVILEGES ON dmims_production.* TO 'dmims_user'@'localhost';
+FLUSH PRIVILEGES;
+EXIT;
+EOF
+
+# Staging (same user, different database — or use a different user if the
+# server is shared and you want the two environments fully isolated)
+sudo mysql -u root << EOF
+CREATE DATABASE dmims_staging;
+GRANT ALL PRIVILEGES ON dmims_staging.* TO 'dmims_user'@'localhost';
 FLUSH PRIVILEGES;
 EXIT;
 EOF
@@ -144,6 +208,7 @@ sudo nano /var/www/dmims/.env
 
 **Key .env settings to update:**
 ```
+# staging or production — matches the --env flag passed to the deploy script
 APP_ENV=production
 APP_DEBUG=false
 APP_URL=https://your-domain.com
@@ -222,20 +287,30 @@ cd /var/www/dmims
 # Run migrations
 sudo -u appuser php artisan migrate --force
 
-# Seed the roles & permissions the access control depends on (no demo data)
+# Seed the roles & permissions the access control depends on (no demo data).
+# Safe on every environment, including production.
 sudo -u appuser php artisan db:seed --class=RolesAndPermissionsSeeder --force
+
+# STAGING ONLY: seed the QA sample accounts (one per role, password
+# "password" — see QASampleUsersSeeder). Never run this on production.
+sudo -u appuser php artisan db:seed --class=QASampleUsersSeeder --force
 
 # Create the first platform administrator (prompts for a password if omitted).
 # Datamation's standard default platform admin identity is
 # dm_it@datamationgroup.com — use it here on every environment (staging,
 # production) unless told otherwise. Choose the password at creation time;
-# never hardcode it in a script, seeder, or commit.
+# never hardcode it in a script, seeder, or commit. Idempotent — refuses (and
+# exits non-zero) if the email already exists, so it's safe to re-run.
 sudo -u appuser php artisan dmims:create-admin dm_it@datamationgroup.com --name="IT Administrator"
 ```
 
-> The full `php artisan db:seed` also creates a demo customer and a default
-> `admin@example.com` / `password` login — use it only for evaluation, never on
-> a production install.
+> **Never run the bare `php artisan db:seed`** (no `--class`). It invokes
+> `DatabaseSeeder`, which creates a demo customer and a default
+> `admin@example.com` / `password` login. That is for local evaluation only and
+> must never exist on staging or production — always specify `--class` as
+> shown above. `deploy-ubuntu-24.sh` enforces this: it only ever calls
+> `RolesAndPermissionsSeeder`, and `QASampleUsersSeeder` only when both
+> `--seed-qa-users` and `--env staging` are given (refused otherwise).
 
 > Database backups can be taken from the admin panel (Platform → Backups → "Run Database Backup")
 > or scheduled via the cron job in Part 13. Ensure the `mysqldump` and `mysql`
@@ -581,14 +656,15 @@ scp "C:\path\to\dmims\package.json" appuser@YOUR_SERVER_IP:/var/www/dmims/
 
 ## **DEPLOYMENT CHECKLIST**
 
+- [ ] Correct target chosen: `--env staging` or `--env production` (never mixed up)
 - [ ] Server prepared (PHP 8.4, Composer, Apache, MariaDB, Node 22, Supervisor installed)
-- [ ] MariaDB database created with user/password
-- [ ] Source code copied to `/var/www/dmims` via SCP
+- [ ] MariaDB database created with user/password (separate database per environment)
+- [ ] Source code deployed to its own directory (via the script's git clone/pull, or SCP)
 - [ ] Permissions set correctly
 - [ ] Composer & npm dependencies installed; `filament:assets` published
-- [ ] .env configured with production settings (MySQL, `SESSION_SECURE_COOKIE=false`, `TRUSTED_PROXIES=*`)
+- [ ] .env configured with correct settings (MySQL, matching `APP_ENV`, `SESSION_SECURE_COOKIE=false`, `TRUSTED_PROXIES=*`)
 - [ ] Application key generated
-- [ ] Database migrations & seeders run; first admin created
+- [ ] `RolesAndPermissionsSeeder` run; first admin created; `QASampleUsersSeeder` run **only if staging**; bare `db:seed` never run
 - [ ] Apache vhost configured (port 80 only) and enabled
 - [ ] PHP-FPM restarted
 - [ ] Cloudflare Tunnel installed, authenticated, routed to your-domain.com, running as a service
@@ -639,6 +715,12 @@ deployment most often.
 7. **PHP 8.4 must be the default `php`.** Ubuntu 24.04 ships 8.3; after adding
    the ondrej/php PPA run `sudo update-alternatives --set php /usr/bin/php8.4`
    so Composer's post-scripts and artisan use 8.4.
+
+8. **Never seed demo/test data by environment mix-up.** Copy-pasting a staging
+   deploy command against production is the classic way test accounts end up
+   somewhere they shouldn't. Always pass `--env production` explicitly for a
+   production run — the script refuses `--seed-qa-users` there — and never run
+   bare `php artisan db:seed` (always specify `--class`).
 
 ---
 
