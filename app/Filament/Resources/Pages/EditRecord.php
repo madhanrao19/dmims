@@ -4,6 +4,8 @@ namespace App\Filament\Resources\Pages;
 
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord as BaseEditRecord;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\QueryException;
 
 /**
  * App-wide base for every resource's Edit page — same reasoning as
@@ -20,7 +22,38 @@ abstract class EditRecord extends BaseEditRecord
     protected function getHeaderActions(): array
     {
         return [
-            DeleteAction::make(),
+            DeleteAction::make()
+                // Several tables (subscription_logs, license_logs, etc.)
+                // deliberately restrictOnDelete their parent (audit trail
+                // must survive deleting the record it documents — see
+                // 2026_08_18_000006_restrict_subscription_logs_cascade.php).
+                // Filament's own DeleteAction has no exception handling
+                // around the delete call, so that constraint violation was
+                // surfacing as a raw, unstyled 500 page instead of the
+                // in-app failure notification every other error uses.
+                ->failureNotificationTitle('Cannot delete')
+                ->failureNotificationMessage('This record is still referenced by other data (history, logs, or related records) and cannot be deleted while those exist.')
+                ->action(function (DeleteAction $action): void {
+                    try {
+                        $result = $action->process(static fn (Model $record): ?bool => $record->delete());
+                    } catch (QueryException $e) {
+                        if ($e->getCode() !== '23000') {
+                            throw $e;
+                        }
+
+                        $action->failure();
+
+                        return;
+                    }
+
+                    if (! $result) {
+                        $action->failure();
+
+                        return;
+                    }
+
+                    $action->success();
+                }),
         ];
     }
 }

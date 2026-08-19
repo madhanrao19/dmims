@@ -4,6 +4,33 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.31] - 2026-08-19
+
+### Fixed — deleting a record with restricted history crashed instead of failing gracefully
+
+Found live-testing: deleting a Customer Subscription that already had
+`SubscriptionLog` history threw a raw, unstyled `QueryException` 500 page
+(`SQLSTATE[23000]: FOREIGN KEY constraint failed`) instead of an in-app
+notification. `subscription_logs.customer_subscription_id` — and, identically,
+`license_logs.license_id` — deliberately `restrictOnDelete()` their parent so
+the audit trail can't be silently wiped by deleting the record it documents
+(see `2026_08_18_000006_restrict_subscription_logs_cascade.php`); Filament's
+built-in `DeleteAction` has no exception handling around the delete call, so
+that intentional block surfaced as a crash rather than a message.
+
+Fixed once in `App\Filament\Resources\Pages\EditRecord` — the shared base
+every resource's Delete button already routes through (see 2.1.29) — by
+wrapping the delete in a try/catch for SQLSTATE `23000` and using Filament's
+own failure-notification mechanism instead of a custom one. Because it's the
+single shared class, this closes the same gap for every resource with a
+restricting child (License, Customer Subscription, and any future one) in
+one change, not per-resource. Audited every other place `DeleteAction::make()`
+is wired directly (Backups, Exports, Imports) — none of those tables have any
+foreign key restricting deletes, so they were never exposed to this.
+
+Regression test added (`DeleteRestrictedByLogTest`). Full suite (146/146),
+Pint, and Larastan verified clean.
+
 ## [2.1.30] - 2026-08-19
 
 ### Fixed — Critical: creating a License or Customer Subscription always 500'd
