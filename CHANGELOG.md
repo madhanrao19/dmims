@@ -4,6 +4,30 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.30] - 2026-08-19
+
+### Fixed — Critical: creating a License or Customer Subscription always 500'd
+
+Found while live-testing the Super Admin workflow: submitting the "Create
+License" (or "Create Customer Subscription") form always threw a 500
+(`BindingResolutionException: ... [$attribute] was unresolvable`) the
+instant `enabled_modules`/`allowed_reports` were validated, regardless of
+what was typed. `BaseResource::jsonRule()` returns a raw
+`function (string $attribute, mixed $value, Closure $fail)` closure —
+Laravel's own signature for an inline validation-rule callback — passed
+straight to Filament's `->rule()`. Filament's `evaluate()` dependency-injects
+*any* closure passed there by parameter name; it has no way to know this
+particular closure is meant as a raw Laravel rule callback rather than
+something to resolve, and blew up trying to resolve `$attribute`. Fixed by
+wrapping the rule in a zero-arg outer closure
+(`fn (): \Closure => function (...) {...}`) so `evaluate()` calls it with no
+arguments and gets the real rule closure back untouched — a one-line change
+in `jsonRule()` itself fixes both call sites (License and Customer
+Subscription) rather than patching each `->rule()` call. Regression test
+added (`JsonRuleValidationTest`, both the invalid-JSON-rejected and
+valid-JSON-succeeds paths). Full suite (145/145), Pint, and Larastan
+verified clean.
+
 ## [2.1.29] - 2026-08-19
 
 ### Fixed — Critical: Create/Delete buttons missing app-wide + custom-action authorization gap

@@ -267,10 +267,18 @@ abstract class BaseResource extends Resource
      * Validation rule for a free-text field that must be valid JSON when
      * filled (e.g. license/subscription module-gating textareas), but is
      * allowed to be left blank.
+     *
+     * Wrapped in a zero-arg closure: every call site passes this straight to
+     * ->rule(), and Filament's evaluate() dependency-injects any closure
+     * given there by parameter name — it has no way to know a
+     * (string $attribute, ...) closure is meant as a raw Laravel validation
+     * callback instead, and throws "[$attribute] was unresolvable." The
+     * outer closure takes no parameters, so evaluate() calls it with no
+     * arguments and gets the real rule closure back untouched.
      */
     protected static function jsonRule(): \Closure
     {
-        return function (string $attribute, mixed $value, \Closure $fail): void {
+        return fn (): \Closure => function (string $attribute, mixed $value, \Closure $fail): void {
             if (blank($value)) {
                 return;
             }
