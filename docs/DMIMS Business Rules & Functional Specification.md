@@ -85,6 +85,10 @@ Datamation Super Admin
 
 Datamation Management
 
+The `is_platform_user` flag must always match whether the user holds one of
+these two roles; server-side enforced on every create/edit
+(`UserResource::enforcePlatformRoleConsistency()`), not left to form input.
+
 ---
 
 ## **Company Users**

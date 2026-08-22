@@ -128,6 +128,33 @@ divergences are cosmetic (enum naming) or operational config.
 > Full suite (152/152), Pint, Larastan, and `npm run build` verified clean;
 > statuses below remain accurate.
 
+> **Re-audit 2026-08-23 (v2.1.36):** a live incident, not a review finding —
+> see CHANGELOG.md [2.1.36]:
+> - **Critical** — a Datamation Super Admin created a Company Admin user with
+>   `is_platform_user=true` set at the same time via the `UserResource`
+>   create form; nothing checked the flag stayed consistent with the
+>   assigned role. `BaseResource::can()`/`shouldRegisterNavigation()` key off
+>   `is_platform_user` alone and skip tenant scoping entirely once true, so
+>   the tenant-scoped account got unrestricted platform-wide read access
+>   despite a real `customer_id`. One real account affected, corrected via
+>   the new backfill command. Fixed with
+>   `UserResource::enforcePlatformRoleConsistency()`, which re-derives
+>   `is_platform_user` from actual role membership on both the create and
+>   edit paths, plus `dmims:fix-platform-role-consistency` to audit/correct
+>   existing users (including soft-deleted, via `withoutGlobalScopes()`).
+>
+> Closed via two independent security-reviewer passes, not one: the first
+> caught two additional bugs in the initial fix attempt before either
+> shipped — an `EditUser::afterSave()` reorder bug that could re-promote an
+> already-mismatched record via the pre-save role snapshot restore, and a
+> `dmims:create-admin` soft-delete bug (`delete()` instead of
+> `forceDelete()`) that would permanently block a retry on the seeded
+> unique email. The second pass independently re-derived the exploit from
+> the code rather than re-reading the diff, and proved the new regression
+> tests fail on the pre-fix code, not just that they pass on the fix. Full
+> suite (155/155, 4 new), Pint, Larastan verified clean; statuses below
+> remain accurate.
+
 Legend: ✅ implemented · WIP partial · ❌ missing
 
 ---
