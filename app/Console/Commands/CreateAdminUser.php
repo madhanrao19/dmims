@@ -55,18 +55,25 @@ class CreateAdminUser extends Command
 
         // is_platform_user alone only grants read access (BaseResource::can());
         // every write action additionally requires a real permission, which
-        // only comes from an assigned role. Without this, "platform admin"
-        // silently means "read-only" with no error anywhere.
-        if (Role::where('name', self::SUPER_ADMIN_ROLE)->exists()) {
-            $user->assignRole(self::SUPER_ADMIN_ROLE);
-        } else {
-            $this->warn(
+        // only comes from an assigned role. A role-less "platform admin" is
+        // also an invalid state UserResource::enforcePlatformRoleConsistency()
+        // will silently demote the moment anyone edits it via the admin UI —
+        // fail closed here instead of creating a state that later gets
+        // corrected without the operator ever being told why.
+        if (! Role::where('name', self::SUPER_ADMIN_ROLE)->exists()) {
+            // User uses SoftDeletes — a plain delete() would leave the row
+            // (and its unique email) behind, permanently blocking any retry
+            // of this command for that address once the role is seeded.
+            $user->forceDelete();
+            $this->error(
                 'Role "'.self::SUPER_ADMIN_ROLE.'" does not exist yet — run '.
-                '`php artisan db:seed --class=RolesAndPermissionsSeeder` first, then '.
-                "assign it manually: php artisan tinker --execute=\"User::where('email','{$email}')->first()->assignRole('".self::SUPER_ADMIN_ROLE."')\""
+                '`php artisan db:seed --class=RolesAndPermissionsSeeder` first, then re-run this command.'
             );
-            $this->warn('Until then, this account can view but not create/edit/delete anything.');
+
+            return self::FAILURE;
         }
+
+        $user->assignRole(self::SUPER_ADMIN_ROLE);
 
         $this->info("Platform admin created: {$user->email}");
 

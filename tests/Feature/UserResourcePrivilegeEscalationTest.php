@@ -93,6 +93,104 @@ class UserResourcePrivilegeEscalationTest extends TestCase
         $this->assertTrue($target->fresh()->hasRole('Datamation Management'));
     }
 
+    /**
+     * Live production bug: a Datamation Super Admin created a Madhan Inc
+     * Company Admin via CreateUser, toggling is_platform_user=true alongside
+     * the tenant-scoped "Company Admin" role — stripDisallowedRoles() only
+     * guards non-platform actors, so nothing caught this. The result: a
+     * tenant admin with unrestricted platform-wide read access (and write
+     * access to anything "manage users"-shaped) because BaseResource::can()
+     * and shouldRegisterNavigation() key off is_platform_user alone,
+     * bypassing tenant scoping entirely regardless of customer_id/role.
+     */
+    public function test_platform_actor_cannot_leave_is_platform_user_true_with_only_a_tenant_role(): void
+    {
+        $platformAdmin = User::factory()->create(['is_platform_user' => true, 'status' => 'active']);
+        $platformAdmin->assignRole('Datamation Super Admin');
+        $this->actingAs($platformAdmin);
+
+        $customer = Customer::create(['company_name' => 'Madhan Inc', 'company_code' => 'MA', 'status' => 'active']);
+
+        Livewire::test(CreateUser::class)
+            ->fillForm([
+                'name' => 'Madhan Rao',
+                'email' => 'madhanrao.v@example.com',
+                'password' => 'password123',
+                'status' => 'active',
+                'customer_id' => $customer->id,
+                'is_platform_user' => true,
+                'roles' => [Role::findByName('Company Admin')->id],
+            ])
+            ->call('create');
+
+        $created = User::where('email', 'madhanrao.v@example.com')->firstOrFail();
+
+        $this->assertFalse($created->is_platform_user);
+        $this->assertTrue($created->hasRole('Company Admin'));
+        $this->assertSame($customer->id, $created->customer_id);
+    }
+
+    /** Same invariant, the other direction: assigning a platform role must
+     *  turn is_platform_user on, not leave a "Datamation Management" user
+     *  stuck read-only-by-accident with the flag off. */
+    public function test_platform_role_assignment_turns_on_is_platform_user(): void
+    {
+        $platformAdmin = User::factory()->create(['is_platform_user' => true, 'status' => 'active']);
+        $this->actingAs($platformAdmin);
+
+        $target = User::factory()->create(['is_platform_user' => false, 'status' => 'active']);
+        $target->assignRole('Datamation Management');
+
+        UserResource::enforcePlatformRoleConsistency($target);
+
+        $this->assertTrue($target->fresh()->is_platform_user);
+    }
+
+    /**
+     * Security review caught a regression in an earlier version of this fix:
+     * EditUser::afterSave() ran stripDisallowedRoles() BEFORE restoring a
+     * limited actor's pre-save role snapshot, so the restore could put a
+     * platform role straight back after it had just been stripped — and the
+     * new enforcePlatformRoleConsistency(), reading that restored role list,
+     * would then promote is_platform_user to true. Reproduces the exact
+     * scenario: a target already sitting in the mismatched state (is_platform_user
+     * false, but holding "Datamation Super Admin" — exactly the kind of stale
+     * row dmims:fix-platform-role-consistency exists to clean up) must not get
+     * promoted just because a Company Supervisor edits an unrelated field on it.
+     */
+    public function test_limited_actor_editing_a_mismatched_target_cannot_promote_it(): void
+    {
+        $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACM', 'status' => 'active']);
+        License::create([
+            'customer_id' => $customer->id,
+            'license_no' => 'LIC-'.$customer->id,
+            'valid_from' => now()->subDay(),
+            'valid_to' => now()->addYear(),
+            'status' => 'active',
+            'technical_access_mode' => 'full',
+        ]);
+        $supervisor = $this->companySupervisor($customer->id);
+
+        $target = User::factory()->create([
+            'customer_id' => $customer->id,
+            'is_platform_user' => false,
+            'status' => 'active',
+        ]);
+        $target->assignRole('Datamation Super Admin');
+
+        $this->actingAs($supervisor);
+
+        Livewire::test(EditUser::class, ['record' => $target->getRouteKey()])
+            ->fillForm(['name' => 'Renamed Only'])
+            ->call('save');
+
+        $target->refresh();
+
+        $this->assertFalse($target->is_platform_user);
+        $this->assertFalse($target->hasRole('Datamation Super Admin'));
+        $this->assertSame('Renamed Only', $target->name);
+    }
+
     public function test_non_platform_actor_cannot_set_is_platform_user_via_create(): void
     {
         $this->actingAs($this->companyAdmin());

@@ -68,6 +68,30 @@ class UserResource extends BaseResource
     }
 
     /**
+     * The other half of the invariant stripDisallowedRoles() enforces: a
+     * platform actor CAN grant is_platform_user and any role (the form's
+     * ->visible()/modifyQueryUsing only restrict non-platform actors), so
+     * nothing previously stopped is_platform_user=true from ending up on a
+     * user holding only tenant-scoped roles (Company Admin, Supervisor,
+     * Stock/Document user, Viewer) — or vice versa. That mismatch is not
+     * cosmetic: BaseResource::can() and shouldRegisterNavigation() key off
+     * is_platform_user alone, skipping tenant scoping entirely, so a tenant
+     * role with the flag set gets unrestricted platform-wide read access
+     * (and write access to anything its role's permission names also match)
+     * regardless of customer_id. Re-derive is_platform_user from the actual
+     * role set after every role sync, rather than trusting whatever the
+     * form/actor submitted independently.
+     */
+    public static function enforcePlatformRoleConsistency(User $user): void
+    {
+        $hasPlatformRole = $user->roles()->whereIn('name', self::PLATFORM_ROLES)->exists();
+
+        if ($user->is_platform_user !== $hasPlatformRole) {
+            $user->forceFill(['is_platform_user' => $hasPlatformRole])->save();
+        }
+    }
+
+    /**
      * Close the credential-takeover path this resource would otherwise leave
      * open: a platform user can share a tenant's customer_id (e.g. the
      * platform admin seeded by DatabaseSeeder), so BaseResource's
@@ -237,6 +261,7 @@ class CreateUser extends CreateRecord
         $record = $this->record;
 
         UserResource::stripDisallowedRoles($record);
+        UserResource::enforcePlatformRoleConsistency($record);
     }
 }
 
@@ -298,13 +323,20 @@ class EditUser extends EditRecord
         /** @var User $record */
         $record = $this->record;
 
-        UserResource::stripDisallowedRoles($record);
-
         // Same reasoning as the field reset above: roles is a relationship,
         // not covered by mutateFormDataBeforeSave — restore the pre-save
-        // snapshot if a limited actor's request tried to change it.
+        // snapshot if a limited actor's request tried to change it. This
+        // must run BEFORE stripDisallowedRoles()/enforcePlatformRoleConsistency():
+        // restoring a snapshot that still contains a platform role (e.g. a
+        // pre-existing is_platform_user/role mismatch this same fix is meant
+        // to clean up) must not be the last word on the role set, or a
+        // limited actor could re-promote a record to platform access simply
+        // by editing an unrelated field on it.
         if (! UserResource::actorCanFullyManage() && $this->originalRoleIds !== null) {
             $record->roles()->sync($this->originalRoleIds);
         }
+
+        UserResource::stripDisallowedRoles($record);
+        UserResource::enforcePlatformRoleConsistency($record);
     }
 }
