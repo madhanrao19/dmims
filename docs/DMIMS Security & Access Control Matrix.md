@@ -23,7 +23,7 @@ It specifies:
 
 This document is the authoritative reference for:
 
-* Laravel Policies  
+* Filament Resource authorization (`BaseResource::can()` / `permissionFor()`)  
 * Spatie Permissions  
 * Filament Navigation  
 * Middleware  
@@ -200,27 +200,27 @@ No operational actions.
 
 # **4\. Permission Naming Standard**
 
-Permissions use the format:
+Permissions use the format (see `database/seeders/RolesAndPermissionsSeeder.php`):
 
-module.action
+manage X (full CRUD) / view X (read-only)
+
+Some resources additionally define a stricter `delete X` permission (checked
+instead of `manage X` for delete actions) or a weaker `update X limited`
+permission (checked instead of `manage X` for the update action only).
 
 Examples
 
-customers.view
+manage customers
 
-customers.create
+view customers
 
-customers.update
+manage inventory
 
-customers.delete
+delete inventory
 
-products.receive
+view reports
 
-products.transfer
-
-documents.move\_out
-
-reports.export
+update users limited
 
 ---
 

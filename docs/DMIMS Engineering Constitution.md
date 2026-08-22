@@ -308,7 +308,7 @@ Reuse existing:
 
 Services
 
-Policies
+Filament resource authorization (BaseResource::can() / permissionFor())
 
 Middleware
 
@@ -320,7 +320,7 @@ Notifications
 
 AccessControlService
 
-SubscriptionService
+CustomerSubscriptionObserver
 
 LicenseService
 
@@ -362,7 +362,7 @@ Prefer:
 
 Form Requests
 
-Policies
+Filament resource authorization (BaseResource::can() / permissionFor())
 
 Middleware
 
@@ -396,7 +396,7 @@ Always derive tenant context from authenticated user.
 
 Verify:
 
-Policies
+Resource authorization (BaseResource::can() / permissionFor())
 
 Queries
 
@@ -472,7 +472,7 @@ Authentication
 
 Authorization
 
-Policies
+Resource authorization checks (BaseResource::can() / permissionFor())
 
 Validation
 

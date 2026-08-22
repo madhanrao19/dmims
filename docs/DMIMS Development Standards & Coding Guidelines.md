@@ -56,7 +56,7 @@ Services contain business rules.
 
 Models represent data.
 
-Policies authorize actions.
+Filament resource authorization (`BaseResource::can()` / `permissionFor()`) authorizes actions.
 
 Middleware performs cross-cutting checks.
 
@@ -89,7 +89,7 @@ Avoid mixed types unless necessary.
 Use:
 
 * Form Requests for validation  
-* Policies for authorization  
+* Filament resource authorization (`BaseResource::can()` / `permissionFor()`)  
 * Service classes for business logic  
 * Eloquent relationships  
 * Dependency Injection  
@@ -189,7 +189,7 @@ Never authorize using UI visibility alone.
 Every protected action must be enforced by:
 
 * Middleware  
-* Policies  
+* Filament resource authorization (`BaseResource::can()` / `permissionFor()`)  
 * AccessControlService
 
 Always derive `customer_id` from the authenticated user.
@@ -435,7 +435,6 @@ Each feature should include:
 
 * Unit tests  
 * Feature tests  
-* Policy tests  
 * Validation tests  
 * Authorization tests
 
