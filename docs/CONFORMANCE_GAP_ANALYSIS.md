@@ -464,24 +464,17 @@ dropping. Full suite (122/122), migrate + rollback + re-migrate, and
 **Optional / future (not implemented — noted for a later, planned change):**
 - Redis cache/queues, HA, read replicas, object storage — infrastructure
   roadmap items already tracked in the Deployment, Operations & DR Guide §28.
-- **PHPStan / Larastan static analysis — attempted, blocked by sandbox network
-  policy, not a code decision.** `composer require --dev larastan/larastan`
-  requires downloading from `api.github.com`/`codeload.github.com` (no
-  Packagist-hosted dist mirror exists for this package/version); the sandbox
-  used for the rest of this hardening pass returns a hard `403` (confirmed via
-  the proxy's own diagnostics as an organizational egress policy block, not a
-  transient failure) for those hosts. Composer's `require-dev` change was
-  reverted rather than commit an unverifiable `composer.lock`. **To complete:**
-  in an environment with normal GitHub access, run
-  `composer require --dev larastan/larastan` then
-  `vendor/bin/phpstan analyse --level=5 app --generate-baseline`, commit the
-  resulting `composer.json`/`composer.lock`/`phpstan-baseline.neon`, add a
-  `phpstan.neon` (`includes: [vendor/larastan/larastan/extension.neon]`,
-  `paths: [app]`, `level: 5`, `includes: [phpstan-baseline.neon]`), and a CI
-  step (`vendor/bin/phpstan analyse`) after the Pint check in
-  `.github/workflows/ci.yml`. Generating the baseline in the same change that
-  adds the CI step is important — otherwise the first CI run after merge fails
-  on pre-existing findings unrelated to the change.
+
+**Resolved since this review — PHPStan / Larastan static analysis:** the
+sandbox network block noted above was environment-specific, not a lasting
+constraint. `larastan/larastan` is installed, `phpstan.neon` is wired up
+(level 5, `paths: [app]`), and `vendor/bin/phpstan analyse` runs as a CI step
+in `.github/workflows/ci.yml`. As of v2.1.35, 203 of the 215 findings in the
+generated baseline were fixed at the root cause (missing PHPDoc on
+trait-typed Eloquent event closures, missing relation return types, two real
+bugs — see `CHANGELOG.md`); `phpstan-baseline.neon` now holds 12 entries,
+each with recorded reasoning for why it's a verified false positive rather
+than a real issue (see the PR history for v2.1.35).
 
 ### Done since the 2026-07-02 review
 - **Billing `invoice_no` / `payment_no` race condition fixed.** Both now use
