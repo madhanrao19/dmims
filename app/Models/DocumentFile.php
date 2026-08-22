@@ -7,6 +7,7 @@ use App\Models\Concerns\BelongsToCustomer;
 use App\Models\Concerns\Taggable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class DocumentFile extends Model
@@ -57,7 +58,10 @@ class DocumentFile extends Model
         return $this->belongsTo(Department::class);
     }
 
-    public function currentBox()
+    /**
+     * @return BelongsTo<Box, $this>
+     */
+    public function currentBox(): BelongsTo
     {
         return $this->belongsTo(Box::class, 'current_box_id');
     }

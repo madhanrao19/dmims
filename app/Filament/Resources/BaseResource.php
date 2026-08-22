@@ -140,8 +140,8 @@ abstract class BaseResource extends Resource
         // direct-ID access paths too). Null customer_id = platform-owned.
         if ($record && ! $user->is_platform_user && $user->customer_id
             && array_key_exists('customer_id', $record->getAttributes())
-            && $record->customer_id !== null
-            && (int) $record->customer_id !== (int) $user->customer_id) {
+            && $record->getAttribute('customer_id') !== null
+            && (int) $record->getAttribute('customer_id') !== (int) $user->customer_id) {
             return false;
         }
 
@@ -226,7 +226,7 @@ abstract class BaseResource extends Resource
         $items = is_array($middleware) ? $middleware : [$middleware];
 
         foreach ($items as $m) {
-            if (is_string($m) && str_contains($m, ':')) {
+            if (str_contains($m, ':')) {
                 [$mw, $arg] = explode(':', $m, 2);
                 if (str_contains($mw, 'EnsureModuleEnabled')) {
                     $service = new ModuleAccessService;

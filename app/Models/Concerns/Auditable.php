@@ -16,10 +16,12 @@ trait Auditable
     public static function bootAuditable(): void
     {
         static::created(function (Model $model): void {
+            /** @var self $model */
             $model->writeAuditLog('created', null, $model->auditableAttributes($model->getAttributes()));
         });
 
         static::updated(function (Model $model): void {
+            /** @var self $model */
             $changes = $model->auditableAttributes($model->getChanges());
 
             // Nothing meaningful changed (e.g. only timestamps were touched).
@@ -33,6 +35,7 @@ trait Auditable
         });
 
         static::deleted(function (Model $model): void {
+            /** @var self $model */
             $model->writeAuditLog('deleted', $model->auditableAttributes($model->getOriginal()), null);
         });
     }

@@ -75,11 +75,11 @@ class BarcodeService
             }
 
             $companyCode = $record->customer?->company_code ?? 'DM';
-            $sequence = SequenceGenerator::next("barcode:{$record->customer_id}:{$type}");
+            $sequence = SequenceGenerator::next("barcode:{$record->getAttribute('customer_id')}:{$type}");
             $barcode = $this->generate($type, $companyCode, $sequence);
 
             $registry = BarcodeRegistry::create([
-                'customer_id' => $record->customer_id,
+                'customer_id' => $record->getAttribute('customer_id'),
                 'barcode' => $barcode,
                 'barcode_type' => $type,
                 'reference_table' => $record->getTable(),

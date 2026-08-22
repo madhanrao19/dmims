@@ -123,4 +123,16 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | API Rate Limit
+    |--------------------------------------------------------------------------
+    |
+    | Requests per minute allowed on the `api` rate limiter (routes/api.php's
+    | /api/v1/* group), keyed by authenticated user or IP. See README.md.
+    |
+    */
+
+    'api_rate_limit_per_minute' => env('API_RATE_LIMIT_PER_MINUTE', 60),
+
 ];

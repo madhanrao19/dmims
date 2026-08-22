@@ -246,6 +246,7 @@ use App\Filament\Resources\DocumentFileResource;
 use App\Filament\Resources\Pages\CreateRecord;
 use App\Filament\Resources\Pages\EditRecord;
 use App\Filament\Resources\Pages\ListRecords;
+use App\Models\DocumentFile;
 use App\Services\DocumentMovementService;
 
 class ListDocumentFiles extends ListRecords
@@ -265,7 +266,10 @@ class CreateDocumentFile extends CreateRecord
      */
     protected function afterCreate(): void
     {
-        app(DocumentMovementService::class)->receiveInFile($this->record, $this->record->current_box_id);
+        /** @var DocumentFile $record */
+        $record = $this->record;
+
+        app(DocumentMovementService::class)->receiveInFile($record, $record->current_box_id);
     }
 }
 

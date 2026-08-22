@@ -6,6 +6,7 @@ use App\Models\Concerns\Auditable;
 use App\Models\Concerns\BelongsToCustomer;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Location extends Model
@@ -28,7 +29,10 @@ class Location extends Model
         'updated_by',
     ];
 
-    public function parent()
+    /**
+     * @return BelongsTo<Location, $this>
+     */
+    public function parent(): BelongsTo
     {
         return $this->belongsTo(self::class, 'parent_id');
     }
@@ -43,7 +47,10 @@ class Location extends Model
         return $this->belongsTo(Customer::class);
     }
 
-    public function locationType()
+    /**
+     * @return BelongsTo<LocationType, $this>
+     */
+    public function locationType(): BelongsTo
     {
         return $this->belongsTo(LocationType::class);
     }

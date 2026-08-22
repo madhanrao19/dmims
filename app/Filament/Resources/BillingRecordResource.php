@@ -159,6 +159,7 @@ use App\Filament\Resources\BillingRecordResource;
 use App\Filament\Resources\Pages\CreateRecord;
 use App\Filament\Resources\Pages\EditRecord;
 use App\Filament\Resources\Pages\ListRecords;
+use App\Models\BillingRecord;
 use App\Services\BillingService;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Database\Eloquent\Model;
@@ -199,6 +200,9 @@ class EditBillingRecord extends EditRecord
 
     protected function afterSave(): void
     {
-        app(BillingService::class)->recalculatePaymentStatus($this->record);
+        /** @var BillingRecord $record */
+        $record = $this->record;
+
+        app(BillingService::class)->recalculatePaymentStatus($record);
     }
 }

@@ -200,6 +200,7 @@ namespace App\Filament\Resources\UserResource\Pages;
 use App\Filament\Resources\Pages\EditRecord;
 use App\Filament\Resources\Pages\ListRecords;
 use App\Filament\Resources\UserResource;
+use App\Models\User;
 use Filament\Resources\Pages\CreateRecord;
 
 class ListUsers extends ListRecords
@@ -232,7 +233,10 @@ class CreateUser extends CreateRecord
 
     protected function afterCreate(): void
     {
-        UserResource::stripDisallowedRoles($this->record);
+        /** @var User $record */
+        $record = $this->record;
+
+        UserResource::stripDisallowedRoles($record);
     }
 }
 
@@ -247,7 +251,10 @@ class EditUser extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        $this->originalRoleIds = $this->record->roles()->pluck('roles.id')->all();
+        /** @var User $record */
+        $record = $this->record;
+
+        $this->originalRoleIds = $record->roles()->pluck('roles.id')->all();
 
         // Preserve, don't clobber: UserResource::can() already denies write
         // access to a platform-user record for a non-platform actor, so this
@@ -258,7 +265,7 @@ class EditUser extends EditRecord
         $actor = auth()->user();
 
         if (! $actor?->is_platform_user) {
-            $data['is_platform_user'] = $this->record->is_platform_user;
+            $data['is_platform_user'] = $record->is_platform_user;
 
             // Same tenant-hop guard as CreateUser::mutateFormDataBeforeCreate —
             // User has no BelongsToCustomer scope, so re-force customer_id on
@@ -277,7 +284,7 @@ class EditUser extends EditRecord
             // request could otherwise still include them.
             if (! UserResource::actorCanFullyManage()) {
                 foreach (['email', 'username', 'status', 'customer_id'] as $field) {
-                    $data[$field] = $this->record->{$field};
+                    $data[$field] = $record->{$field};
                 }
                 unset($data['password']);
             }
@@ -288,13 +295,16 @@ class EditUser extends EditRecord
 
     protected function afterSave(): void
     {
-        UserResource::stripDisallowedRoles($this->record);
+        /** @var User $record */
+        $record = $this->record;
+
+        UserResource::stripDisallowedRoles($record);
 
         // Same reasoning as the field reset above: roles is a relationship,
         // not covered by mutateFormDataBeforeSave — restore the pre-save
         // snapshot if a limited actor's request tried to change it.
         if (! UserResource::actorCanFullyManage() && $this->originalRoleIds !== null) {
-            $this->record->roles()->sync($this->originalRoleIds);
+            $record->roles()->sync($this->originalRoleIds);
         }
     }
 }

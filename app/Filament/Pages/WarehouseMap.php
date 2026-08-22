@@ -12,6 +12,8 @@ use Illuminate\Support\Collection;
  * Clickable Warehouse > Room > Rack > Shelf > Box hierarchy browser
  * (production-readiness roadmap #15), built on the existing Location
  * parent/child tree — no new data model needed.
+ *
+ * @property-read Location|null $currentLocation
  */
 class WarehouseMap extends Page
 {
