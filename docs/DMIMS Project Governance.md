@@ -371,8 +371,7 @@ Mandatory project documents include:
 \- DMIMS Technical Design Document (TDD).md  
 \- DMIMS Test Strategy, QA Plan & UAT Specification.md  
 \- DMIMS UIUX & Design System Specification.md  
-\- PWA.md  
-\- PWA\_PR\_BODY.md
+\- PWA.md
 
 These documents collectively define the project.
 
