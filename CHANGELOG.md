@@ -4,6 +4,47 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.35] - 2026-08-22
+
+### Fixed — resolved 203 of 215 PHPStan/Larastan baseline findings
+
+Root-cause fixes, not suppressions (`phpstan-baseline.neon`: 215 → 12
+entries). Two real bugs found along the way, not just lint:
+
+- **`AppServiceProvider`**: `env('API_RATE_LIMIT_PER_MINUTE')` was called
+  inside `boot()`, which silently falls back to the hardcoded default once
+  `php artisan config:cache` runs in production — ignoring any custom `.env`
+  value. Moved to `config('app.api_rate_limit_per_minute')` (new key in
+  `config/app.php`), with a defensive `?: 60` fallback at the read site so a
+  stale or missing config cache can't zero out the rate limit and lock out
+  the API entirely (caught in security review before merge).
+- **`ImportService`**: a stale `@return` docblock on `importableTypes()` was
+  missing the `unique` key every real entry has, which made PHPStan think
+  the duplicate-row-detection block was dead code. Fixed the docblock and
+  removed one genuinely-unreachable null check in `validateRow()`.
+
+The remaining fixes were mostly missing PHPDoc type annotations cascading
+from two trait event closures (`Auditable`, `BelongsToCustomer`) typed as
+base `Model` instead of the composing class — zero runtime effect. 12
+findings were deliberately left in the baseline (mostly `nullsafe.neverNull`
+"false positives" verified against migration nullability, not blindly
+trusted) with reasoning recorded in the PR. Independently re-verified by a
+security-reviewer pass over the full diff — no regressions.
+
+## [2.1.34] - 2026-08-22
+
+### Changed — dependency updates (composer, npm, CI actions)
+
+Routine dependency maintenance, verified with the full local check suite
+(Pint, Larastan, 152 tests, asset build) before merge:
+
+- composer: `nunomaduro/collision` → 8.9.5, `phpunit/phpunit` → 13.3.1,
+  `spatie/laravel-permission` → 8.3.0 (lockfile only, no `composer.json`
+  range changes needed).
+- npm: `tailwindcss` + `@tailwindcss/vite` → 4.3.3, `vite` → 8.2.2,
+  `laravel-vite-plugin` → 3.2.0 (lockfile only).
+- `.github/workflows/ci.yml`: `actions/setup-node` v6 → v7.
+
 ## [2.1.33] - 2026-08-19
 
 ### Changed — deploy-ubuntu-24.sh: single script for staging and production
