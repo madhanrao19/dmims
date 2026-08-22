@@ -128,6 +128,19 @@ Platform-wide.
 
 ---
 
+**Invariant:** `Datamation Super Admin` and `Datamation Management` are the
+only platform-tier roles; every other role in the hierarchy above is
+tenant-scoped. The `users.is_platform_user` flag must always match whether a
+user holds a platform-tier role — `BaseResource::can()` and
+`shouldRegisterNavigation()` key off this flag alone and skip tenant scoping
+entirely once it is `true`. Enforced server-side by
+`UserResource::enforcePlatformRoleConsistency()` on every create and edit: a
+platform-tier role without the flag gets the flag promoted, a non-platform
+role with the flag set gets it demoted. Do not rely on the create/edit form
+alone to keep the two in sync.
+
+---
+
 ## **Company Admin**
 
 Purpose

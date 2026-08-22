@@ -141,7 +141,9 @@ Enforce:
 * Middleware  
 * AccessControlService  
 * Customer filtering  
-* Automated tests
+* Automated tests  
+* UserResource::enforcePlatformRoleConsistency() (v2.1.36 — closes the
+  is\_platform\_user/role-mismatch path that caused a real incident)
 
 Status
 
