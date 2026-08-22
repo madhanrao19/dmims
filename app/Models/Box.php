@@ -7,6 +7,7 @@ use App\Models\Concerns\BelongsToCustomer;
 use App\Models\Concerns\Taggable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Box extends Model
@@ -32,7 +33,10 @@ class Box extends Model
         return $this->belongsTo(Customer::class);
     }
 
-    public function currentLocation()
+    /**
+     * @return BelongsTo<Location, $this>
+     */
+    public function currentLocation(): BelongsTo
     {
         return $this->belongsTo(Location::class, 'current_location_id');
     }

@@ -206,6 +206,7 @@ use App\Filament\Resources\BoxResource;
 use App\Filament\Resources\Pages\CreateRecord;
 use App\Filament\Resources\Pages\EditRecord;
 use App\Filament\Resources\Pages\ListRecords;
+use App\Models\Box;
 use App\Services\DocumentMovementService;
 
 class ListBoxes extends ListRecords
@@ -221,10 +222,13 @@ class CreateBox extends CreateRecord
      *  first event through DocumentMovementService::receiveInBox(). */
     protected function afterCreate(): void
     {
+        /** @var Box $record */
+        $record = $this->record;
+
         app(DocumentMovementService::class)->receiveInBox(
-            $this->record,
-            $this->record->current_location_id,
-            $this->record->source_origin,
+            $record,
+            $record->current_location_id,
+            $record->source_origin,
         );
     }
 }

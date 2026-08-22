@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Customer extends Model
@@ -59,12 +60,18 @@ class Customer extends Model
         return $this->hasMany(CustomerModule::class);
     }
 
-    public function subscriptions()
+    /**
+     * @return HasMany<CustomerSubscription, $this>
+     */
+    public function subscriptions(): HasMany
     {
         return $this->hasMany(CustomerSubscription::class);
     }
 
-    public function licenses()
+    /**
+     * @return HasMany<License, $this>
+     */
+    public function licenses(): HasMany
     {
         return $this->hasMany(License::class);
     }

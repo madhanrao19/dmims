@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\BelongsToCustomer;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class DocumentMovementLog extends Model
 {
@@ -47,12 +48,18 @@ class DocumentMovementLog extends Model
         return $this->belongsTo(Location::class, 'to_location_id');
     }
 
-    public function fromBox()
+    /**
+     * @return BelongsTo<Box, $this>
+     */
+    public function fromBox(): BelongsTo
     {
         return $this->belongsTo(Box::class, 'from_box_id');
     }
 
-    public function toBox()
+    /**
+     * @return BelongsTo<Box, $this>
+     */
+    public function toBox(): BelongsTo
     {
         return $this->belongsTo(Box::class, 'to_box_id');
     }

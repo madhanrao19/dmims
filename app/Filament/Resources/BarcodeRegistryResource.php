@@ -212,6 +212,7 @@ class BarcodeRegistryResource extends BaseResource
                         'size' => $get('size') ?? 'small',
                     ]))
                     ->action(function (Collection $records): void {
+                        /** @var Collection<int, BarcodeRegistry> $records */
                         $records->each(fn (BarcodeRegistry $record) => app(BarcodeService::class)->incrementPrinted($record));
                         Notification::make()->title('Batch marked as printed')->success()->send();
                     }),

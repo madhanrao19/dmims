@@ -12,6 +12,9 @@ use Filament\Schemas\Schema;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
+/**
+ * @property Schema $form
+ */
 class Reports extends Page implements HasForms
 {
     use InteractsWithForms;

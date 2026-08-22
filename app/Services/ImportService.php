@@ -21,7 +21,7 @@ class ImportService
      * Importable entity types: the target model, the columns accepted from the
      * CSV header, and which of those are required for a row to be valid.
      *
-     * @return array<string, array{model: class-string, columns: list<string>, required: list<string>}>
+     * @return array<string, array{model: class-string, columns: list<string>, required: list<string>, unique?: string}>
      */
     public static function importableTypes(): array
     {
@@ -182,7 +182,7 @@ class ImportService
         $errors = [];
 
         foreach ($required as $field) {
-            if (! isset($data[$field]) || $data[$field] === null || $data[$field] === '') {
+            if (! isset($data[$field]) || $data[$field] === '') {
                 $errors[$field] = "The {$field} field is required.";
             }
         }

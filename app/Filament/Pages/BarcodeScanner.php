@@ -22,6 +22,8 @@ use Illuminate\Support\Collection;
  * auto-detect what it is (product/location/box/document file/unknown), and
  * either open the record or — in bulk mode — keep scanning without
  * navigating away. Built on the existing ScannerService/BarcodeScanLog.
+ *
+ * @property Schema $form
  */
 class BarcodeScanner extends Page implements HasForms
 {

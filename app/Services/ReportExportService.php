@@ -16,6 +16,7 @@ use App\Models\Product;
 use App\Models\ProductLocationStock;
 use App\Models\StockMovement;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Database\Eloquent\Builder;
 use InvalidArgumentException;
 use OpenSpout\Common\Entity\Row;
 use OpenSpout\Writer\XLSX\Writer as XlsxWriter;
@@ -160,23 +161,23 @@ class ReportExportService
         return match ($key) {
             'customer_summary' => [
                 ['ID', 'Company', 'Code', 'Status', 'Created'],
-                Customer::query()->lazy()->map(fn ($c) => [$c->id, $c->company_name, $c->company_code, $c->status, (string) $c->created_at]),
+                Customer::query()->lazy()->map(fn (Customer $c) => [$c->id, $c->company_name, $c->company_code, $c->status, (string) $c->created_at]),
             ],
             'subscription_summary' => [
                 ['Subscription No', 'Company', 'Status', 'Valid From', 'Valid To'],
-                CustomerSubscription::with('customer')->lazy()->map(fn ($s) => [$s->subscription_no, $s->customer?->company_name, $s->status, (string) $s->valid_from, (string) $s->valid_to]),
+                CustomerSubscription::with('customer')->lazy()->map(fn (CustomerSubscription $s): array => [$s->subscription_no, $s->customer?->company_name, $s->status, (string) $s->valid_from, (string) $s->valid_to]),
             ],
             'license_summary' => [
                 ['License No', 'Company', 'Status', 'Access Mode', 'Valid To'],
-                License::with('customer')->lazy()->map(fn ($l) => [$l->license_no, $l->customer?->company_name, $l->status, $l->technical_access_mode, (string) $l->valid_to]),
+                License::with('customer')->lazy()->map(fn (License $l) => [$l->license_no, $l->customer?->company_name, $l->status, $l->technical_access_mode, (string) $l->valid_to]),
             ],
             'billing_summary' => [
                 ['Invoice No', 'Company', 'Total', 'Billing Status', 'Payment Status', 'Due Date'],
-                BillingRecord::with('customer')->lazy()->map(fn ($b) => [$b->invoice_no, $b->customer?->company_name, $b->total_amount, $b->billing_status, $b->payment_status, (string) $b->due_date]),
+                BillingRecord::with('customer')->lazy()->map(fn (BillingRecord $b) => [$b->invoice_no, $b->customer?->company_name, $b->total_amount, $b->billing_status, $b->payment_status, (string) $b->due_date]),
             ],
             'payment_summary' => [
                 ['Payment No', 'Invoice', 'Amount', 'Method', 'Date'],
-                BillingPayment::with('billingRecord')->lazy()->map(fn ($p) => [$p->payment_no, $p->billingRecord?->invoice_no, $p->amount, $p->payment_method, (string) $p->payment_date]),
+                BillingPayment::with('billingRecord')->lazy()->map(fn (BillingPayment $p) => [$p->payment_no, $p->billingRecord?->invoice_no, $p->amount, $p->payment_method, (string) $p->payment_date]),
             ],
             'outstanding_balance' => [
                 ['Invoice No', 'Company', 'Total', 'Outstanding', 'Due Date'],
@@ -184,59 +185,59 @@ class ReportExportService
                     ->where('payment_status', '!=', 'paid')
                     ->where('billing_status', '!=', 'cancelled')
                     ->lazy()
-                    ->map(fn ($b) => [$b->invoice_no, $b->customer?->company_name, $b->total_amount, $b->outstandingAmount(), (string) $b->due_date]),
+                    ->map(fn (BillingRecord $b) => [$b->invoice_no, $b->customer?->company_name, $b->total_amount, $b->outstandingAmount(), (string) $b->due_date]),
             ],
             'audit_summary' => [
                 ['Date', 'Module', 'Action', 'User ID', 'Auditable'],
-                AuditLog::latest()->limit(5000)->get()->map(fn ($a) => [(string) $a->created_at, $a->module, $a->action, $a->user_id, class_basename((string) $a->auditable_type).'#'.$a->auditable_id]),
+                AuditLog::latest()->limit(5000)->get()->map(fn (AuditLog $a) => [(string) $a->created_at, $a->module, $a->action, $a->user_id, class_basename((string) $a->auditable_type).'#'.$a->auditable_id]),
             ],
             'module_usage' => [
                 ['Company', 'Module', 'Enabled', 'Enabled At'],
-                CustomerModule::with(['customer', 'module'])->lazy()->map(fn ($cm) => [
+                CustomerModule::with(['customer', 'module'])->lazy()->map(fn (CustomerModule $cm) => [
                     $cm->customer?->company_name, $cm->module?->module_name,
                     $cm->is_enabled ? 'Yes' : 'No', (string) $cm->enabled_at,
                 ]),
             ],
             'inventory_summary' => [
                 ['SKU', 'Product', 'Reorder Level', 'Unit Cost', 'Unit Price', 'Status'],
-                Product::query()->lazy()->map(fn ($p) => [$p->sku, $p->product_name, $p->reorder_level, $p->unit_cost, $p->unit_price, $p->status]),
+                Product::query()->lazy()->map(fn (Product $p) => [$p->sku, $p->product_name, $p->reorder_level, $p->unit_cost, $p->unit_price, $p->status]),
             ],
             'low_stock' => $this->lowStock(),
             'stock_movement' => [
                 ['Movement No', 'Product ID', 'Type', 'Qty', 'From', 'To', 'Performed At'],
-                StockMovement::query()->latest('performed_at')->lazy()->map(fn ($m) => [$m->movement_no, $m->product_id, $m->movement_type, $m->quantity, $m->from_location_id, $m->to_location_id, (string) $m->performed_at]),
+                StockMovement::query()->latest('performed_at')->lazy()->map(fn (StockMovement $m) => [$m->movement_no, $m->product_id, $m->movement_type, $m->quantity, $m->from_location_id, $m->to_location_id, (string) $m->performed_at]),
             ],
             'stock_value' => $this->stockValue(),
             'file_master' => [
                 ['Reference No', 'Title', 'Status', 'Box ID'],
-                DocumentFile::query()->lazy()->map(fn ($f) => [$f->file_reference_no, $f->title, $f->current_status, $f->current_box_id]),
+                DocumentFile::query()->lazy()->map(fn (DocumentFile $f) => [$f->file_reference_no, $f->title, $f->current_status, $f->current_box_id]),
             ],
             'box_master' => [
                 ['Box No', 'Barcode', 'Location ID', 'Status'],
-                Box::query()->lazy()->map(fn ($b) => [$b->box_number, $b->box_barcode, $b->current_location_id, $b->status]),
+                Box::query()->lazy()->map(fn (Box $b) => [$b->box_number, $b->box_barcode, $b->current_location_id, $b->status]),
             ],
             'files_by_box' => [
                 ['Box No', 'Reference No', 'File Title', 'File Status'],
                 DocumentFile::with('currentBox')->whereNotNull('current_box_id')->orderBy('current_box_id')->lazy()
-                    ->map(fn ($f) => [$f->currentBox?->box_number, $f->file_reference_no, $f->title, $f->current_status]),
+                    ->map(fn (DocumentFile $f) => [$f->currentBox?->box_number, $f->file_reference_no, $f->title, $f->current_status]),
             ],
             'boxes_by_location' => [
                 ['Location', 'Box No', 'Barcode', 'Box Status'],
                 Box::with('currentLocation')->whereNotNull('current_location_id')->orderBy('current_location_id')->lazy()
-                    ->map(fn ($b) => [$b->currentLocation?->location_name, $b->box_number, $b->box_barcode, $b->status]),
+                    ->map(fn (Box $b) => [$b->currentLocation?->location_name, $b->box_number, $b->box_barcode, $b->status]),
             ],
             'movement_history' => [
                 ['Movement No', 'Action', 'From Box', 'To Box', 'Performed At'],
-                DocumentMovementLog::query()->latest('performed_at')->lazy()->map(fn ($m) => [$m->movement_no, $m->action_type, $m->from_box_id, $m->to_box_id, (string) $m->performed_at]),
+                DocumentMovementLog::query()->latest('performed_at')->lazy()->map(fn (DocumentMovementLog $m) => [$m->movement_no, $m->action_type, $m->from_box_id, $m->to_box_id, (string) $m->performed_at]),
             ],
             'external_movement' => [
                 // "External" = a documented origin/destination outside the system
                 // (TDD §20 — free text, never a fake location/box row).
                 ['Movement No', 'Action', 'Item Type', 'Item ID', 'Source Origin', 'Destination', 'Performed At'],
                 DocumentMovementLog::query()
-                    ->where(fn ($q) => $q->whereNotNull('source_origin')->orWhereNotNull('destination'))
+                    ->where(fn (Builder $q) => $q->whereNotNull('source_origin')->orWhereNotNull('destination'))
                     ->latest('performed_at')->lazy()
-                    ->map(fn ($m) => [
+                    ->map(fn (DocumentMovementLog $m) => [
                         $m->movement_no, $m->action_type,
                         $m->movable_type ? class_basename($m->movable_type) : '', $m->movable_id,
                         $m->source_origin, $m->destination, (string) $m->performed_at,
@@ -285,7 +286,7 @@ class ReportExportService
             ->where('performed_at', '<', $cutoff)
             ->latest('performed_at')
             ->lazy()
-            ->map(fn ($m) => [$m->movement_no, $m->action_type, $m->movable_type ? class_basename($m->movable_type) : '', $m->movable_id, (string) $m->performed_at]);
+            ->map(fn (DocumentMovementLog $m) => [$m->movement_no, $m->action_type, $m->movable_type ? class_basename($m->movable_type) : '', $m->movable_id, (string) $m->performed_at]);
 
         return [['Movement No', 'Action', 'Item Type', 'Item ID', 'Moved Out At'], $rows];
     }

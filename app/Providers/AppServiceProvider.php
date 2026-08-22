@@ -58,7 +58,7 @@ class AppServiceProvider extends ServiceProvider
         // routes/api.php's v1 group is lightweight and read-only; 60/min per
         // token (falling back to IP) is generous headroom, not a hard cap.
         RateLimiter::for('api', function (Request $request) {
-            return Limit::perMinute((int) env('API_RATE_LIMIT_PER_MINUTE', 60))
+            return Limit::perMinute((int) config('app.api_rate_limit_per_minute') ?: 60)
                 ->by($request->user()?->id ?: $request->ip());
         });
     }

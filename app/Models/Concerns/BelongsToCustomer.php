@@ -36,6 +36,7 @@ trait BelongsToCustomer
         });
 
         static::creating(function (Model $model): void {
+            /** @var self $model */
             $user = auth()->user();
 
             // Always bind a tenant user's records to their own customer,
@@ -50,6 +51,7 @@ trait BelongsToCustomer
         });
 
         static::updating(function (Model $model): void {
+            /** @var self $model */
             $user = auth()->user();
 
             // Same as creating(): a tenant user editing a record they already own

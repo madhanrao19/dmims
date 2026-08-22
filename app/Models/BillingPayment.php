@@ -6,6 +6,7 @@ use App\Models\Concerns\Auditable;
 use App\Models\Concerns\BelongsToCustomer;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class BillingPayment extends Model
 {
@@ -28,12 +29,18 @@ class BillingPayment extends Model
         'amount' => 'decimal:2',
     ];
 
-    public function customer()
+    /**
+     * @return BelongsTo<Customer, $this>
+     */
+    public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
     }
 
-    public function billingRecord()
+    /**
+     * @return BelongsTo<BillingRecord, $this>
+     */
+    public function billingRecord(): BelongsTo
     {
         return $this->belongsTo(BillingRecord::class);
     }

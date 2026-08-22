@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Box;
 use App\Models\DocumentFile;
 use App\Models\DocumentMovementLog;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
 /**
@@ -25,7 +26,7 @@ class MovementTimelineService
     }
 
     /**
-     * @return Collection<string, Collection> entries grouped by day label
+     * @return Collection<(int|string), Collection<int, array{time: Carbon|null, title: string, detail: string, actor: mixed}>> entries grouped by day label
      */
     protected function build(string $movableType, int $movableId): Collection
     {
