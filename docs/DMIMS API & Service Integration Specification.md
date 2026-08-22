@@ -57,17 +57,19 @@ Future versions
 
 Never introduce breaking changes inside the same API version.
 
+Currently implemented (see `routes/api.php`): three narrow, read-only, Sanctum-token-authenticated endpoints under `/api/v1` — `GET /barcodes/{barcode}`, `GET /products/{product}/stock`, `GET /exports/{exportNo}`. Everything else in this document (Sections 8–11 onward) is the target interface design for future development, not yet implemented, unless stated otherwise.
+
 ---
 
 # **3\. Authentication**
 
-Future authentication methods:
+Implemented today
 
-Laravel Sanctum
+Laravel Sanctum personal access tokens, issued via the `dmims:issue-api-token` artisan command. Tokens default to the `api:read` ability and a configurable expiration (`SANCTUM_TOKEN_EXPIRATION`, default 365 days). `routes/api.php` enforces `auth:sanctum`, `business-access` and `abilities:api:read` on every `/api/v1` route.
+
+Future authentication methods
 
 OAuth2
-
-API Tokens
 
 Future Enterprise
 
@@ -575,15 +577,9 @@ Offline synchronization (future version)
 
 # **21\. API Rate Limiting**
 
-Recommended defaults
+Implemented today
 
-Authenticated users
-
-120 requests per minute
-
-Public endpoints
-
-30 requests per minute
+`/api/v1/*` is throttled via the `api` rate limiter (`throttle:api` middleware), configured through `API_RATE_LIMIT_PER_MINUTE` (default 60 requests per minute per authenticated user). See `app/Providers/AppServiceProvider.php`.
 
 Large exports
 

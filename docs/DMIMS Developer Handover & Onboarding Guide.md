@@ -92,7 +92,7 @@ app/Models
 app/Services  
 app/Filament  
 app/Http  
-app/Policies  
+app/Observers  
 database/migrations  
 database/seeders  
 tests
@@ -105,7 +105,7 @@ Before changing anything, understand these services:
 
 AccessControlService
 
-SubscriptionService
+CustomerSubscriptionObserver (subscription lifecycle)
 
 LicenseService
 
@@ -333,7 +333,7 @@ Always:
 
 * Reuse Services.  
 * Use Form Requests.  
-* Use Policies.  
+* Authorize through `BaseResource::can()` / `permissionFor()` (Filament Resource authorization — DMIMS does not use Laravel Policy classes).  
 * Use database transactions.  
 * Write audit records.
 

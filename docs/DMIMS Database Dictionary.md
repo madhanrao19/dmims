@@ -165,6 +165,7 @@ Yes
 | phone | string | Yes | Contact phone |
 | address | text | Yes | Company address |
 | status | enum | No | Company status |
+| deployment\_type | string | No | Deployment model (default DatamationOnPremHosted) |
 | notes | text | Yes | Internal notes |
 | created\_by | bigint | Yes | User ID |
 | updated\_by | bigint | Yes | User ID |
@@ -277,6 +278,7 @@ Yes
 | username | string | Yes | Optional username |
 | employee\_id | string | Yes | Employee identifier |
 | phone | string | Yes | Contact number |
+| department\_id | bigint | Yes | Owning department |
 | job\_title | string | Yes | Job title |
 | password | string | No | Hashed password |
 | status | enum | No | User status |
@@ -291,6 +293,8 @@ Yes
 ## **Relationships**
 
 belongsTo Customer
+
+belongsTo Department
 
 belongsToMany Roles
 

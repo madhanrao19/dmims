@@ -328,21 +328,16 @@ http://127.0.0.1:8000/admin
 # **12\. Project Folder Structure**
 
 app/  
-    Actions/  
     Console/  
-    Events/  
     Exceptions/  
     Filament/  
     Http/  
     Jobs/  
     Mail/  
     Models/  
-    Notifications/  
     Observers/  
-    Policies/  
     Providers/  
-    Services/  
-    Traits/
+    Services/
 
 bootstrap/
 

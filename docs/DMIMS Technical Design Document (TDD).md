@@ -17,7 +17,6 @@ It provides developers with the complete software design including:
 * Models  
 * Services  
 * Middleware  
-* Policies  
 * Filament Resources  
 * Database relationships  
 * Coding standards  
@@ -71,7 +70,6 @@ app/
 ├── Models/  
 ├── Notifications/  
 ├── Observers/  
-├── Policies/  
 ├── Providers/  
 ├── Services/  
 ├── Traits/  
@@ -136,9 +134,9 @@ Examples:
 
 ---
 
-## **Policies**
+## **Authorization**
 
-Every CRUD operation must be protected using Laravel Policies.
+Every CRUD operation must be protected using Filament resource authorization (`BaseResource::can()` / `permissionFor()`).
 
 Never rely only on hidden buttons.
 
@@ -253,15 +251,12 @@ No module should duplicate these checks.
 
 ---
 
-## **SubscriptionService**
+## **Subscription Lifecycle (AccessControlService + CustomerSubscriptionObserver)**
 
-Responsibilities
+There is no dedicated `SubscriptionService` class. Subscription lifecycle is handled by:
 
-* Current subscription  
-* Plan limits  
-* Grace period  
-* Enabled modules  
-* Renewal
+* `AccessControlService` — current subscription, plan limits, grace period  
+* `CustomerSubscriptionObserver` — syncs enabled modules and logs subscription changes on create/update/delete
 
 ---
 
@@ -552,12 +547,6 @@ Suffix with Controller
 
 ---
 
-## **Policies**
-
-Suffix with Policy
-
----
-
 ## **Requests**
 
 Suffix with Request
@@ -788,7 +777,7 @@ CSRF protection
 
 Rate limiting
 
-Policies
+Filament resource authorization (`BaseResource::can()` / `permissionFor()`)
 
 Middleware
 
@@ -809,8 +798,6 @@ Each module should include:
 Feature Tests
 
 Unit Tests
-
-Policy Tests
 
 Permission Tests
 
@@ -884,7 +871,7 @@ A feature is considered complete only when:
 
 ✓ Customer isolation enforced
 
-✓ Policies implemented
+✓ Resource authorization implemented
 
 ✓ Validation completed
 
@@ -939,7 +926,7 @@ The DMIMS architecture follows these engineering principles:
 * Thin controllers  
 * Reusable services  
 * Database transaction integrity  
-* Policy-based authorization  
+* Resource-based authorization  
 * Modular feature design  
 * Future-ready scalability
 

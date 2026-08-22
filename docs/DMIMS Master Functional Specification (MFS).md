@@ -192,9 +192,9 @@ Valid email format
 
 Password
 
-Minimum 12 characters
+Minimum 8 characters
 
-Strong password policy
+No complexity rule currently enforced
 
 ---
 

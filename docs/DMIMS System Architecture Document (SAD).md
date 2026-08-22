@@ -288,7 +288,7 @@ Examples
 
 AccessControlService
 
-SubscriptionService
+CustomerSubscriptionObserver
 
 LicenseService
 
@@ -364,15 +364,12 @@ No module should implement these checks independently.
 
 ---
 
-## **SubscriptionService**
+## **Subscription Lifecycle (AccessControlService + CustomerSubscriptionObserver)**
 
-Responsible for
+There is no dedicated `SubscriptionService` class. Responsibility is split:
 
-* Subscription lookup  
-* Plan limits  
-* Enabled modules  
-* Grace periods  
-* Renewal
+* `AccessControlService` — subscription lookup, plan limits, grace periods  
+* `CustomerSubscriptionObserver` — syncs enabled modules on subscription create/update/delete
 
 ---
 
@@ -520,7 +517,7 @@ Model
 
 ↓
 
-Policy
+Resource Authorization
 
 ↓
 
