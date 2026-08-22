@@ -137,7 +137,7 @@ Mitigation
 
 Enforce:
 
-* Policies  
+* Filament resource authorization (BaseResource::can() / permissionFor())  
 * Middleware  
 * AccessControlService  
 * Customer filtering  
