@@ -4,6 +4,53 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.36] - 2026-08-23
+
+### Fixed — Critical: tenant Company Admin could hold platform-wide access
+
+Live incident: a Datamation Super Admin created a Company Admin user for a
+new tenant ("Madhan Inc") via the Filament `UserResource` create form and
+set `is_platform_user=true` on it at the same time — the form's toggle is
+visible to platform actors with no check against the assigned role.
+`BaseResource::can()` and `shouldRegisterNavigation()` both key off
+`is_platform_user` alone to skip tenant scoping entirely, so the account
+ended up with unrestricted platform-wide read access (Customers, Users,
+Backups, Audit Logs, Subscription Plans, Licenses, etc.) despite a
+tenant-scoped role and a real `customer_id`.
+
+- **`UserResource::enforcePlatformRoleConsistency()`** (new): re-derives
+  `is_platform_user` from whether the user actually holds a platform-tier
+  role (`Datamation Super Admin` / `Datamation Management`), called from
+  both `CreateUser::afterCreate()` and `EditUser::afterSave()` after role
+  sync. A security review caught a regression in the first version of this
+  fix — `EditUser::afterSave()` restoring a limited actor's pre-save role
+  snapshot *after* stripping disallowed roles could put a platform role
+  back and re-promote an already-mismatched record; reordered so the
+  snapshot restore happens first, `stripDisallowedRoles()` always has the
+  last word on the role set, and the consistency check reads a role list
+  that's already been sanitized.
+- **`dmims:fix-platform-role-consistency`** (new console command): audits
+  every user (including soft-deleted, via `withoutGlobalScopes()`) for this
+  mismatch and corrects it via the same method the live form uses;
+  `--dry-run` lists what would change before applying. Used to remediate the
+  live incident.
+- **`dmims:create-admin`**: now fails closed (deletes the user, returns
+  `FAILURE`) instead of warning and creating a role-less
+  `is_platform_user=true` account when the Super Admin role hasn't been
+  seeded yet — that state is invalid and the new consistency check would
+  otherwise silently demote it later with no operator-visible reason. Uses
+  `forceDelete()`, not `delete()` — `User` has `SoftDeletes`, and a soft
+  delete would leave the row (and its unique email) behind, permanently
+  blocking a retry once the role is seeded.
+
+Verified: composer validate/audit, pint, phpstan (clean), 155 tests
+(4 new, covering the create path, the edit-path reorder regression
+specifically, the reverse direction, and the command's dry-run/apply
+behavior). Two independent security-reviewer passes — the first caught the
+edit-path reorder bug and the `delete()`/soft-delete bug above before
+either shipped; the second confirmed both closed by reverting and
+re-running the regression tests, not just re-reading the diff.
+
 ## [2.1.35] - 2026-08-22
 
 ### Fixed — resolved 203 of 215 PHPStan/Larastan baseline findings
