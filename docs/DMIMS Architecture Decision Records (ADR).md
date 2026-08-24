@@ -1,971 +1,233 @@
-# **DMIMS Architecture Decision Records (ADR)**
+# DMIMS Architecture Decision Records (ADR)
 
-## **Datamation Inventory Management System (DMIMS)**
+**Datamation Inventory Management System (DMIMS)**  
+**Version:** 1.1  
+**Updated:** 24 August 2026
 
-Version 1.0
-
----
-
-# **Document Purpose**
-
-This document records the major architectural and engineering decisions made during the design and development of DMIMS.
-
-Its purpose is to explain **why** decisions were made, what alternatives were considered, and what consequences those decisions have.
-
-This document should evolve throughout the lifetime of the project.
-
-Whenever a significant architectural decision is made, a new ADR should be added.
-
----
-
-# **ADR Format**
-
-Each Architecture Decision Record follows this template.
-
-## **ADR Number**
-
-Unique identifier
-
-Example
-
-ADR-001
-
----
-
-## **Title**
-
-Short description
-
----
-
-## **Status**
-
-One of
-
-* Proposed  
-* Accepted  
-* Deprecated  
-* Superseded
-
----
-
-## **Date**
-
-Decision date
-
----
-
-## **Context**
-
-What problem existed?
-
----
-
-## **Decision**
-
-What was chosen?
-
----
-
-## **Alternatives Considered**
-
-What other options were evaluated?
-
----
-
-## **Consequences**
-
-Positive
-
-Negative
-
-Trade-offs
-
----
-
-# **ADR-001**
-
-## **Use Laravel as the Primary Framework**
-
-Status
-
-Accepted
-
----
-
-### **Context**
-
-DMIMS requires:
-
-* Long-term maintainability  
-* Large developer ecosystem  
-* Enterprise authentication  
-* Strong ORM  
-* Mature package ecosystem
-
----
-
-### **Decision**
-
-Laravel is selected as the primary backend framework.
-
----
-
-### **Alternatives Considered**
-
-Symfony
-
-ASP.NET Core
-
-NestJS
-
-Django
-
-Spring Boot
-
----
-
-### **Reasons**
-
-Large ecosystem
-
-Excellent documentation
-
-Strong community
-
-Long-term support
-
-Filament compatibility
-
-Rapid development
-
----
-
-### **Consequences**
-
-Positive
-
-Fast development.
-
-Large hiring pool.
-
-Excellent package support.
-
-Negative
-
-Higher memory usage than micro-frameworks.
-
----
-
-# **ADR-002**
-
-## **Use Filament as the Administration Framework**
-
-Status
-
-Accepted
-
----
-
-### **Context**
-
-DMIMS is primarily an internal business application.
-
-Rapid CRUD development is required.
-
----
-
-### **Decision**
-
-Filament will be used for all administration pages.
-
----
-
-### **Alternatives**
-
-Nova
-
-Backpack
-
-Voyager
-
-Custom Blade
-
----
-
-### **Reasons**
-
-Modern
-
-Fast
-
-Laravel-native
-
-Excellent tables and forms
-
-Strong ecosystem
-
----
-
-### **Consequences**
-
-Rapid feature development.
-
-Less frontend code.
-
----
-
-# **ADR-003**
-
-## **Multi-Tenant Architecture Using customer\_id**
-
-Status
-
-Accepted
-
----
-
-### **Context**
-
-Multiple customer companies share the same application.
-
-Data isolation is mandatory.
-
----
-
-### **Decision**
-
-Every customer-owned table includes:
-
-customer\_id
-
----
-
-### **Alternatives**
-
-Separate database per customer
-
-Separate schema
-
-Hybrid multi-tenancy
-
----
-
-### **Reasons**
-
-Simpler deployment
-
-Lower operational cost
-
-Shared reporting
-
-Simpler upgrades
-
----
-
-### **Consequences**
-
-Positive
-
-Single deployment.
-
-Central management.
-
-Negative
-
-Developers must always enforce customer isolation.
-
----
-
-# **ADR-004**
-
-## **Never Trust customer\_id from Client**
-
-Status
-
-Accepted
-
----
-
-### **Context**
-
-Users could manipulate requests.
-
----
-
-### **Decision**
-
-customer\_id is always derived from the authenticated user.
-
----
-
-### **Consequences**
-
-Prevents cross-company access.
-
-Reduces security risks.
-
----
-
-# **ADR-005**
-
-## **Separate Subscription and License**
-
-Status
-
-Accepted
-
----
-
-### **Context**
-
-Commercial entitlement and technical access are different concepts.
-
----
-
-### **Decision**
-
-Subscription
-
-Commercial contract
-
-License
-
-Technical access
-
----
-
-### **Alternatives**
-
-Single combined table
-
----
-
-### **Reasons**
-
-Greater flexibility.
-
-Supports payment disputes.
-
-Supports legal suspension.
-
-Supports technical overrides.
-
----
-
-### **Consequences**
-
-Slightly more complex implementation.
-
-Much greater operational flexibility.
-
----
-
-# **ADR-006**
-
-## **Service-Oriented Business Logic**
-
-Status
-
-Accepted
-
----
-
-### **Context**
-
-Controllers become difficult to maintain when business rules grow.
-
----
-
-### **Decision**
-
-Business rules belong in Services.
-
-Controllers remain thin.
-
----
-
-### **Alternatives**
-
-Fat Controllers
-
-Fat Models
-
----
-
-### **Consequences**
-
-Better testing.
-
-Reusable logic.
-
-Cleaner architecture.
-
----
-
-# **ADR-007**
-
-## **Immutable Movement History**
-
-Status
-
-Accepted
-
----
-
-### **Context**
-
-Inventory history must remain trustworthy.
-
----
-
-### **Decision**
-
-Movement records are never updated or deleted.
-
-Corrections generate new records.
-
----
-
-### **Alternatives**
-
-Update movement history
-
-Delete incorrect records
-
----
-
-### **Reasons**
-
-Auditability
-
-Compliance
-
-Traceability
-
----
-
-### **Consequences**
-
-Complete historical integrity.
-
----
-
-# **ADR-008**
-
-## **Shared Location Model**
-
-Status
-
-Accepted
-
----
-
-### **Context**
-
-Inventory and document tracking both use physical locations.
-
----
-
-### **Decision**
-
-Single locations table.
-
-Products occupy locations.
-
-Boxes occupy locations.
-
-Files occupy boxes.
-
----
-
-### **Alternatives**
-
-Stock locations
-
-Document locations
-
----
-
-### **Consequences**
-
-Cleaner database.
-
-Less duplicated logic.
-
----
-
-# **ADR-009**
-
-## **Manual Billing in Version 1**
-
-Status
-
-Accepted
-
----
-
-### **Context**
-
-Customers pay outside the application.
-
-Online payments are unnecessary.
-
----
-
-### **Decision**
-
-Manual billing only.
-
-Manual payment confirmation.
-
----
-
-### **Alternatives**
-
-Stripe
-
-PayPal
-
-Bank APIs
-
----
-
-### **Consequences**
-
-Simpler implementation.
-
-Can integrate online payments later.
-
----
-
-# **ADR-010**
-
-## **Centralized AccessControlService**
-
-Status
-
-Accepted
-
----
-
-### **Context**
-
-Permission logic becomes duplicated across modules.
-
----
-
-### **Decision**
-
-Single AccessControlService.
-
----
-
-### **Reasons**
-
-Consistency.
-
-Maintainability.
-
-Reduced duplication.
-
----
-
-### **Consequences**
-
-One place to maintain authorization logic.
-
----
-
-# **ADR-011**
-
-## **Audit-First Design**
-
-Status
-
-Accepted
-
----
-
-### **Context**
-
-Business-critical systems require accountability.
-
----
-
-### **Decision**
-
-Every critical action generates an audit record.
-
----
-
-### **Consequences**
-
-Improved traceability.
-
-Supports investigations.
-
----
-
-# **ADR-012**
-
-## **Progressive Web App Instead of Native Mobile App**
-
-Status
-
-Accepted
-
----
-
-### **Context**
-
-Customers need mobile access primarily for barcode scanning.
-
----
-
-### **Decision**
-
-Build a responsive PWA first.
-
-Native apps remain a future enhancement.
-
----
-
-### **Alternatives**
-
-Android app
-
-iOS app
-
-Flutter
-
-React Native
-
----
-
-### **Consequences**
-
-Lower development cost.
-
-Single codebase.
-
-Faster deployment.
-
----
-
-# **ADR-013**
-
-## **API-Ready Architecture**
-
-Status
-
-Accepted
-
----
-
-### **Context**
-
-Future integrations are expected.
-
----
-
-### **Decision**
-
-Keep business logic independent of UI.
-
-Expose functionality through Services.
-
----
-
-### **Consequences**
-
-Future REST and GraphQL APIs can reuse existing business logic.
-
----
-
-# **ADR-014**
-
-## **Database Transactions for Multi-Step Operations**
-
-Status
-
-Accepted
-
----
-
-### **Context**
-
-Inventory and document operations update multiple tables.
-
----
-
-### **Decision**
-
-All multi-table operations execute inside database transactions.
-
----
-
-### **Consequences**
-
-Data integrity.
-
-Automatic rollback on failure.
-
----
-
-# **ADR-015**
-
-## **Soft Deletes for Master Data**
-
-Status
-
-Accepted
-
----
-
-### **Context**
-
-Business records should remain recoverable.
-
 ---
 
-### **Decision**
+# Document Purpose
 
-Master data uses soft deletes.
+This document records major architectural decisions.
 
-History tables remain immutable.
+Existing accepted decisions remain in force.
 
 ---
 
-### **Consequences**
+# ADR-001 — Use Laravel as Primary Framework
 
-Recovery is possible.
+**Status:** Accepted
 
-Historical relationships remain valid.
+Laravel is the primary backend framework.
 
 ---
-
-# **ADR-016**
 
-## **Database Queue Before Redis**
+# ADR-002 — Use Filament as Administration Framework
 
-Status
+**Status:** Accepted
 
-Accepted
+Filament is used for business administration interfaces.
 
 ---
 
-### **Context**
+# ADR-003 — Multi-Tenant Architecture Using customer_id
 
-Version 1 aims to minimise infrastructure complexity.
+**Status:** Accepted
 
----
-
-### **Decision**
-
-Use Laravel Database Queue initially.
+Every customer-owned table includes `customer_id`.
 
-Redis can be introduced later without changing business logic.
+Shared deployment is retained.
 
 ---
 
-### **Consequences**
+# ADR-004 — Never Trust customer_id from Client
 
-Simpler deployment.
+**Status:** Accepted
 
-Easy future migration.
+Trusted customer ownership is always derived server-side from authenticated context.
 
 ---
 
-# **ADR-017**
+# ADR-005 — Separate Subscription and License
 
-## **File Cache Before Redis**
-
-Status
-
-Accepted
-
----
+**Status:** Accepted
 
-### **Context**
+Subscription = commercial entitlement.
 
-Current workload does not justify Redis.
+License = technical access.
 
 ---
 
-### **Decision**
+# ADR-006 — Service-Oriented Business Logic
 
-Use file cache.
+**Status:** Accepted
 
-Prepare interfaces for future Redis support.
+Business logic belongs in reusable services rather than controllers/resources.
 
 ---
 
-### **Consequences**
+# ADR-007 — Immutable Movement History
 
-Lower operational complexity.
+**Status:** Accepted
 
----
-
-# **ADR-018**
-
-## **Cloudflare Tunnel for Secure Publishing**
-
-Status
+Movement history is never edited/deleted; corrections create new records.
 
-Accepted
-
 ---
-
-### **Context**
 
-The production environment should avoid exposing inbound ports directly where possible.
-
----
+# ADR-008 — Shared Location Model
 
-### **Decision**
+**Status:** Accepted
 
-Publish the application through Cloudflare Tunnel.
+Inventory and Document Tracking share one location hierarchy.
 
 ---
 
-### **Alternatives**
+# ADR-009 — Manual Billing in Version 1
 
-Direct public IP
+**Status:** Accepted
 
-Traditional reverse proxy
+Billing/payment is manual and controlled by Datamation administration.
 
-VPN-only access
-
 ---
-
-### **Consequences**
-
-Improved security.
 
-Simplified TLS management.
+# ADR-010 — Explicit Resource Scope Classification and Customer-Facing My Company Boundary
 
----
-
-# **ADR-019**
+**Status:** Accepted  
+**Date:** 24 August 2026
 
-## **AI-Assisted Development is Supported**
+## Context
 
-Status
+DMIMS uses `customer_id` multi-tenancy.
 
-Accepted
+Some tables legitimately contain global/default records with `customer_id = NULL`.
 
----
+Applying:
 
-### **Context**
+```text
+customer_id = current customer
+OR customer_id IS NULL
+```
 
-Modern development increasingly uses AI coding assistants.
+as a generic tenant query is unsafe.
 
----
+It can expose platform-level records such as platform users or platform audit logs to customer roles.
 
-### **Decision**
+DMIMS also contains platform resources such as Subscription Plans and License Management that customers do not need as standalone administration functions.
 
-AI-generated code is permitted.
+Report authorization must reflect operational module, permission and entitlement.
 
-Every change must still comply with:
+## Decision
 
-* Coding standards  
-* Security standards  
-* Testing requirements  
-* Documentation requirements  
-* Human review
+DMIMS uses three resource-scope classifications:
 
----
+1. PLATFORM_ONLY
+2. TENANT_STRICT
+3. TENANT_WITH_GLOBAL_DEFAULTS
 
-### **Consequences**
+### TENANT_STRICT
 
-Higher productivity while maintaining engineering quality.
+Default for customer-owned data.
 
----
+```text
+customer_id = authenticated user's customer_id
+```
 
-# **ADR-020**
+No implicit NULL/global records.
 
-## **Documentation is a Deliverable**
+### TENANT_WITH_GLOBAL_DEFAULTS
 
-Status
+Opt-in only for resources whose documented business rules explicitly support global/default records.
 
-Accepted
+### PLATFORM_ONLY
 
----
+Customer roles cannot directly access platform administration resources.
 
-### **Context**
+Customer-facing company administration is consolidated under:
 
-Knowledge should not exist only in developers' heads.
+**My Company**
 
----
+Possible panels:
 
-### **Decision**
+- Profile
+- Users
+- Enabled Modules
+- Subscription
+- License Status
+- Billing
+- Audit
 
-Every significant architectural or functional change must include updates to the relevant documentation.
+Subscription Plans and full License Management remain platform administration.
 
-Documentation is part of the Definition of Done.
+Customers may see only own effective subscription summary and simplified license status where permitted.
 
----
+Reports are authorized by:
 
-### **Consequences**
+- Report family
+- Required module
+- Required permission
+- Entitlement
+- Tenant ownership
+- License mode
 
-Improved onboarding.
+## Alternatives Considered
 
-Reduced knowledge loss.
+1. Generic tenant scope with NULL fallback.
+2. Hide sensitive resources only from navigation.
+3. Duplicate customer versions of platform resources.
+4. Explicit resource-scope classifications.
 
-Simpler maintenance.
+## Rationale
 
----
+Explicit scope provides:
 
-# **Future ADRs**
-
-Future decisions should be recorded for topics such as:
-
-* Redis adoption  
-* Elasticsearch integration  
-* Object storage (S3-compatible)  
-* Multi-language support  
-* Multi-currency support  
-* Event-driven architecture  
-* WebSocket notifications  
-* OCR integration  
-* RFID support  
-* AI document classification  
-* AI inventory forecasting  
-* High Availability deployment  
-* Blue/Green deployment  
-* Kubernetes adoption  
-* Public REST API  
-* GraphQL support
+- Least privilege
+- Clear tenant boundaries
+- Defense in depth
+- Reduced data-leak risk
+- Cleaner customer UI
+- Better report authorization
+- No duplication of authoritative business data
 
----
+## Consequences
 
-# **Decision Review Process**
+Positive:
 
-Every new ADR should:
+- Platform records cannot accidentally appear in tenant resources.
+- Audit visibility is deterministic.
+- Platform users cannot appear in customer user lists.
+- Customer navigation is simpler.
+- Report authorization matches operational permissions.
 
-1. Define the problem.  
-2. Evaluate alternatives.  
-3. Explain the chosen solution.  
-4. Record trade-offs.  
-5. Be reviewed by the technical lead.  
-6. Be version-controlled with the source code.
+Trade-offs:
 
-Deprecated or superseded ADRs should remain in the document to preserve historical context.
+- Existing resource scoping must be reviewed.
+- Regression tests are required.
+- Navigation/report logic must be refactored.
+- Documentation and UAT must stay synchronized.
 
----
+## Security Requirement
 
-# **Summary**
+Menu hiding is never sufficient.
 
-Architecture Decision Records provide the historical reasoning behind DMIMS.
+Enforce the same decision in:
 
-They prevent accidental reversal of deliberate design choices, improve onboarding, support future maintenance, and help ensure architectural consistency as the system evolves.
+- Resource queries
+- Authorization
+- Direct URLs
+- Global search
+- Relationships
+- Select fields
+- Actions
+- Reports
+- Exports
+- APIs
+- Jobs
 
 ---
 
-# **Document History**
+# Document History
 
 | Version | Date | Description |
-| ----- | ----- | ----- |
-| 1.0 | June 2026 | Initial Architecture Decision Records |
-
+|---|---|---|
+| 1.0 | June 2026 | Initial ADR collection |
+| 1.1 | 24 August 2026 | Added ADR-010 explicit resource scope and My Company architecture |

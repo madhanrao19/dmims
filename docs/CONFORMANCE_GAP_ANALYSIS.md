@@ -1,526 +1,366 @@
 # DMIMS — Requirements Conformance & Gap Analysis
 
-Audited the implementation against the authoritative documents (PRD, SAD,
-Security & Access Control Matrix, Database Dictionary, TDD) on 2026-06-14.
-**Status: all identified gaps remediated** (see CHANGELOG.md). Remaining
-divergences are cosmetic (enum naming) or operational config.
+**Updated:** 24 August 2026 (implementation pass same day)
 
-> **Re-audit 2026-07-08 (v2.1.15):** browser-level QA (role-based Playwright
-> suite, `tests/playwright/role-qa.spec.js`) found that several layers below,
-> while correctly implemented in code, were **not actually enforced over
-> HTTP**: the Filament panel had no middleware stack (no session/CSRF), the
-> `User` model did not implement `FilamentUser` (production login lockout),
-> Filament v5 authorized pages via Gate policies rather than
-> `BaseResource::can()`, a `Gate::before` bypass gave the view-only
-> Datamation Management role full write access, and customer users could
-> enumerate all companies via `customer_id` dropdowns. All fixed in v2.1.15;
-> the statuses below are accurate again and now verified end-to-end in a
-> browser, not only via PHPUnit.
+This document tracks differences between the approved DMIMS specification and current implementation.
 
-> **Re-audit 2026-07-30 (v2.1.16):** a full production-readiness pass
-> (independent security-reviewer subagent + manual verification) found three
-> more issues in the same "correct-looking code, wrong enforcement point"
-> class — see CHANGELOG.md [2.1.16] for full detail:
-> - **Critical** — `UserResource`'s form let any `manage users` holder
->   (including the tenant-scoped Company Admin role) grant `is_platform_user`
->   or a platform-only role to any user in their company. Self-service
->   platform-wide escalation, closed with a `visible()`/query-scope guard on
->   the form plus a server-side strip regardless of client input.
-> - **Critical** — because a platform user can share a tenant's `customer_id`
->   (the seeded `admin@example.com` does), the existing tenant scope alone
->   let a same-tenant Company Admin open that platform user's edit page —
->   and, combined with the missing-password bug below, set a **new
->   password** on it. Full platform takeover without ever touching
->   `is_platform_user`/`roles`. Closed by denying all writes on
->   `is_platform_user = true` records to non-platform actors, independent of
->   `customer_id`.
-> - **High** — Layer 4 (subscription validity) and the user/company-active
->   and license-blocked checks were registered as *global* Laravel
->   middleware, which runs before the Filament panel's `StartSession` (and
->   before `routes/api.php`'s `auth:sanctum`). All six checks read
->   `auth()->user()`, which was always `null` at that point — they silently
->   no-op'd on every request. A customer with a lapsed subscription (but a
->   non-blocked license) kept full access indefinitely. Moved to a named
->   `business-access` middleware group attached after authentication.
->
-> Also found, not a security issue but a **Critical functional defect**: the
-> `UserResource` form had no `password` field at all, so creating any user
-> via the admin UI threw a DB `NOT NULL` violation on every attempt — fixed
-> alongside the above, regression-tested for both the create and
-> blank-on-edit-preserves-hash paths. Full suite (122 tests) and `npm run
-> build` pass; statuses below remain accurate.
+Legend:
 
-> **Re-audit 2026-08-04 (v2.1.18):** an external production-readiness review
-> found one more issue in the same class — see CHANGELOG.md [2.1.18]:
-> - **Critical** — `AccessControlService::modeFromLicense()` granted `full`
->   technical access whenever a customer had no `License` row at all, and
->   nothing in the app auto-creates one on customer creation. A customer
->   stayed fully unrestricted for as long as staff hadn't issued a license —
->   contradicting `LicenseService::isLicenseValid()`, which already treats a
->   missing license as invalid. Fixed: a missing license now degrades to
->   `view_only`, same as a suspended/expired license (Business Rules §8).
->   `DatabaseSeeder` now seeds a `full`-mode license for the `DEMO` customer
->   so the demo tenant and role-based QA keep working. **Any live customer
->   currently relying on this gap loses write access on deploy until a
->   license is issued — intended, not a regression.**
->
-> Also removed a stray `console.log()` from `resources/js/app.js`
-> (`docs/DEFINITION_OF_DONE.md` prohibits debug statements in production
-> code). Full suite (122/122), `composer validate`/`audit`, `pint --test`,
-> and `npm run build:assets` all verified clean; statuses below remain
-> accurate.
-
-> **Re-audit 2026-08-19 (v2.1.29):** a 3-agent council audit (user-requested,
-> covering every resource's Create/Edit/Delete/Print/Download actions) found
-> two more issues in the same "correct-looking code, wrong enforcement point"
-> class — see CHANGELOG.md [2.1.29]:
-> - **Critical (functional, not security)** — no `ListRecords` page anywhere
->   had a working Create button and no `EditRecord` page anywhere had a
->   working Delete button, across the app's entire history. Filament never
->   auto-adds `getHeaderActions()`; every page class must declare it. Fixed
->   via two shared base classes under `App\Filament\Resources\Pages`.
-> - **Critical/High (security)** — custom `Action`/`BulkAction` instances
->   (as opposed to Filament's built-in `CreateAction`/`EditAction`/
->   `DeleteAction`) are never auto-authorized against the resource's `can()`
->   — they need an explicit `->authorize()`, which no resource had. Worst
->   case: `BackupResource`'s `restore` action could overwrite the live
->   production database, reachable by any platform user regardless of role.
->   Also open on Import/Export/Barcode-batch actions (platform-reachable)
->   and Stock-movement/Box/DocumentFile transfer-move-return actions and the
->   shared barcode row action (tenant-Viewer-reachable). Fixed with
->   `->authorize()` closures mirroring `BaseResource::can()`'s read/write
->   split.
->
-> Full suite (143/143), Pint, and Larastan verified clean; statuses below
-> remain accurate.
-
-> **Re-audit 2026-08-19 (v2.1.32):** a structured module review (security
-> reviewer + QA agent, per the project's risk-tiered review workflow) of
-> Users, Products, Document Files, Billing, and Backups — see CHANGELOG.md
-> [2.1.32]:
-> - **Critical** — Billing's `recordPayment`/`issue`/`cancel` had no
->   `->authorize()` at all; any user who could view an invoice (Company
->   Admin/Supervisor's `view billing`) could act on it, though the matrix
->   reserves those actions for Super Admin.
-> - **High** — Backup/Import/Export downloads gated on `can('view', ...)`,
->   which `BaseResource::can()` grants unconditionally to any platform user;
->   `Datamation Management` (view-only, zero permissions) could download and
->   decrypt a full database backup. Changed to `can('update', ...)`.
-> - **High** — Billing Summary/Payment Summary/Outstanding Balance reports
->   were reachable by any role holding the generic `view reports` permission
->   (Stock Inventory User, Document Tracking User, Viewer), not just the
->   roles Security & Access Control Matrix §9 allows. `ReportExportService`
->   report definitions now carry an optional required permission.
-> - **High** — 13 resources' Create pages had no server-side re-assertion of
->   `customer_id` (only `->visible()` hiding the field for tenant actors).
->   Closed once via a new shared `CreateRecord` base page, mirroring the
->   existing `ListRecords`/`EditRecord` pattern, plus the same hook added to
->   `EditRecord`.
-> - **Medium** — `CategoryResource` missing the `delete inventory` permission
->   split Product already has; `BackupService::restoreDatabase()` skipped its
->   tamper check on a null checksum instead of failing closed.
-> - A security-review claim that `Box`/`Location` had no tenant scoping (so
->   Document Files/Boxes' Transfer/Return dropdowns could leak cross-tenant
->   rows) was investigated and found **not exploitable** — both models carry
->   `BelongsToCustomer`'s global scope. Confirmed with a new regression test
->   rather than left as an assumption.
->
-> Full suite (152/152), Pint, Larastan, and `npm run build` verified clean;
-> statuses below remain accurate.
-
-> **Re-audit 2026-08-23 (v2.1.36):** a live incident, not a review finding —
-> see CHANGELOG.md [2.1.36]:
-> - **Critical** — a Datamation Super Admin created a Company Admin user with
->   `is_platform_user=true` set at the same time via the `UserResource`
->   create form; nothing checked the flag stayed consistent with the
->   assigned role. `BaseResource::can()`/`shouldRegisterNavigation()` key off
->   `is_platform_user` alone and skip tenant scoping entirely once true, so
->   the tenant-scoped account got unrestricted platform-wide read access
->   despite a real `customer_id`. One real account affected, corrected via
->   the new backfill command. Fixed with
->   `UserResource::enforcePlatformRoleConsistency()`, which re-derives
->   `is_platform_user` from actual role membership on both the create and
->   edit paths, plus `dmims:fix-platform-role-consistency` to audit/correct
->   existing users (including soft-deleted, via `withoutGlobalScopes()`).
->
-> Closed via two independent security-reviewer passes, not one: the first
-> caught two additional bugs in the initial fix attempt before either
-> shipped — an `EditUser::afterSave()` reorder bug that could re-promote an
-> already-mismatched record via the pre-save role snapshot restore, and a
-> `dmims:create-admin` soft-delete bug (`delete()` instead of
-> `forceDelete()`) that would permanently block a retry on the seeded
-> unique email. The second pass independently re-derived the exploit from
-> the code rather than re-reading the diff, and proved the new regression
-> tests fail on the pre-fix code, not just that they pass on the fix. Full
-> suite (155/155, 4 new), Pint, Larastan verified clean; statuses below
-> remain accurate.
-
-Legend: ✅ implemented · WIP partial · ❌ missing
+- ✅ Implemented and verified
+- WIP Partial / pending verification
+- ❌ Missing / open
+- ⚠️ Open security or production-readiness gap
 
 ---
 
-## 1. Database schema (TDD §8 / Database Dictionary)
+# 1. Current Baseline
 
-| Table | Status | Notes |
-|---|---|---|
-| customers, users, modules, customer_modules | ✅ | `users.last_login_at` exists in schema |
-| subscription_plans, customer_subscriptions | ✅ | |
-| subscription_logs | ✅ | append-only history via observer |
-| licenses, license_logs | ✅ | but see License field gaps below |
-| billing_records, billing_payments, billing_logs | ✅ | Billing module implemented |
-| settings, audit_logs, notifications | ✅ | |
-| categories, products, product_location_stocks, stock_movements, stock_alerts | ✅ | |
-| location_types, locations, document_types, boxes, document_files, document_movement_logs | ✅ | |
-| barcode_registry, barcode_scan_logs | ✅ | `barcode_registry` table-name bug fixed |
+The repository has undergone multiple security and production-readiness hardening passes.
 
-**License fields (Dictionary §7):** ✅ `technical_access_mode`
-(full / view_only / blocked) added and enforced. The `status` enum has no
-literal `revoked` value; revocation is handled via `cancelled` +
-`technical_access_mode = blocked` (cosmetic divergence). A customer with no
-`License` row at all resolves to `view_only` (v2.1.18) — full access is
-never granted by the *absence* of a license.
+Previously remediated classes of issues include:
 
-**Movement-type enum:** ✅ reconciled (docs → code). The implemented enum is
-`opening_balance, stock_in, stock_out, transfer, adjustment, return, disposal`.
-The Database Dictionary's Movement Types section now documents each label with
-its stored enum value (e.g. Receive In → `stock_in`, Internal Transfer →
-`transfer`), so the documentation matches the schema. The values were left
-unchanged to avoid a data-affecting schema migration on the production enum.
+- Missing Filament/session enforcement
+- Platform-role bypass
+- User privilege escalation
+- Business-access middleware ordering
+- Missing-license full-access behaviour
+- Unauthorised custom Filament actions
+- Billing action authorization
+- Export/download authorization
+- Platform-role consistency
 
-## 2. Models (TDD §10)
-All required models present (SubscriptionLog, BillingRecord/Payment/Log added).
-
-## 3. Services (TDD §11)
-| Required | Status |
-|---|---|
-| ModuleAccessService | ✅ |
-| AccessControlService (TDD §12 — canLogin/canView/canExport/…) | ✅ |
-| LicenseService | ✅ |
-| BillingService, PaymentService | ✅ |
-| StockMovementService, DocumentMovementService | ✅ |
-| BarcodeService, ScannerService | ✅ |
-| AuditService, NotificationService, ImportService, BackupService | ✅ |
-| ReportExportService | ✅ | 14 named reports (CSV; PDF/Excel when lib present) |
-
-**Removed in v2.1.16 (dead code):** `CompanyContextService`, `UserSecurityService`,
-`LocationService`, `SubscriptionService` were named in TDD §11 but had zero
-references anywhere in the codebase — their responsibilities were absorbed
-into `AccessControlService` (login/company/license checks), the
-`BelongsToCustomer` global scope (tenant context), and the `EnsureLicenseAllowsAccess`
-/ `EnsureSubscriptionActive` middleware (subscription checks) during earlier
-hardening passes, leaving the original classes as empty, unreachable shells.
-Confirmed via grep across `app/`, `resources/`, `routes/`, `database/`,
-`tests/`, `config/`, `bootstrap/` before removal. TDD §11/§13 and SAD's
-`CompanyContextService`/`LocationService` sections describe the original
-design intent and are retained as historical record; this row is the
-authoritative current-implementation status.
-
-## 4. Middleware (TDD §13) / Access layers (SAD §4)
-| Layer | Status |
-|---|---|
-| 1 Authentication | ✅ |
-| 2 Role/permission validation | ✅ `manage X` / `view X` permissions; reads on either, writes on `manage` |
-| 3 Customer isolation | ✅ global scopes + Filament scope |
-| 4 Subscription validation | ✅ `EnsureSubscriptionActive` (TDD calls it `EnsureSubscriptionValid`) |
-| 5 License validation | ✅ `EnsureLicenseAllowsAccess` + `technical_access_mode`; date-based expiry now authoritative (v2.1.2 — lapsed licenses degrade to view-only even if `status` is stale) |
-| 6 Module validation | ✅ enforced in `can()` + nav |
-| 7 Operational permission | ✅ permission check in `can()` |
-
-## 5. RBAC — roles & permissions (Security Matrix, TDD §5) — ✅
-The seven documented roles are seeded (Datamation Super Admin, Datamation
-Management, Company Admin, Company Supervisor, Stock Inventory User, Document
-Tracking User, Viewer). Each functional area has a `manage X` (full CRUD) and a
-`view X` (read-only) permission; `BaseResource::can()` allows read actions on
-either and write actions only on `manage X`, so the matrix's view-only roles
-(Management, Viewer) get genuine read access. License `view_only` mode adds a
-second, orthogonal read-only tier.
-
-Since v2.1.15, Filament's page/action authorization is routed through this
-engine via a `BaseResource::getAuthorizationResponse()` override (Filament v5
-consults Gate policies, not `can()`, by default). Platform users have
-platform-wide read scope but writes require the manage permission — enforcing
-the matrix's view-only rule for Datamation Management. The former
-`Gate::before` platform bypass and the per-model `ResourcePolicy` are removed;
-with no policy registered the Gate default-denies model abilities. `Customer`
-carries a tenant scope so customer users can only ever see their own company.
-
-## 6. Module codes (Dictionary §3) — ✅
-All six dictionary module codes are present (`stock_inventory`,
-`document_tracking`, `barcode_scanning`, `barcode_printing`, `reports`,
-`billing_view`) and drive the resources' module gating.
-
-## 7. Functional modules (PRD / SAD / TDD)
-| Module | Status | Gap |
-|---|---|---|
-| Customer / User management | ✅ | suspend/reactivate/archive via `status` |
-| Inventory (categories, products, locations, movements, alerts) | ✅ | guided Receive-In / Stock Out / Transfer / Adjust operations via StockMovementService |
-| Document tracking (boxes, files, movement logs) | ✅ | guided file/box Receive-In / Transfer / Move-Out / Return via DocumentMovementService; placement FKs made nullable for move-out |
-| Barcode | ✅ | `PRD-CODE-000001` generation + registry, Generate/Print actions, Scanner page (scan-to-open + logging). Scannable image needs the barcode lib on PHP 8.4 |
-| Subscription | ✅ | `subscription_logs` history missing |
-| License | ✅ | enforcement layer + view-only/blocked modes |
-| Billing | ✅ | records, invoices, manual payments, immutable logs; CSV report via Export |
-| Reporting & analytics | ✅ | 14 named platform/inventory/document reports via a Reports page (CSV; PDF/Excel when lib present) |
-| Audit | ✅ | model-level `Auditable` trail + login activity |
-| Notifications | ✅ | hourly generator (low stock, subscription/license expiry, billing overdue) + export-completed/import-failed alerts |
-| Import/Export | ✅ | CSV import with per-row validation, duplicate detection (in-file + DB), error-file download; CSV export |
-| Backup/Restore | ✅ | manual + nightly scheduled backup (dmims:backup-database) + restore |
-| PWA | ✅ | manifest, service worker, offline page present |
-
-## 8. Configuration (TDD §29) & security (§30)
-✅ `APP_ENV=production`, `APP_DEBUG=false`, `SESSION_DRIVER=database`,
-`QUEUE_CONNECTION=database`, isolation, audit, direct-URL protection, ✅
-`TRUSTED_PROXIES=*` (Cloudflare). `SESSION_SECURE_COOKIE=false` is intentional
-for the reference Cloudflare Tunnel deployment, which is reached over the tunnel
-(HTTPS) **and** directly over plain HTTP on localhost/LAN — a forced secure
-cookie would break the HTTP path. Set it to `true` only for HTTPS-on-every-path
-deployments (see DEPLOYMENT_GUIDE.md). Operational values still set on the
-server: real `DB_*` credentials, `php artisan key:generate`, and SMTP mail
-(password reset).
+Existing fixes remain authoritative and must not regress.
 
 ---
 
-## Remediation status — all phases complete
+# 2. Access-Control Design Review — 24 August 2026
 
-| Phase | Scope | Status |
-|---|---|---|
-| P1 | Security backbone: 7 roles + `manage`/`view` permissions, dictionary module codes, `AccessControlService`, `EnsureLicenseAllowsAccess` + `technical_access_mode`, `TRUSTED_PROXIES` | ✅ |
-| P2 | Billing module (records, payments, logs, services, gated resource) | ✅ |
-| P3 | Reporting — 14 named reports, CSV/XLSX/PDF | ✅ |
-| P4 | Notifications generation + scheduler | ✅ |
-| P5 | Barcode generation/registry/scanner + label images | ✅ |
-| P6 | `subscription_logs`, scheduled backup, import dedupe/error-file | ✅ |
+A customer-facing access-control review identified a further class of least-privilege gaps.
 
-Also remediated: User mass-assignment, module gating on access, model-level
-audit, tenant global scopes, real Backup/Import/Export, the database seeder,
-schema/enum/table-name bugs, deprecated Filament components, branding, guided
-stock/document operations, the PWA installability fix, and role-based view-only
-access. Dependencies updated to Laravel 12 + current packages (CVE-2026-48019
-patched).
+The approved target architecture now distinguishes:
 
-### Remaining (non-code / cosmetic)
-- Movement-type enum naming — ✅ reconciled docs → code (see §1); the Dictionary
-  now documents the stored enum values.
-- The missing literal `revoked` license status — cosmetic (handled via
-  `cancelled` + `technical_access_mode = blocked`).
-- Operational `.env` values on the server: DB credentials, `key:generate`, SMTP.
-- **Documentation stack references — reconciled.** The root files and the whole
-  `/docs` set now document the tested stack — Ubuntu 24.04 + **Apache** +
-  **PHP 8.4** + **MariaDB** + Node 22 + Cloudflare Tunnel, on Laravel 13 +
-  Filament 5. The SAD, TDD, Developer Getting Started / Handover, Support &
-  Maintenance Handbook and RAID Log were updated from the earlier
-  Nginx / PHP 8.3 / Laravel 12 / Filament 4 wording. (The 2026-06-14 audit note
-  below is retained as historical record and predates the Laravel 13 / Filament 5
-  upgrade.)
+- `PLATFORM_ONLY`
+- `TENANT_STRICT`
+- `TENANT_WITH_GLOBAL_DEFAULTS`
 
-### Done since the 2026-06-14 audit
-- Filament 5 / Laravel 13 / PHP 8.4 upgrade shipped in v2.0.0 (see CHANGELOG).
-- Root project files aligned with `/docs` governance and the tested Ubuntu
-  deployment in v2.1.0; fixed `AssignRequestContext` fataling on download
-  responses.
-- v2.1.1: tenant write-protection hardened — the `BelongsToCustomer` creating
-  hook now always binds a tenant user's records to their own `customer_id`
-  (defence-in-depth against mass-assignment of `customer_id`), with a regression
-  test.
-- v2.1.2: fixed a licensing enforcement gap where an expired-by-date license
-  kept full access if its `status` column was never updated; date-based expiry is
-  now authoritative. Also enforced non-negative billing amounts. Regression tests
-  added.
-- v2.1.3: fixed `BoxResource` requiring `manage inventory` (locked the Document
-  Tracking User / Viewer roles out of a document-tracking resource) → now
-  `manage documents`; added billing money-path service guards (issue/cancel/pay
-  state checks); removed the dead `RecentlyViewed` model. Regression tests added.
-- v2.1.20: council-style CRUD review across all 28 Filament resources found the
-  v2.1.1 tenant write-protection only covered `creating()`, not `updating()` —
-  a tenant user editing a record they already owned could still reassign its
-  `customer_id` to another tenant. Added the matching `updating()` hook (plus
-  the same guard directly in `UserResource`, which doesn't use the trait).
-  Also closed a cross-tenant stock-write gap in `StockMovementService::record()`,
-  and made `ProductLocationStockResource`, `StockMovementResource`,
-  `DocumentMovementLogResource`, `LicenseLogResource`, and
-  `StockAdjustmentApprovalResource` list-only where their create/edit forms
-  bypassed the service/observer layer or let audit/approval records be
-  fabricated. See CHANGELOG for the full list.
-- v2.1.21: full-app follow-up (search/filter/upload/download + DBA schema
-  review) found `Department` was the one tenant-owned lookup model missing
-  `BelongsToCustomer`, leaking cross-tenant department names through two
-  Select/filter dropdowns — fixed. DBA review of all 22 migrations found
-  three Critical schema gaps, now fixed: `users.customer_id` had no FK/index;
-  `boxes`/`document_files` barcode uniqueness was global instead of
-  per-tenant; `billing_records` had no soft delete despite child tables
-  (`billing_payments`, `billing_logs`) cascading off it, so a hard delete
-  could destroy the immutable billing audit trail. High/Medium findings
-  fixed in v2.1.22 (below); only Low items remain open.
-- v2.1.22: fixed the remaining High/Medium DBA findings from v2.1.21 —
-  `created_by`/`updated_by` now FK-constrained on 9 master tables
-  (`customers`, `departments`, `customer_modules`, `customer_subscriptions`,
-  `licenses`, `locations`, `barcode_registry`, `categories`, `products`);
-  `users.department_id` FK/index added; `subscription_logs` changed
-  cascade→restrict to match `license_logs`; `users` gained `status`/
-  `last_login_at` indexes; `document_types.type_code` is now unique per
-  tenant; `licenses`/`customer_subscriptions` now enforce "at most one
-  active row per customer" via a generated-column unique index. All
-  guarded against existing data (skip + log rather than fail); migrate/
-  rollback/re-migrate and full suite verified.
-- v2.1.23: fixed the remaining Low DBA findings — `stock_movements`,
-  `document_movement_logs`, and `audit_logs` now have DB-level BEFORE
-  UPDATE/DELETE triggers rejecting any write (previously app-discipline
-  only); functionally verified via tinker that both are actually rejected.
-  `2026_06_14_000003_make_placement_columns_nullable`'s `down()` now fails
-  fast with a clear message instead of a raw DB constraint error if any
-  box/file has been moved out, rather than pretending to be safely
-  reversible. **No DBA findings remain open.**
-- v2.1.24: closed the last deferred findings from the v2.1.20/21 CRUD
-  review — `BillingRecordResource` now sets `$applyCustomerScope = true`
-  (consistency; not previously exploitable); `License`/
-  `CustomerSubscription`'s `enabled_modules`/`allowed_reports` textareas now
-  validate as JSON via a shared `BaseResource::jsonRule()`;
-  `CustomerResource.company_code` now has form-level `->unique()`
-  validation matching the existing DB constraint. **No findings remain open
-  from the full-app review.** Not yet run: live browser/Playwright QA and
-  an accessibility audit (no disposable environment/credentials available
-  this session).
-- v2.1.26: a fresh, deeper 3-agent council audit — this time cross-checking
-  every module/role against the actual Business Rules, MFS, and Security &
-  Access Control Matrix docs (not just CRUD/tenant-isolation mechanics) —
-  found 7 Critical and 5 High findings the earlier passes hadn't covered:
-  two customer/subscription-status bugs that blocked trial-tier customers
-  from using the system at all, a fully dead `StockAlert` feature, three
-  cases where Filament's single `manage X` permission couldn't express the
-  doc's finer-grained role distinctions (delete-vs-write, audit-log
-  visibility), a bypassed guided Receive-In workflow for new boxes/files,
-  missing "own company" visibility for Company Admin/Supervisor, and
-  missing security headers / production log-level guidance. All fixed —
-  see CHANGELOG for the full list and regression tests added.
+`TENANT_STRICT` customer queries must match the authenticated customer's exact `customer_id` and must not automatically include `customer_id IS NULL`.
 
-  **Still open from this pass (Medium/Low, and two deliberately unimplemented
-  ambiguous items):**
-  - **Medium** — 5 of 19 documented reports missing (Outstanding Balance,
-    Module Usage, Files by Box, Boxes by Location, External Movement); 5 of
-    9 documented notification triggers missing (Payment Recorded, File/Box
-    Return Overdue, Import Failure, Export Completion); Barcode Registry
-    unreachable for Document Tracking User (doc says all roles get view
-    access); no barcode-specific permission exists in the seeder (folded
-    into `manage inventory`); the doc's 8-step "Access Decision Flow" isn't
-    fully re-validated on every request (User Active/Company
-    Active/Subscription Validity/Usage Limits are checked at login or
-    elsewhere, not per-authorization-check); Import/Export/Settings/Backup
-    are Super-Admin-only with no direct doc contradiction but narrower than
-    likely operational need; no documented dead-letter/failed-job handling
-    (`failed_jobs` table exists, no runbook mentions `queue:retry` or
-    alerting); `bootstrap/app.php`'s exception-handling customization is
-    empty (relies on Laravel defaults — no external error tracking, no
-    sensitive-field scrubbing).
-  - **Low** — minor dependency drift (Filament/Laravel/Sanctum patch
-    versions; one major-version gap on `openspout/openspout`); usage-limit
-    enforcement (`getEffectiveLimits()`) wasn't traced to every creation
-    path (flagged unverified, not confirmed broken).
-  - **Deliberately not implemented (ambiguous in the doc, not guessed at)**
-    — "Update User: Limited" for Company Supervisor (§6) doesn't specify
-    which fields are restricted; Supervisor currently gets `view users`
-    only (no update at all) rather than a fabricated field-level rule.
-- v2.1.27: closed the remaining Medium/Low findings from v2.1.26, and found
-  one more Critical while verifying the "Access Decision Flow" finding:
-  `EnsureCompanyActive` middleware had the identical `status='active'`-only
-  bug already fixed in `AccessControlService::companyActive()`, but in the
-  per-request middleware, not just the login gate — re-blocking every page
-  load for trial/suspended companies even after that earlier fix. Also
-  found usage-limit enforcement (`getEffectiveLimits()`) was completely
-  unimplemented (zero call sites) — added `BaseResource::$usageLimitKey`
-  and wired it into the four resources with documented limits.
+## ⚠️ Open High — Generic tenant scope includes NULL/global records
 
-  Corrected two things in the v2.1.26 audit itself: the "8-step Access
-  Decision Flow" finding was largely wrong (per-request re-validation
-  already existed via the `business-access` middleware group — only usage
-  limits were actually missing), and 2 of the 5 "missing" notification
-  triggers were false positives (Import Failure/Export Completion were
-  already implemented in `ImportService`/`ExportService`, just not in the
-  scheduled command the audit checked).
+Current common resource scoping may include:
 
-  Fixed: Barcode Registry permission (dedicated `manage/view barcode`
-  permissions), Payment updates + Overdue returns notifications, all 5
-  missing reports (Outstanding Balance, Module Usage, Files by Box, Boxes
-  by Location, External Movement), dead-letter/failed-job docs, explicit
-  exception-handling `dontFlash` list, dependency updates within existing
-  majors. Also implemented and **live-verified** (not guessed) a
-  Content-Security-Policy header — logged into a disposable admin panel
-  instance and exercised login/dashboard/CRUD-create/Livewire-AJAX-search
-  with zero console CSP violations before shipping it.
+```text
+customer_id = tenant
+OR customer_id IS NULL
+```
 
-  **No findings remain open** from the full-app doc-conformance audit
-  except "Update User: Limited" for Company Supervisor, still deliberately
-  unimplemented — the doc doesn't specify which fields, and a fabricated
-  field-level rule would be guessing, not fixing.
-- v2.1.28: resolved "Update User: Limited" by explicit product decision
-  (asked, not guessed): Company Supervisor may edit an existing user's
-  operational fields (name, phone, job_title, department_id, employee_id)
-  but not create/delete a user, and not touch identity/security/privilege
-  fields (email, username, password, status, roles, customer_id). New
-  `BaseResource::$limitedUpdatePermission` mechanism (a resource can allow
-  the update action on a weaker permission than full `manage X`, without
-  granting create/delete) and a new `update users limited` permission, held
-  only by Company Supervisor. Enforced both at the UI (`->disabled()`) and
-  server-side (`EditUser::mutateFormDataBeforeSave()`/`afterSave()`) —
-  the latter is the one that actually matters, since a crafted request
-  bypasses `->disabled()` trivially. Regression test added.
+for resources using generic customer scoping.
 
-  **No findings remain open** from the full-app doc-conformance audit.
+This is appropriate only for explicitly global/default resources.
+
+It is not safe as a default tenant scope.
+
+### Required Resolution
+
+Introduce explicit scope semantics.
+
+TENANT_STRICT becomes default for customer-owned resources.
+
+NULL/global visibility becomes opt-in only.
+
+### ✅ Implemented (24 August 2026)
+
+`App\Models\Concerns\BelongsToCustomer` and `App\Filament\Resources\BaseResource`
+now default to TENANT_STRICT (`customer_id = tenant`, no `OR customer_id IS
+NULL`). Only `DocumentType`/`Setting` (model + Filament resource) opt back
+into TENANT_WITH_GLOBAL_DEFAULTS, matching §3.3's approved examples. Covered
+by `tests/Feature/TenantScopeTest.php`.
 
 ---
 
-## Cleanup & unused-schema report (v2.1.3)
+# 3. ⚠️ Open High — Customer Audit Query
 
-Dead code removed: `RecentlyViewed` model (unwired — no references, UI, factory
-or tests).
+Customer Company Admin must see only:
 
-**Unused / scaffolded — reported, not dropped (DB left intact per instruction):**
+```text
+audit_logs.customer_id = authenticated_user.customer_id
+```
 
-| Item | State | Recommendation |
-|---|---|---|
-| `tags` / `taggables` tables + `Tag` model + `Taggable` trait | Functioning and **test-covered** (`TagsTest`) but not surfaced in any Filament resource | Surface tagging in the UI, or leave as a supported-but-headless capability. |
+Platform audit records with `customer_id = NULL` must not be customer-visible.
 
-**Removed in v2.1.17:** `favorites` and `recently_viewed` tables (dropped via
-`2026_07_30_000000_drop_favorites_and_recently_viewed_tables.php`, reversible
-`down()` recreates both to the original schema), `Favorite` model,
-`Favoritable` trait, and its `use` in `Box`/`DocumentFile`. `recently_viewed`
-was orphaned since the `RecentlyViewed` model's removal in v2.1.3;
-`favorites` had the trait mixed in but no UI, route, or test ever called
-`toggleFavorite()`/`isFavoritedBy()`. Confirmed zero references before
-dropping. Full suite (122/122), migrate + rollback + re-migrate, and
-`pint` all verified clean.
+Other-customer audit records must not be customer-visible.
 
-**Optional / future (not implemented — noted for a later, planned change):**
-- Redis cache/queues, HA, read replicas, object storage — infrastructure
-  roadmap items already tracked in the Deployment, Operations & DR Guide §28.
+### Verification Required
 
-**Resolved since this review — PHPStan / Larastan static analysis:** the
-sandbox network block noted above was environment-specific, not a lasting
-constraint. `larastan/larastan` is installed, `phpstan.neon` is wired up
-(level 5, `paths: [app]`), and `vendor/bin/phpstan analyse` runs as a CI step
-in `.github/workflows/ci.yml`. As of v2.1.35, 203 of the 215 findings in the
-generated baseline were fixed at the root cause (missing PHPDoc on
-trait-typed Eloquent event closures, missing relation return types, two real
-bugs — see `CHANGELOG.md`); `phpstan-baseline.neon` now holds 12 entries,
-each with recorded reasoning for why it's a verified false positive rather
-than a real issue (see the PR history for v2.1.35).
+- Feature test
+- Browser test
+- Direct URL test
+- Global search/filter test if applicable
+- Export/report test
 
-### Done since the 2026-07-02 review
-- **Billing `invoice_no` / `payment_no` race condition fixed.** Both now use
-  `SequenceGenerator` (the same row-locked counter already used by stock and
-  document movements) instead of `count()+1`. A one-time migration
-  (`2026_07_03_000000_seed_sequence_counters_for_billing_numbering`) seeded the
-  counters from existing data (max of row count and parsed existing numbers per
-  year) so no collision or renumbering occurred.
-- **LICENSE file added**; `composer.json`'s `audit.block-insecure` override
-  removed so Composer's own default (block installs with known advisories)
-  applies.
-- **Sanctum API tokens hardened**: `dmims:issue-api-token` now defaults to a
-  restricted `api:read` ability and a 365-day expiration
-  (`SANCTUM_TOKEN_EXPIRATION`), `abilities:api:read` is enforced on
-  `routes/api.php`, and `sanctum:prune-expired` runs daily. Existing tokens are
-  unaffected (Sanctum's global `sanctum.expiration` is deliberately left
-  `null` — see `config/sanctum.php` for why).
-- **API rate limiting added**: a named `api` limiter (60/min per user,
-  configurable via `API_RATE_LIMIT_PER_MINUTE`) is applied to `/api/v1/*`.
-- **Backup script credential handling fixed** in `DEPLOYMENT_GUIDE.md`'s
-  optional OS-level cron example (now uses `/root/.my.cnf` instead of an
-  inline `mysqldump -p` flag).
+### ✅ Implemented (24 August 2026)
+
+Covered by the BaseResource TENANT_STRICT fix above (`AuditLogResource` sets
+no global-defaults opt-in). Feature-tested in
+`tests/Feature/CustomerAccessScopeTest.php::test_company_admin_sees_only_own_customer_audit_logs`.
+Browser/Playwright-level verification is still outstanding (see §19 of the
+Security & Access Control Matrix QA checklist).
+
+---
+
+# 4. ⚠️ Open High — Customer User Query
+
+Customer user management must exclude platform users.
+
+For customer role:
+
+```text
+users.customer_id = authenticated_user.customer_id
+```
+
+Do not include `customer_id = NULL`.
+
+### Verification Required
+
+- Company Admin cannot enumerate platform users.
+- Company Supervisor cannot enumerate platform users.
+- Direct edit/view URL to platform user is denied.
+- Relationship/global search does not expose platform users.
+
+### ✅ Implemented (24 August 2026)
+
+Covered by the BaseResource TENANT_STRICT fix (`UserResource` sets no
+global-defaults opt-in) plus the existing platform-user write guard. Feature-
+tested in `tests/Feature/CustomerAccessScopeTest.php::test_company_admin_cannot_see_other_customer_or_platform_null_users`.
+Browser/Playwright-level verification is still outstanding.
+
+---
+
+# 5. ⚠️ Open High — Subscription Plans Must Be Platform-Only
+
+Subscription Plans are platform master data.
+
+Customer roles with permission to view their own subscription must not thereby obtain access to the platform Subscription Plans resource.
+
+### Target
+
+Customers receive only a read-only own subscription summary under My Company.
+
+### ✅ Implemented (24 August 2026)
+
+`SubscriptionPlanResource` now sets `$platformOnly = true` — no customer
+role can browse/view/edit it regardless of permission. Company Admin/
+Supervisor's existing read-only "own subscription summary" via
+`CustomerSubscriptionResource` (already TENANT_STRICT-scoped) is unaffected.
+Feature-tested in `tests/Feature/CustomerAccessScopeTest.php`. The full "My
+Company" tab consolidation (§8 below) is still outstanding.
+
+---
+
+# 6. ⚠️ Open High — License Management Must Be Platform-Only
+
+Customer users may view only simplified own License Status where permitted.
+
+They must not receive the administrative License Management resource.
+
+Internal technical licensing fields must remain platform-only.
+
+### ✅ Implemented (24 August 2026)
+
+`LicenseResource` now sets `$platformOnly = true`. A new read-only
+`MyLicenseStatusWidget` (Dashboard) gives Company Admin/Supervisor a
+simplified own-license status/access-mode/expiry view without internal
+technical fields (server fingerprint, installation id, deployment mode).
+Feature-tested in `tests/Feature/CustomerAccessScopeTest.php` and
+`tests/Feature/MyLicenseStatusWidgetTest.php`.
+
+---
+
+# 7. ⚠️ Open High — Report Authorization Must Include Underlying Module/Permission
+
+Generic report access is insufficient.
+
+Target rules:
+
+- Inventory reports → Inventory module + inventory permission
+- Document reports → Document Tracking + document permission
+- Billing reports → Billing View + billing permission
+- Audit reports → audit permission + exact customer scope
+- All customer reports → effective `allowed_reports` where configured
+- Platform reports → platform roles only
+
+The UI selector and direct generation route/action must enforce the same rule.
+
+### ✅ Implemented (24 August 2026)
+
+`ReportExportService::definitions()`/`availableTo()` now require the
+matching operational permission (`view`/`manage` inventory or documents) and
+module (`stock_inventory`/`document_tracking`) for those report families, and
+additionally require the `billing_view` module for the three billing
+reports (on top of the existing `view billing` permission check). Both the
+selector (`Reports::form()`) and the direct download action
+(`Reports::download()`'s `abort_unless`) share the same `availableTo()` call,
+so both are covered. Feature-tested in `tests/Feature/ReportExportServiceTest.php`.
+
+---
+
+# 8. WIP — Customer Navigation Consolidation
+
+Approved customer-facing structure:
+
+**My Company**
+
+- Profile
+- Users
+- Enabled Modules
+- Subscription
+- License Status
+- Billing
+- Audit Logs
+
+Each tab remains independently authorized.
+
+Standalone customer exposure of:
+
+- Subscription Plans
+- License Management
+- Platform Module Management
+- Platform Settings
+- Backup / Restore
+- Platform Reports
+- Platform Audit Logs
+
+is not permitted.
+
+---
+
+# 9. Required Implementation Scope
+
+Implementation should review:
+
+- BaseResource customer scoping
+- UserResource
+- AuditLogResource
+- CustomerResource presentation
+- CustomerModuleResource
+- CustomerSubscriptionResource
+- SubscriptionPlanResource
+- LicenseResource
+- BillingResource
+- Reports page
+- ReportExportService
+- Global search
+- Select/relationship queries
+- Relevant middleware
+- Tests/playwright role QA
+
+Root cause should be fixed centrally without weakening existing protections.
+
+---
+
+# 10. Required Regression Tests
+
+At minimum:
+
+1. Customer A Company Admin cannot see Customer B users. — ✅ tested (`CustomerAccessScopeTest`)
+2. Customer A Company Admin cannot see platform NULL users. — ✅ tested (`CustomerAccessScopeTest`)
+3. Customer A Company Admin cannot see Customer B audit logs. — ✅ tested (`CustomerAccessScopeTest`)
+4. Customer A Company Admin cannot see platform NULL audit logs. — ✅ tested (`CustomerAccessScopeTest`)
+5. Customer user cannot browse Subscription Plans. — ✅ tested (`CustomerAccessScopeTest`)
+6. Customer user cannot open License Management. — ✅ tested (`CustomerAccessScopeTest`)
+7. Stock User cannot run Document reports. — ✅ tested (`ReportExportServiceTest`)
+8. Document User cannot run Inventory reports. — ✅ tested (`ReportExportServiceTest`)
+9. Billing report requires Billing View. — ✅ tested (`ReportExportServiceTest`)
+10. Unauthorized direct report code returns 403. — ⚠️ reasoned-correct via `ReportExportServiceTest` (the same `availableTo()` call `Reports::download()`'s `abort_unless` uses), but the Livewire HTTP path itself is not directly under test — a `Livewire::test(Reports::class)` attempt hit unrelated Livewire component-snapshot test plumbing issues and was not worth forcing. Real-browser verification (Company Admin denied `/admin/subscription-plans`, `/admin/licenses`) was run manually via Playwright on 24 August 2026 and passed.
+11. Customer global search cannot expose platform/other-tenant records. — ✅ tested (`CustomerAccessScopeTest::test_global_search_does_not_expose_platform_only_resources_to_customer` asserts `canGloballySearch()`; the underlying query path is covered by items 1–4).
+12. Mobile/PWA navigation matches desktop authorization. — ⚠️ not covered by this pass; existing `tests/playwright/role-qa.spec.js` covers desktop role QA only (all roles' navigation/permission assertions pass unchanged after this implementation — verified by browser run on 24 August 2026; 10 pre-existing, unrelated CSP-console-error failures on external font/avatar CDNs in the same run are an environment issue, not a regression from this change).
+
+---
+
+# 10a. Security Review Findings (24 August 2026 implementation pass)
+
+An independent `security-reviewer` pass on the implementation above found three
+High and three Medium findings. Fixed same-day unless noted:
+
+- **H1 (fixed):** `TENANT_WITH_GLOBAL_DEFAULTS` was read/write — a tenant's
+  "manage" role could rename, re-own or delete a shared global-default
+  record (e.g. a Document Type) that every other tenant relies on. Fixed in
+  `BaseResource::can()` (write actions on a null-owned record are now always
+  denied for non-platform users) and `BelongsToCustomer`'s `updating` hook
+  (cancels the save as a second line of defence). Regression tests in
+  `TenantScopeTest`.
+- **H2 (fixed):** a non-platform user with `customer_id = NULL` (a data-
+  integrity defect — e.g. an admin who forgot to select a company when
+  creating a tenant user) fell through every "is this scoped?" check to
+  *unscoped*, granting full cross-tenant read access. Fixed by making
+  `AccessControlService::canLogin()`, `BelongsToCustomer`'s global scope, and
+  `BaseResource::getEloquentQuery()`/`can()` fail closed (no rows / denied)
+  for this state instead. Regression tests in `AccessControlTest` and
+  `TenantScopeTest`. The underlying data-integrity gap (the `customer_id`
+  Select on `UserResource`'s form has no `->required()`) is not yet closed —
+  tracked below.
+- **H3 (open, not fixed this pass):** `LocationTypeResource` (`manage
+  inventory`) is global master data with no `customer_id` column, but has no
+  `$platformOnly`/read-only restriction — a Stock Inventory User at any
+  tenant can edit/delete a location type other tenants' `locations` rows
+  reference. Not in this pass's named implementation scope (§9) and left
+  open pending a decision on intended behaviour: platform-only, or
+  tenant-read/platform-write. Recommend resolving before the next access-
+  control pass.
+- **M1 (partially fixed):** `$platformOnly` is now also set on
+  `ModuleResource` and `BackupResource` (verified zero live behaviour change
+  — no tenant role holds `manage modules`/`manage settings`/`view
+  modules`/`view settings`). `SettingResource` was deliberately left as
+  `TENANT_WITH_GLOBAL_DEFAULTS` (not `$platformOnly`), matching §3.3's own
+  "Explicitly approved global Settings/reference values" example, in case a
+  tenant-readable-settings permission is granted in future; it is currently
+  inert for the same reason. `LocationTypeResource` remains open (see H3).
+- **M2 (fixed):** `$platformOnly` is now also enforced in
+  `BaseResource::getEloquentQuery()` (`whereRaw('1 = 0')`), not just
+  `can()`/`shouldRegisterNavigation()`, as defence in depth for any future
+  relation manager/select query.
+- **M3 (documented, not resolved):** the Security & Access Control Matrix
+  classifies "Licenses"/"License logs" as both §3.1 PLATFORM_ONLY (line ~132)
+  and §3.2 TENANT_STRICT (line ~160). This pass resolved it as: `License`
+  administration (`LicenseResource`) is §3.1 platform-only; `LicenseLog`
+  (history/audit trail) stays §3.2 tenant-readable, since Company Admin/
+  Supervisor already hold `view licensing` and the matrix's own §14 Audit
+  Permissions section implies own-tenant history access is intended. The
+  matrix itself has not been edited to remove the ambiguity — recommend
+  amending §3.2 to read "licence *status/history*, not administration" on
+  the next documentation pass.
+
+---
+
+# 11. Completion Criteria
+
+Do not mark these gaps conformant until:
+
+- Code implemented
+- Unit/feature tests pass
+- Browser role QA passes
+- Pint passes
+- Larastan/PHPStan passes
+- Build passes
+- Security review passes
+- Documentation remains synchronized
+- No Critical/High issue remains in this scope
+
+---
+
+# 12. Status
+
+**Documentation target state:** ✅ Approved and synchronized
+**Implementation:** ✅ Items 2–7 (§2–§7 above) implemented; §8 (My Company nav
+consolidation) remains WIP; H3/M1(LocationTypeResource)/M3 from §10a remain open
+**Regression verification:** ✅ 173/173 automated tests pass (Pest/PHPUnit);
+Pint clean; Larastan/PHPStan clean; independent security-reviewer and
+qa-tester passes completed 24 August 2026; real-browser Playwright
+verification completed for the platform-only lockdown, audit-log scoping,
+and full existing role-QA suite (`tests/playwright/role-qa.spec.js`, all
+role/permission assertions pass unchanged)
+**Production-ready for this access-control change:** ⚠️ Conditional — the
+items above are implemented, tested, and reviewed; H3 (LocationTypeResource)
+and the full "My Company" navigation consolidation (§8) remain open and
+should be resolved before this is called fully conformant to the approved
+target state.

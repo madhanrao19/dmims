@@ -1,820 +1,527 @@
-# **DMIMS Master Functional Specification (MFS)**
+# DMIMS Master Functional Specification (MFS)
 
-## **Datamation Inventory Management System (DMIMS)**
-
-**Version:** 1.0
-
----
-
-# **Document Purpose**
-
-The Master Functional Specification (MFS) defines every functional aspect of DMIMS.
-
-It is the authoritative reference for:
-
-* Business Owners  
-* Project Managers  
-* Developers  
-* QA Engineers  
-* UAT Testers  
-* Future Maintenance Teams
-
-Unlike the Developer Blueprint, which provides an overview, this document specifies **exactly how every feature must behave**.
+**Datamation Inventory Management System (DMIMS)**  
+**Version:** 1.1  
+**Updated:** 24 August 2026
 
 ---
 
-# **1\. Functional Scope**
+# Document Purpose
 
-DMIMS Version 1 includes the following modules:
+The MFS defines the expected functional behaviour of DMIMS.
 
-1. Dashboard  
-2. Customer Management  
-3. User Management  
-4. Role & Permission Management  
-5. Module Management  
-6. Subscription Management  
-7. License Management  
-8. Billing & Payment Management  
-9. Shared Location Management  
-10. Stock Inventory  
-11. Document Tracking  
-12. Barcode Registry  
-13. Barcode Scanning  
-14. Barcode Printing  
-15. Reports & Analytics  
-16. Import & Export  
-17. Notifications  
-18. Audit Logs  
-19. System Settings  
-20. Progressive Web App (PWA)
-
-Each module is specified in the following chapters.
+No implementation may contradict this specification without an approved change request.
 
 ---
 
-# **2\. Dashboard Module**
+# 1. Functional Scope
 
-## **Purpose**
+DMIMS Version 1 includes:
 
-Provide users with an immediate overview of the information most relevant to their role.
+1. Dashboard
+2. Customer Management
+3. User Management
+4. Role & Permission Management
+5. Module Management
+6. Subscription Management
+7. License Management
+8. Billing & Payment Management
+9. Shared Location Management
+10. Stock Inventory
+11. Document Tracking
+12. Barcode Registry
+13. Barcode Scanning
+14. Barcode Printing
+15. Reports & Analytics
+16. Import & Export
+17. Notifications
+18. Audit Logs
+19. System Settings
+20. Progressive Web App
 
----
-
-## **Super Admin Dashboard**
-
-Displays:
-
-* Total Customers  
-* Active Customers  
-* Suspended Customers  
-* Active Licenses  
-* Expiring Licenses  
-* Active Subscriptions  
-* Expiring Subscriptions  
-* Outstanding Billing  
-* Total Recorded Revenue  
-* Recent Audit Activities  
-* System Notifications
-
-### **Quick Actions**
-
-* Create Customer  
-* Create User  
-* Create Subscription  
-* Create License  
-* Create Billing Record
+Platform administration and customer presentation are separated.
 
 ---
 
-## **Customer Dashboard**
+# 2. Dashboard Module
 
-Displays:
+## Super Admin Dashboard
 
-* Total Products  
-* Low Stock Items  
-* Total Boxes  
-* Total Document Files  
-* Overdue Returns  
-* Recent Inventory Activity  
-* Recent Document Activity  
-* Subscription Status  
-* License Status
+Displays platform information such as:
 
----
+- Total Customers
+- Active/Suspended Customers
+- Subscription status
+- License status
+- Billing/outstanding balances
+- Revenue summaries
+- Recent audit activity
+- Platform notifications
 
-# **3\. Customer Management Module**
+## Customer Dashboard
 
-## **Purpose**
+Displays only role-relevant own-customer information.
 
-Manage customer companies hosted within DMIMS.
+Examples:
 
----
+- Total Products
+- Low Stock
+- Total Boxes
+- Total Document Files
+- Overdue Returns
+- Recent operational activity
+- Subscription Status
+- License Status
+- Billing status where permitted
 
-## **Functions**
-
-* Create Customer  
-* Edit Customer  
-* Suspend Customer  
-* Reactivate Customer  
-* Archive Customer  
-* View Customer Details  
-* View Customer Users  
-* View Subscription  
-* View License  
-* View Billing  
-* View Audit History
+Widgets for disabled/unpermitted modules must not appear.
 
 ---
 
-## **Validation Rules**
+# 3. Customer Management Module
 
-Company Name
+Platform Customer Management is for Datamation platform roles.
 
-Required
+Functions include:
 
-Maximum 255 characters
+- Create Customer
+- Edit Customer
+- Suspend
+- Reactivate
+- Archive
+- View Customer Details
+- View Customer Users
+- View Modules
+- View Subscription
+- View License
+- View Billing
+- View Audit History
 
----
+## Customer-Facing My Company
 
-Company Code
+Customer users do not use the multi-customer Customer Management interface.
 
-Required
+Authorized Company Admin and Company Supervisor users receive:
 
-Unique
+**My Company**
 
-Immutable after creation unless Super Admin overrides
+Possible tabs:
 
----
+1. Overview
+2. Users
+3. Enabled Modules
+4. Subscription
+5. License Status
+6. Billing
+7. Audit Logs
 
-Status
+Each tab is independently authorized.
 
-Required
+### Company Admin
 
-Values:
+May see:
 
-* Trial  
-* Active  
-* Near Expiry  
-* Expired  
-* Suspended  
-* Cancelled  
-* Archived
+- Own company profile
+- Own customer users
+- Own enabled modules
+- Own subscription summary
+- Own license status
+- Own billing when Billing View is enabled
+- Own customer audit logs
 
----
+### Company Supervisor
 
-# **4\. User Management Module**
+May see:
 
-## **Functions**
+- Own company profile
+- Own users according to limited permissions
+- Own enabled modules
+- Own subscription summary
+- Own license status
+- Own billing when Billing View is enabled
 
-* Create User  
-* Edit User  
-* Assign Company  
-* Assign Roles  
-* Reset Password  
-* Lock User  
-* Unlock User  
-* Deactivate User  
-* View Login History
+Does not receive Audit Logs by default.
 
----
+### Other Customer Roles
 
-## **Validation**
-
-Email
-
-Required
-
-Unique
-
-Valid email format
-
----
-
-Password
-
-Minimum 8 characters
-
-No complexity rule currently enforced
+Operational roles should not receive administrative tabs unrelated to their role.
 
 ---
 
-Company Assignment
+# 4. User Management
 
-Required for customer users
+Functions:
 
-Forbidden for platform users
+- Create
+- Edit
+- Assign role
+- Reset password
+- Lock/unlock
+- Deactivate
+- View login history
 
----
+Customer Admin users operate only on their own customer's non-platform users.
 
-# **5\. Module Management**
-
-## **Available Modules**
-
-* Stock Inventory  
-* Document Tracking  
-* Barcode Scanning  
-* Barcode Printing  
-* Reports  
-* Import / Export  
-* Advanced Audit  
-* Backup / Restore  
-* Billing View
+Platform users must never appear in customer user management.
 
 ---
 
-## **Behaviour**
+# 5. Module Management
 
-Disabled modules:
+Available modules include:
 
-* Hidden from menus  
-* Blocked by middleware  
-* Blocked through direct URLs  
-* Blocked in business services
+- Stock Inventory
+- Document Tracking
+- Barcode Scanning
+- Barcode Printing
+- Reports
+- Import / Export
+- Advanced Audit
+- Backup / Restore
+- Billing View
 
----
+Disabled modules are hidden and blocked through navigation, routes, actions and services.
 
-# **6\. Subscription Management**
+Platform Module Management is platform-only.
 
-## **Functions**
-
-* Create Plan  
-* Edit Plan  
-* Assign Plan  
-* Renew Subscription  
-* Change Modules  
-* Update Limits  
-* Cancel Subscription
+Customers may see only a read-only summary of their enabled modules through My Company where permitted.
 
 ---
 
-## **Limits**
+# 6. Subscription Management
 
-Maximum Users
+Platform functions:
 
-Maximum Products
+- Create Plan
+- Edit Plan
+- Assign Plan
+- Renew Subscription
+- Change Modules
+- Update Limits
+- Cancel Subscription
 
-Maximum Document Files
+## Customer Subscription Visibility
 
-Maximum Boxes
+Subscription Plans are platform-only master records.
 
-Allowed Reports
+Customer users cannot browse or manage Subscription Plans.
 
-Enabled Modules
+Authorized Company Admin/Supervisor users may see only their effective subscription summary:
 
-Grace Period
+- Current plan
+- Subscription status
+- Validity dates
+- Effective limits
+- Current usage
+- Enabled modules
+- Allowed report summary
+- Billing cycle
 
-Billing Cycle
-
----
-
-## **Renewal Workflow**
-
-1. Open subscription.  
-2. Select renewal.  
-3. Choose plan.  
-4. Set validity period.  
-5. Confirm limits.  
-6. Save.  
-7. Generate subscription log.  
-8. Generate audit log.
-
----
-
-# **7\. License Management**
-
-## **Functions**
-
-* Create License  
-* Renew License  
-* Suspend License  
-* Revoke License  
-* Reactivate License
+Modification remains a Datamation responsibility.
 
 ---
 
-## **Access Modes**
+# 7. License Management
 
-* Full Access  
-* View Only  
-* Blocked
+Platform functions:
 
----
+- Create
+- Renew
+- Suspend
+- Revoke
+- Reactivate
+- Change access mode
 
-## **Suspension Workflow**
+## Customer License Visibility
 
-1. Select customer.  
-2. Suspend license.  
-3. Enter reason.  
-4. System updates status.  
-5. Audit log created.  
-6. License log created.
+Customers do not receive License Management.
 
----
+Authorized Company Admin/Supervisor users may see only a simplified License Status panel.
 
-# **8\. Billing & Payment Module**
-
-## **Functions**
-
-* Create Billing Record  
-* Create Invoice  
-* Record Manual Payment  
-* Upload Payment Proof  
-* View Outstanding Balance  
-* Export Billing Report
+The panel must not expose unnecessary platform licensing configuration.
 
 ---
 
-## **Payment Methods**
+# 8. Billing & Payment Module
 
-* Bank Transfer  
-* Cash  
-* Cheque  
-* Online Transfer  
-* Internal Adjustment  
-* Waived  
-* Other
+Only Datamation Super Admin modifies billing/payment.
 
----
+Customer users may view own billing only when Billing View is enabled and permission allows.
 
-## **Rules**
+Customer users cannot:
 
-Only Datamation Super Admin can modify billing.
-
-Customer users may only view billing if the Billing View module is enabled.
+- Create invoices
+- Issue invoices
+- Cancel billing
+- Record payments
+- Change payment status
 
 ---
 
-# **9\. Shared Location Module**
+# 9. Shared Location Module
 
-## **Purpose**
+Single location hierarchy shared by Inventory and Document Tracking.
 
-Provide a single hierarchy of physical locations used by both Inventory and Document Tracking.
-
----
-
-## **Hierarchy Example**
-
-Warehouse
-
-↓
-
-Building
-
-↓
-
-Floor
-
-↓
-
-Room
-
-↓
-
-Rack
-
-↓
-
-Shelf
-
-↓
-
-Cabinet
+External destinations are never stored as fake locations.
 
 ---
 
-## **Rules**
+# 10. Stock Inventory Module
 
-Products occupy locations.
+Pages:
 
-Boxes occupy locations.
+- Categories
+- Products
+- Locations
+- Receive-In
+- Internal Transfer
+- Stock Out
+- Adjustment
+- Movement History
+- Inventory Reports
 
-Files occupy boxes.
-
-External destinations are never stored as locations.
-
----
-
-# **10\. Stock Inventory Module**
-
-## **Pages**
-
-* Categories  
-* Products  
-* Locations  
-* Receive-In  
-* Internal Transfer  
-* Stock Out  
-* Stock Adjustment  
-* Stock Movement History  
-* Inventory Reports
+All records and actions are tenant-scoped.
 
 ---
 
-## **Product Fields**
+# 11. Document Tracking Module
 
-SKU
+Pages:
 
-Barcode
+- Boxes
+- Files
+- Receive
+- Transfer
+- Move Out
+- Return
+- Movement History
+- Document Reports
 
-Category
-
-Default Location
-
-Description
-
-Reorder Level
-
-Unit Cost
-
-Unit Price
-
-Status
+All records and actions are tenant-scoped.
 
 ---
 
-## **Receive-In Workflow**
-
-Input:
-
-Product
-
-Location
-
-Quantity
-
-Source
-
-Reference
-
-↓
-
-Validate
-
-↓
-
-Increase inventory
-
-↓
-
-Write stock movement
-
-↓
-
-Write audit log
-
-↓
-
-Return success
-
----
-
-## **Stock Out Workflow**
-
-Input:
-
-Product
-
-Quantity
-
-Destination
-
-Reason
-
-↓
-
-Validate
-
-↓
-
-Prevent negative stock
-
-↓
-
-Reduce inventory
-
-↓
-
-Write movement
-
-↓
-
-Audit
-
----
-
-# **11\. Document Tracking Module**
-
-## **Pages**
-
-* Boxes  
-* Files  
-* Receive File  
-* Transfer File  
-* Move Out File  
-* Return File  
-* Receive Box  
-* Transfer Box  
-* Move Out Box  
-* Return Box  
-* Movement History
-
----
-
-## **Box Fields**
-
-Box Number
-
-Barcode
-
-Current Location
-
-Capacity
-
-Current File Count
-
-Status
-
-Expected Return Date
-
-Remarks
-
----
-
-## **File Fields**
-
-Barcode
-
-Reference Number
-
-Title
-
-Document Type
-
-Owner
-
-Current Box
-
-Status
-
-Expected Return Date
-
-Remarks
-
----
-
-# **12\. Barcode Module**
-
-## **Barcode Types**
-
-* Product  
-* Location  
-* Box  
-* Document File
-
----
-
-## **Barcode Format**
-
-PRD-COMPANYCODE-000001
-
-LOC-COMPANYCODE-000001
-
-BOX-COMPANYCODE-000001
-
-DOC-COMPANYCODE-000001
-
----
-
-## **Scanner Workflow**
-
-Scan
-
-↓
-
-Lookup Registry
-
-↓
-
-Determine Type
-
-↓
-
-Validate Customer
-
-↓
-
-Validate Permission
-
-↓
-
-Open Related Screen
-
-↓
-
+# 12. Barcode Module
+
+Types:
+
+- Product
+- Location
+- Box
+- Document File
+
+Scan flow:
+
+Scan  
+↓  
+Lookup Registry  
+↓  
+Determine Type  
+↓  
+Validate Customer  
+↓  
+Validate Permission  
+↓  
+Validate Module  
+↓  
+Open Allowed Screen  
+↓  
 Log Scan
 
----
-
-# **13\. Reports & Analytics**
-
-## **Platform Reports**
-
-* Customer Summary  
-* Subscription Report  
-* License Report  
-* Billing Report  
-* Payment Report  
-* Outstanding Balance  
-* Audit Summary  
-* Module Usage
+Cross-customer barcodes must not reveal data.
 
 ---
 
-## **Inventory Reports**
+# 13. Reports & Analytics
 
-* Inventory Summary  
-* Low Stock  
-* Stock Movement  
-* Stock Value
+Reports are role-aware, module-aware and entitlement-aware.
 
----
+## Platform Reports
 
-## **Document Reports**
+Platform-only:
 
-* File Master  
-* Box Master  
-* Files by Box  
-* Boxes by Location  
-* Movement History  
-* External Movement  
-* Overdue Returns
+- Customer Summary
+- Subscription Report
+- License Report
+- Platform Billing Analytics
+- Platform Payment Analytics
+- Platform Audit Summary
+- Module Usage
 
----
+## Inventory Reports
 
-# **14\. Import & Export**
+Require:
 
-## **Import Types**
+- Reports module where applicable
+- Stock Inventory enabled
+- Inventory view permission
+- Effective report entitlement
 
-* Products  
-* Opening Stock  
-* Locations  
-* Boxes  
-* Document Files
+Examples:
 
----
+- Inventory Summary
+- Low Stock
+- Stock Movement
+- Stock Value
 
-## **Export Formats**
+## Document Reports
 
-* CSV  
-* Excel  
-* PDF  
-* Print
+Require:
 
----
+- Reports module where applicable
+- Document Tracking enabled
+- Document view permission
+- Effective report entitlement
 
-## **Rules**
+Examples:
 
-Preview before import.
+- File Master
+- Box Master
+- Files by Box
+- Boxes by Location
+- Movement History
+- External Movement
+- Overdue Returns
 
-Reject invalid rows.
+## Billing Reports
 
-Generate error report.
+Require:
 
-Audit every import and export.
+- Billing View enabled
+- View Billing permission
+- Own-customer scope for customer users
 
----
+## Audit Reports
 
-# **15\. Notifications**
+Company Admin may see only own-customer audit information when audit access is enabled/permitted.
 
-Generated for:
+## Report Selector Rule
 
-* Low Stock  
-* Subscription Expiry  
-* License Expiry  
-* Billing Overdue  
-* Payment Recorded  
-* File Return Overdue  
-* Box Return Overdue  
-* Import Failure  
-* Export Completion
+The report selector must contain only reports the authenticated user is authorized to execute.
 
----
-
-# **16\. Audit Logs**
-
-Audit every critical action.
-
-Audit record includes:
-
-* User  
-* Customer  
-* Module  
-* Action  
-* Timestamp  
-* IP Address  
-* Old Values  
-* New Values
-
-Audit history is immutable.
+Backend generation repeats the same checks.
 
 ---
 
-# **17\. System Settings**
+# 14. Import & Export
 
-Platform Settings
+Imports supported for authorized operational modules.
 
-Customer Settings
+Exports supported in configured formats.
 
-Email Settings (future)
+Every import/export:
 
-Barcode Settings
-
-Report Settings
-
-Security Settings
-
-PWA Settings
-
----
-
-# **18\. Progressive Web App**
-
-Requirements:
-
-* Installable  
-* Responsive  
-* Offline Information Page  
-* Mobile Scanner Interface  
-* App Icons  
-* Manifest  
-* Service Worker
-
-Version 1 is online-first.
+- Validates permission
+- Validates module
+- Validates customer ownership
+- Validates license
+- Validates entitlement/limits where applicable
+- Writes audit record
 
 ---
 
-# **19\. Global Validation Rules**
+# 15. Notifications
+
+Generated for relevant customer/platform events.
+
+Customer notifications remain tenant-scoped.
+
+---
+
+# 16. Audit Logs
+
+Audit records include user, customer, module, action, timestamp, IP and value changes.
+
+Immutable.
+
+Company Admin may view only exact own-customer audit records.
+
+Platform `customer_id = NULL` audit records are not customer-visible.
+
+---
+
+# 17. System Settings
+
+Platform settings are platform-only.
+
+Customer settings may be exposed only where explicitly supported and authorized.
+
+---
+
+# 18. Progressive Web App
+
+Installable, responsive and online-first.
+
+Navigation remains role-aware in desktop, mobile and PWA modes.
+
+---
+
+# 19. Global Validation Rules
 
 Across all modules:
 
-* Required fields validated.  
-* Foreign keys validated.  
-* Customer ownership verified.  
-* Permissions checked.  
-* Subscription checked.  
-* License checked.  
-* Module enabled.  
-* Audit written.  
-* Transactions used where required.
+- Validate required fields
+- Validate ownership
+- Validate resource scope
+- Check permissions
+- Check subscription
+- Check license
+- Check module
+- Check report entitlement where applicable
+- Audit critical actions
+- Use transactions where required
 
 ---
 
-# **20\. Functional Acceptance Criteria**
+# 20. Functional Acceptance Criteria
 
 A feature is accepted only when:
 
-* Functional behaviour matches specification.  
-* Validation rules are enforced.  
-* Security rules are enforced.  
-* Customer isolation is verified.  
-* Audit logging is complete.  
-* Error handling is implemented.  
-* UI follows the design system.  
-* Automated tests pass.  
-* UAT is approved.
+- Behaviour matches specification
+- Validation is enforced
+- Security is enforced
+- Customer isolation is verified
+- Platform/customer boundary is verified
+- Audit logging is complete
+- Error handling is implemented
+- UI follows design system
+- Automated tests pass
+- UAT is approved
 
 ---
 
-# **21\. Future Functional Enhancements**
+# 21. Future Functional Enhancements
 
-Reserved for future releases:
+May include:
 
-* Native mobile applications  
-* Offline synchronization  
-* RFID support  
-* OCR document indexing  
-* AI document classification  
-* AI inventory forecasting  
-* Public REST API  
-* GraphQL API  
-* Microsoft 365 integration  
-* SAP integration  
-* Multi-language  
-* Multi-currency
+- Native mobile apps
+- Offline synchronization
+- RFID
+- OCR
+- AI classification
+- AI forecasting
+- Public REST API expansion
+- GraphQL
+- Microsoft 365
+- SAP
+- Multi-language
+- Multi-currency
 
----
-
-# **22\. Functional Summary**
-
-The Master Functional Specification defines the expected behaviour of every module in DMIMS.
-
-No implementation should contradict this specification without an approved change request.
+Future features must inherit the same platform/tenant resource-scope rules.
 
 ---
 
-# **Document History**
+# 22. Functional Summary
+
+Customer users only receive features belonging to their customer, enabled modules, role permissions, subscription/report entitlement and license access.
+
+Platform administration remains separate.
+
+---
+
+# Document History
 
 | Version | Date | Description |
-| ----- | ----- | ----- |
+|---|---|---|
 | 1.0 | June 2026 | Initial Master Functional Specification |
-
+| 1.1 | 24 August 2026 | Added My Company, strict tenant scope and module/permission-aware report model |

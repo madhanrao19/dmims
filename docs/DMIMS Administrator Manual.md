@@ -1,724 +1,400 @@
-# **DMIMS Administrator Manual**
+# DMIMS Administrator Manual
 
-## **Datamation Inventory Management System (DMIMS)**
-
-**Version:** 1.0
-
----
-
-# **Document Purpose**
-
-This manual provides complete operational guidance for administrators responsible for managing DMIMS.
-
-It explains how to perform routine administration tasks, manage customer companies, configure the platform, and maintain day-to-day operations.
-
-This manual is intended for:
-
-* Datamation Super Administrators  
-* Datamation Management  
-* Customer Company Administrators
+**Datamation Inventory Management System (DMIMS)**  
+**Version:** 1.1  
+**Updated:** 24 August 2026
 
 ---
 
-# **1\. Administrator Roles**
+# 1. Administrator Roles
 
-## **Datamation Super Admin**
+## Datamation Super Admin
 
 Full platform administrator.
 
-Responsibilities:
+## Datamation Management
 
-* Customer onboarding  
-* User management  
-* Subscription management  
-* License management  
-* Billing  
-* Reports  
-* Audit review  
-* System settings
+Read-only platform analytics/summary role.
 
-Has unrestricted access.
-
----
-
-## **Datamation Management**
-
-Read-only administration.
-
-Can view:
-
-* Reports  
-* Analytics  
-* Billing summaries  
-* Customer summaries  
-* License summaries
-
-Cannot modify operational data.
-
----
-
-## **Customer Company Administrator**
+## Customer Company Administrator
 
 Responsible only for their own company.
 
-Can manage:
-
-* Company users  
-* Inventory  
-* Documents  
-* Locations  
-* Reports  
-* Barcode operations
-
-Cannot access platform configuration.
+Uses the customer-facing **My Company** administration area plus authorized operational modules.
 
 ---
 
-# **2\. Logging In**
+# 2. Logging In
 
-Navigate to
+Use the DMIMS login URL.
 
-https://dmims.datamationgroup.com/login
+After login, menus and dashboard content depend on:
 
-Enter:
-
-Email
-
-Password
-
-If Multi-Factor Authentication (future) is enabled, complete verification.
-
----
-
-# **3\. Dashboard**
-
-After login, the dashboard displays:
-
-* Notifications  
-* Summary cards  
-* Recent activities  
-* Alerts  
-* Quick actions
-
-Dashboard content depends on the logged-in role.
+- Role
+- Customer
+- Enabled modules
+- Subscription
+- License
+- Permissions
 
 ---
 
-# **4\. Customer Management**
+# 3. Dashboard
 
-Available only to Datamation Super Admin.
+Shows only relevant authorized information.
+
+Customer users do not see platform customer counts, platform billing totals or platform audit activity.
+
+---
+
+# 4. Platform Customer Management
+
+Available to authorized Datamation platform roles only.
 
 Functions:
 
-* Create customer  
-* Edit customer  
-* Suspend customer  
-* Reactivate customer  
-* Archive customer  
-* View customer details
+- Create customer
+- Edit customer
+- Suspend/reactivate
+- Archive
+- View customer details
+- Manage subscription/license/billing
+
+Customer users do not access this multi-customer screen.
 
 ---
 
-## **Create Customer**
+# 5. Customer My Company
 
-Required fields:
+Authorized customer administrators use:
 
-Company Name
+**My Company**
 
-Company Code
+## Company Profile
 
-Status
+Shows only the logged-in customer's own information.
 
-Optional:
+No customer selector is available.
 
-Registration Number
+## Users
 
-Tax Number
+Company Admin may manage permitted users belonging to the same company.
 
-Contact Person
+Platform users and other-company users must not appear.
 
-Email
+Company Supervisor may have only limited view/update functionality.
 
-Phone
+## Enabled Modules
 
-Address
+Shows a read-only summary of modules enabled for the company.
 
-Notes
+This is not Platform Module Management.
 
-Click:
+## Subscription
 
-Save
+Shows current subscription summary.
 
-The customer becomes available immediately.
+Customers do not access Subscription Plans.
 
----
+## License Status
 
-# **5\. User Management**
+Shows current license/access status.
 
-Create users
+Customers do not access administrative License Management.
 
-Edit users
+## Billing
 
-Assign roles
+Available only if Billing View is enabled and role permits.
 
-Reset passwords
+Customers cannot create, issue, cancel or record payment against billing records.
 
-Deactivate users
+## Audit Logs
 
-Unlock users
+Company Admin may see only own-company audit records.
 
-Every customer user must belong to exactly one customer.
-
----
-
-## **Password Reset**
-
-Open User
-
-↓
-
-Reset Password
-
-↓
-
-Enter new password
-
-↓
-
-Save
-
-User will use the new password immediately.
+Datamation platform audit activity and other customers' audit records are not visible.
 
 ---
 
-# **6\. Role Assignment**
+# 6. User Management
 
-Available roles:
+Platform administrators may manage platform/customer users according to role.
 
-Company Admin
+Company Admin manages own customer users only.
 
-Company Supervisor
-
-Stock Inventory User
-
-Document Tracking User
-
-Viewer
-
-Assign only the minimum permissions required.
+Minimum privilege should always be assigned.
 
 ---
 
-# **7\. Module Management**
+# 7. Role Assignment
 
-Datamation Super Admin may enable or disable modules per customer.
+Roles:
 
-Example:
+- Datamation Super Admin
+- Datamation Management
+- Company Admin
+- Company Supervisor
+- Stock Inventory User
+- Document Tracking User
+- Viewer
 
-Enable
-
-Inventory
-
-Documents
-
-Barcode
-
-Disable
-
-Billing View
-
-Backup
-
-Changes take effect immediately.
+Customer administrators must never assign platform-tier roles.
 
 ---
 
-# **8\. Subscription Management**
+# 8. Module Management
 
-Functions:
+Only Datamation Super Admin configures platform/customer module assignments.
 
-* Assign plan  
-* Renew subscription  
-* Update limits  
-* Modify modules  
-* Change expiry
-
-Renewal process:
-
-Open customer
-
-↓
-
-Subscription
-
-↓
-
-Renew
-
-↓
-
-Select plan
-
-↓
-
-Save
-
-Subscription log is created automatically.
+Customers may view their enabled modules but do not manage the platform Module catalogue.
 
 ---
 
-# **9\. License Management**
+# 9. Subscription Management
 
-Functions:
+Datamation Super Admin handles:
 
-* Activate  
-* Suspend  
-* Revoke  
-* Renew
+- Plan assignment
+- Renewal
+- Limits
+- Modules
+- Expiry
 
-License determines technical access.
-
-Subscription alone does not grant access.
-
----
-
-## **Suspend License**
-
-Open customer
-
-↓
-
-License
-
-↓
-
-Suspend
-
-↓
-
-Enter reason
-
-↓
-
-Confirm
-
-Customer immediately enters View Only mode.
+Customers see only their current subscription summary.
 
 ---
 
-# **10\. Billing Management**
+# 10. License Management
 
-Functions:
+Datamation Super Admin handles:
 
-* Create invoice  
-* Update payment  
-* View outstanding balance  
-* Export reports
+- Activation
+- Suspension
+- Revocation
+- Renewal
+- Access mode
 
-Payments are entered manually.
-
-No payment gateway is integrated in Version 1\.
-
----
-
-## **Record Payment**
-
-Open billing record
-
-↓
-
-Update Payment
-
-↓
-
-Enter amount
-
-↓
-
-Enter reference
-
-↓
-
-Select payment method
-
-↓
-
-Save
-
-Balances are recalculated automatically.
+Customers see only simplified own License Status.
 
 ---
 
-# **11\. Inventory Administration**
+# 11. Billing Management
 
-Customer administrators manage:
+Datamation Super Admin manages billing and manual payments.
 
-Categories
-
-Products
-
-Locations
-
-Inventory
-
-Movements
-
-Reports
+Customers have view-only own billing when enabled.
 
 ---
 
-## **Create Product**
+# 12. Inventory Administration
 
-Required:
+Authorized users manage:
 
-SKU
+- Categories
+- Products
+- Locations
+- Receive In
+- Transfer
+- Stock Out
+- Adjustment
+- Reports
 
-Product Name
-
-Category
-
-Location
-
-Barcode (optional)
-
-Status
-
-Click Save.
+Inventory data is customer-scoped.
 
 ---
 
-# **12\. Document Administration**
+# 13. Document Administration
 
-Functions:
+Authorized users manage:
 
-* Create box  
-* Create file  
-* Transfer  
-* Move out  
-* Return  
-* Archive
+- Boxes
+- Files
+- Receive
+- Transfer
+- Move Out
+- Return
+- Document reports
 
-Monitor overdue returns regularly.
-
----
-
-# **13\. Shared Locations**
-
-Locations are shared between:
-
-Inventory
-
-Documents
-
-Never create duplicate locations.
-
-Maintain a clean hierarchy.
+Document data is customer-scoped.
 
 ---
 
-# **14\. Barcode Administration**
+# 14. Shared Locations
 
-Functions:
+Single hierarchy shared by inventory and documents.
 
-* Generate barcode  
-* Print barcode  
-* Register barcode  
-* Scan barcode  
-* View barcode history
-
-Verify barcode uniqueness before printing replacements.
+Do not create fake external locations.
 
 ---
 
-# **15\. Reports**
+# 15. Barcode Administration
 
-Available reports depend on role.
+Barcode lookup, print and scan are role/module controlled.
 
-Examples:
-
-Inventory Summary
-
-Low Stock
-
-Stock Movement
-
-Document Reports
-
-Billing Reports
-
-Audit Reports
-
-Reports may be exported as:
-
-CSV
-
-Excel
-
-PDF
+Cross-customer barcode information is never exposed.
 
 ---
 
-# **16\. Notifications**
+# 16. Reports
 
-Administrators receive notifications for:
+Reports shown depend on:
 
-* Low stock  
-* Expiring subscriptions  
-* Expiring licenses  
-* Billing overdue  
-* Overdue document returns  
-* Import failures  
-* Export completion
+- Customer
+- Role
+- Enabled modules
+- Subscription/report entitlement
+- License
+- Report permission
 
-Review notifications daily.
+Stock Inventory User sees Inventory reports only.
 
----
+Document Tracking User sees Document reports only.
 
-# **17\. Audit Logs**
+Billing reports require Billing View.
 
-Audit logs record:
+Customer audit reports contain own-customer information only.
 
-* Login  
-* User changes  
-* Customer changes  
-* Billing changes  
-* Inventory movements  
-* Document movements  
-* Barcode activity
-
-Audit records cannot be modified.
+Unauthorized reports do not appear in the selector.
 
 ---
 
-# **18\. System Settings**
+# 17. Notifications
 
-Platform settings include:
-
-* General configuration  
-* Barcode settings  
-* Notification settings  
-* Report settings  
-* Security settings
-
-Only Datamation Super Admin may modify platform settings.
+Customer notifications remain within the customer's boundary.
 
 ---
 
-# **19\. Backup Verification**
+# 18. Audit Logs
 
-Administrators should verify:
+Audit records cannot be edited.
 
-* Daily backup completed  
-* Backup size appears correct  
-* Restore tests completed according to schedule
+Company Admin sees only own customer logs.
 
-Backup verification is an operational responsibility even when backups are automated.
+Platform administrators follow platform audit permissions.
 
 ---
 
-# **20\. Routine Daily Tasks**
+# 19. System Settings
 
-Recommended daily checklist:
-
-✓ Review notifications
-
-✓ Check dashboard alerts
-
-✓ Review overdue returns
-
-✓ Monitor expiring subscriptions
-
-✓ Monitor expiring licenses
-
-✓ Review outstanding billing
-
-✓ Verify backup status
+Platform settings are Datamation platform-only.
 
 ---
 
-# **21\. Weekly Tasks**
+# 20. Backup Verification
 
-✓ Review audit logs
+Backup/restore is platform administration.
 
-✓ Verify user accounts
-
-✓ Check low stock reports
-
-✓ Review system health
-
-✓ Review failed imports
+Customer roles do not receive Backup / Restore access.
 
 ---
 
-# **22\. Monthly Tasks**
+# 21. Routine Tasks
 
-✓ Review inactive users
+Datamation administrators monitor:
 
-✓ Review subscriptions
+- Platform health
+- Backups
+- Expiring subscriptions/licenses
+- Billing
+- Audit
 
-✓ Review licenses
+Customer Admin monitors:
 
-✓ Verify backups
-
-✓ Review reports
-
-✓ Review storage usage
-
-✓ Review documentation updates
-
----
-
-# **23\. Common Administrative Tasks**
-
-Examples:
-
-* Create customer  
-* Reset password  
-* Add new warehouse location  
-* Assign barcode  
-* Renew subscription  
-* Suspend license  
-* Record payment  
-* Export inventory report
-
-Follow documented procedures for each task.
+- Own users
+- Own operational alerts
+- Own reports
+- Own billing/subscription/license status where permitted
 
 ---
 
-# **24\. Troubleshooting**
+# 22. Troubleshooting
 
-## **User Cannot Login**
+## User Cannot Login
 
 Check:
 
-* User status  
-* Company status  
-* Subscription  
-* License  
-* Password
+- User status
+- Company status
+- Subscription
+- License
+- Role
 
----
-
-## **Barcode Not Found**
+## Module Missing
 
 Check:
 
-* Barcode registry  
-* Customer ownership  
-* Barcode status
+- Customer module assignment
+- Role permission
+- Subscription entitlement
+- License mode
 
----
-
-## **Product Not Visible**
-
-Check:
-
-* Customer assignment  
-* Permissions  
-* Module enabled  
-* Filters
-
----
-
-## **Reports Empty**
+## Report Missing
 
 Check:
 
-* Filters  
-* Date range  
-* Customer selection  
-* Permissions
+- Reports availability
+- Required underlying module
+- Required permission
+- `allowed_reports`
+- License mode
+
+## Audit Record Missing for Customer Admin
+
+Confirm the audit record belongs to the same customer.
+
+Platform `customer_id = NULL` logs are intentionally not visible.
 
 ---
 
-# **25\. Security Best Practices**
+# 23. Security Best Practices
 
-Administrators should:
-
-* Use strong passwords  
-* Lock inactive accounts  
-* Review permissions regularly  
-* Avoid sharing accounts  
-* Log out after use  
-* Review audit logs  
-* Report suspicious activity immediately
+- Use individual accounts
+- Apply least privilege
+- Review roles regularly
+- Never share platform accounts
+- Review customer ownership before role changes
+- Report suspicious access
+- Do not attempt to bypass hidden navigation via URL
 
 ---
 
-# **26\. Administrator Checklist**
+# 24. FAQ
 
-Before ending each week:
-
-✓ New users reviewed
-
-✓ Old users disabled
-
-✓ Backups verified
-
-✓ Notifications reviewed
-
-✓ Audit logs checked
-
-✓ Billing reviewed
-
-✓ Inventory exceptions reviewed
-
-✓ Document exceptions reviewed
-
----
-
-# **27\. Frequently Asked Questions**
-
-### **Can a customer see another customer's data?**
+### Can a customer see another customer's data?
 
 No.
 
----
-
-### **Can audit logs be edited?**
-
-Never.
-
----
-
-### **Can movement history be changed?**
+### Can Company Admin see platform users?
 
 No.
 
-Corrections create new movement records.
+### Can a customer browse Subscription Plans?
+
+No. They may see only their current subscription summary.
+
+### Can a customer manage licenses?
+
+No. They may see only own License Status where permitted.
+
+### Can Company Admin see Datamation audit logs?
+
+No.
+
+### Why is a report not shown?
+
+DMIMS only shows reports allowed by the user's module, role, entitlement and license.
 
 ---
 
-### **Why can't a suspended customer create new records?**
+# 25. Summary
 
-Because the license places the customer into View Only mode.
-
----
-
-### **Why is billing manual?**
-
-Version 1 is designed for manual billing and payment processing.
+DMIMS separates platform administration from customer administration and presents customer users only with own-company functions appropriate to their role and entitlement.
 
 ---
 
-# **28\. Summary**
-
-The Administrator Manual provides all procedures required to operate DMIMS safely and consistently.
-
-Following this manual helps maintain:
-
-* Data integrity  
-* Customer isolation  
-* Operational consistency  
-* Security  
-* Compliance  
-* Reliable day-to-day administration
-
----
-
-# **Document History**
+# Document History
 
 | Version | Date | Description |
-| ----- | ----- | ----- |
+|---|---|---|
 | 1.0 | June 2026 | Initial Administrator Manual |
-
+| 1.1 | 24 August 2026 | Added My Company workflow and strict customer/platform visibility guidance |

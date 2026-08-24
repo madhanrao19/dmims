@@ -1,797 +1,410 @@
-# **DMIMS UI/UX & Design System Specification**
+# DMIMS UI/UX & Design System Specification
 
-**Datamation Inventory Management System (DMIMS)**
-
-Version 1.0
-
----
-
-# **Document Purpose**
-
-This document defines the complete user interface (UI), user experience (UX), and design system standards for DMIMS.
-
-It ensures that every page, form, table, dashboard, and interaction follows a consistent design language across the application.
-
-This document applies to:
-
-* Laravel  
-* Filament  
-* Progressive Web App (PWA)  
-* Desktop  
-* Tablet  
-* Mobile
+**Datamation Inventory Management System (DMIMS)**  
+**Version:** 1.1  
+**Updated:** 24 August 2026
 
 ---
 
-# **1\. Design Principles**
+# 1. Design Principles
 
-The DMIMS interface should be:
+DMIMS should be:
 
-* Clean  
-* Professional  
-* Fast  
-* Consistent  
-* Accessible  
-* Mobile-friendly  
-* Easy to learn  
-* Optimized for daily operational use
+- Clean
+- Professional
+- Fast
+- Consistent
+- Accessible
+- Mobile-friendly
+- Easy to learn
+- Optimized for operational work
+- Least-privilege by presentation
 
-The system is used for long periods by office staff, so readability and efficiency take priority over decorative design.
+Users should not be shown irrelevant platform functions.
 
 ---
 
-# **2\. Design Philosophy**
+# 2. Design Philosophy
 
-Every screen should answer three questions immediately:
+Every screen should answer:
 
-1. Where am I?  
-2. What can I do?  
+1. Where am I?
+2. What can I do?
 3. What should I do next?
 
-Users should never need to search for common actions.
+Navigation must reflect actual authorization.
 
 ---
 
-# **3\. Theme**
+# 3. Theme
 
-Primary Style
+Modern enterprise dashboard.
 
-Modern Enterprise Dashboard
-
-Inspired by
-
-* Microsoft 365 Admin  
-* GitHub  
-* Linear  
-* Notion  
-* Laravel Filament
-
-Avoid excessive gradients, animations, or visual clutter.
+Use the documented DMIMS theme and avoid unnecessary visual clutter.
 
 ---
 
-# **4\. Colour Palette**
+# 4. Colour Palette
 
-| Element | Colour |
-| ----- | ----- |
-| Primary | \#2563EB |
-| Secondary | \#0B1F3A |
-| Success | \#16A34A |
-| Warning | \#F59E0B |
-| Danger | \#DC2626 |
-| Information | \#0284C7 |
-| Background | \#F5F7FA |
-| Card | \#FFFFFF |
-| Border | \#E5E7EB |
-| Text Primary | \#111827 |
-| Text Secondary | \#6B7280 |
+Use existing DMIMS palette and status conventions.
 
 ---
 
-# **5\. Typography**
+# 5. Typography
 
-Primary Font
-
-Inter
-
-Fallback
-
-System UI
-
-Arial
-
-Sans-serif
-
-Font Sizes
-
-| Purpose | Size |
-| ----- | ----- |
-| Page Title | 28 px |
-| Section Heading | 22 px |
-| Card Heading | 18 px |
-| Table Header | 14 px |
-| Body Text | 14 px |
-| Helper Text | 12 px |
+Use Inter/system UI with readable enterprise sizing.
 
 ---
 
-# **6\. Spacing**
+# 6. Spacing
 
-Use an 8-point spacing system.
-
-Examples
-
-8 px
-
-16 px
-
-24 px
-
-32 px
-
-48 px
-
-Avoid arbitrary spacing values.
+Use consistent 8-point spacing.
 
 ---
 
-# **7\. Icons**
+# 7. Icons
 
-Use Heroicons (default Filament set).
+Use Heroicons consistently.
 
-Examples
+---
+
+# 8. Navigation Structure
+
+## Platform Navigation
+
+Authorized Datamation users may see platform items such as:
+
+- Dashboard
+- Customers
+- Users
+- Roles & Permissions
+- Modules
+- Subscription Plans
+- Customer Subscriptions
+- Licenses
+- Billing
+- Reports & Analytics
+- Audit Logs
+- Backup / Restore
+- System Settings
+
+Actual visibility remains role-aware.
+
+## Customer Navigation
+
+Recommended:
 
 Dashboard
 
-Users
+My Company  
+├── Overview  
+├── Users  
+├── Enabled Modules  
+├── Subscription  
+├── License Status  
+├── Billing  
+└── Audit Logs  
 
-Products
+Stock Inventory  
+├── Categories  
+├── Products  
+├── Locations  
+├── Receive In  
+├── Transfer  
+├── Stock Out  
+├── Adjustment  
+└── Stock Reports  
 
-Boxes
+Document Tracking  
+├── Locations  
+├── Boxes  
+├── Document Files  
+├── File / Box Movements  
+└── Document Reports  
+
+Barcode  
+├── Scanner  
+├── Registry  
+└── Printing  
 
 Reports
 
-Settings
+Profile / Account
 
-Notifications
+Not every role sees every item.
 
-Keep icon usage consistent throughout the application.
+### Customer Navigation Rules
 
----
+- Hide My Company tabs the role cannot access.
+- Hide Stock Inventory when disabled/unpermitted.
+- Hide Document Tracking when disabled/unpermitted.
+- Hide Barcode functions according to module/permission.
+- Hide Billing unless Billing View is enabled.
+- Hide Reports when unavailable.
+- Never show platform administration to customer roles.
 
-# **8\. Navigation Structure**
+## Platform-Only Navigation
 
-## **Platform Navigation**
+Customer users must never see:
 
-Dashboard
-
-Customers
-
-Users
-
-Roles & Permissions
-
-Modules
-
-Subscription Plans
-
-Customer Subscriptions
-
-Licenses
-
-Billing
-
-Payments
-
-Reports & Analytics
-
-Audit Logs
-
-System Settings
+- Multi-customer Customers
+- Platform Users
+- Roles & Permissions management
+- Module catalogue management
+- Subscription Plans
+- Customer Subscription administration
+- License Management
+- Platform Billing administration
+- Backup / Restore
+- Platform Settings
+- Platform reports
+- Platform audit logs
 
 ---
 
-## **Customer Navigation**
+# 9. Dashboard Design
 
-Dashboard
+Widgets are role/module aware.
 
-Stock Inventory
-
-Document Tracking
-
-Barcode
-
-Reports
-
-Audit Logs
-
-Profile
+Do not show empty or unauthorized module cards merely because the widget exists.
 
 ---
 
-# **9\. Dashboard Design**
+# 10. Summary Cards
 
-Every dashboard should include:
+Use icon, label, value and status.
 
-Summary cards
-
-Recent activity
-
-Alerts
-
-Quick actions
-
-Charts
-
-Upcoming renewals
-
-Notifications
-
-The most important information should appear above the fold.
+Customer cards use own-customer data only.
 
 ---
 
-# **10\. Summary Cards**
+# 11. Tables
 
-Every summary card contains:
+Support:
 
-* Icon  
-* Label  
-* Value  
-* Trend (optional)  
-* Status colour
+- Search
+- Sort
+- Pagination
+- Filters
+- Responsive layout
 
-Example
-
-Total Products
-
-1,245
-
-\+18 this week
+Export is shown only when authorized.
 
 ---
 
-# **11\. Tables**
+# 12. Filters
 
-Every table should support:
+Customer users must not receive multi-customer selectors.
 
-Search
-
-Sorting
-
-Pagination
-
-Column visibility
-
-Export
-
-Bulk actions (where appropriate)
-
-Responsive layout
-
-Sticky header (recommended)
+Platform-only customer filters are restricted to Datamation platform roles.
 
 ---
 
-# **12\. Filters**
+# 13. Forms
 
-Filters should appear above tables.
+Forms are logically grouped.
 
-Examples
+Customer ownership fields are hidden/locked where derived server-side.
 
-Status
-
-Category
-
-Location
-
-Date
-
-Customer
-
-Movement Type
-
-Assigned User
-
-Filters should remain visible after refresh where practical.
+Do not expose platform fields to customer users.
 
 ---
 
-# **13\. Forms**
+# 14. Required Fields
 
-Forms should be divided into logical sections.
+Use clear validation.
 
-Example
-
-General Information
-
-↓
-
-Location
-
-↓
-
-Additional Details
-
-↓
-
-Audit Information
-
-Do not present more than 10–12 unrelated fields in a single section.
+Server-side authorization and validation remain authoritative.
 
 ---
 
-# **14\. Required Field Indicators**
+# 15. Buttons
 
-Required fields
+Only render actions the user can execute.
 
-Red asterisk
-
-Optional fields
-
-No indicator
-
-Validation messages should appear directly beneath the affected field.
+Backend must still authorize each action.
 
 ---
 
-# **15\. Buttons**
+# 16. Status Badges
 
-Primary
-
-Blue
-
-Save
-
-Create
-
-Submit
-
-Secondary
-
-Grey
-
-Cancel
-
-Back
-
-Close
-
-Danger
-
-Red
-
-Delete
-
-Revoke
-
-Suspend
+Use consistent documented status colours.
 
 ---
 
-# **16\. Status Badges**
+# 17. Confirmation Dialogues
 
-| Status | Colour |
-| ----- | ----- |
-| Active | Green |
-| Pending | Blue |
-| Trial | Blue |
-| Near Expiry | Amber |
-| Expired | Orange |
-| Suspended | Red |
-| Revoked | Dark Red |
-| Cancelled | Grey |
-| Archived | Grey |
-
-Use badges consistently across all modules.
+Require confirmation for destructive/high-impact actions.
 
 ---
 
-# **17\. Confirmation Dialogues**
+# 18. Notifications
 
-Require confirmation for:
-
-Delete
-
-Archive
-
-Suspend
-
-Revoke
-
-Move Out
-
-Stock Adjustment
-
-Import
-
-Restore
-
-Display the impact of the action before confirmation.
+Messages should be concise and should not disclose unauthorized entity existence.
 
 ---
 
-# **18\. Notifications**
+# 19. Empty States
 
-Notification types
-
-Success
-
-Information
-
-Warning
-
-Error
-
-Notifications should:
-
-Be concise.
-
-Explain the outcome.
-
-Suggest the next step where appropriate.
+Empty states should offer only actions the user may perform.
 
 ---
 
-# **19\. Empty States**
+# 20. Loading States
 
-Every empty table should display:
-
-Friendly illustration (optional)
-
-Clear explanation
-
-Primary action
-
-Example
-
-"No products have been created yet."
-
-Button
-
-Create Product
+Use component-level loading where practical.
 
 ---
 
-# **20\. Loading States**
+# 21. Inventory Screens
 
-Display loading indicators during:
-
-Search
-
-Filtering
-
-Saving
-
-Import
-
-Export
-
-Barcode lookup
-
-Avoid blocking the entire interface when only one component is loading.
+Shown only when Inventory is enabled and role permits.
 
 ---
 
-# **21\. Inventory Screens**
+# 22. Document Tracking Screens
 
-Products
-
-Categories
-
-Locations
-
-Receive In
-
-Transfer
-
-Stock Out
-
-Adjustment
-
-Movement History
-
-Each page should have:
-
-Header
-
-Filters
-
-Table/Form
-
-Quick Actions
-
-Recent Activity (where relevant)
+Shown only when Document Tracking is enabled and role permits.
 
 ---
 
-# **22\. Document Tracking Screens**
+# 23. Barcode Scanner
 
-Boxes
+Mobile-friendly.
 
-Files
-
-Receive
-
-Transfer
-
-Move Out
-
-Return
-
-Movement History
-
-Location Lookup
-
-Keep inventory and document layouts visually consistent.
+Do not reveal barcode details belonging to another customer.
 
 ---
 
-# **23\. Barcode Scanner Screen**
+# 24. Dashboard Widgets
 
-Optimised for mobile.
+Examples:
 
-Features
+- Products
+- Low Stock
+- Boxes
+- Documents
+- Returns
+- Subscription Status
+- License Status
+- Own Billing
 
-Large scan input
-
-Large action buttons
-
-Current scanned item
-
-Recent scan history
-
-Error feedback
-
-Auto-focus after each successful scan
-
-Support both USB scanners and camera scanners.
+Show only relevant authorized widgets.
 
 ---
 
-# **24\. Dashboard Widgets**
+# 25. Responsive Behaviour
 
-Examples
+Authorization does not change between desktop, tablet and mobile.
 
-Products
-
-Low Stock
-
-Boxes
-
-Documents
-
-Pending Returns
-
-Recent Stock Movements
-
-Recent File Movements
-
-Subscription Status
-
-License Status
-
-Outstanding Billing
+Hidden desktop navigation must remain hidden in mobile drawer/PWA.
 
 ---
 
-# **25\. Responsive Behaviour**
+# 26. PWA
 
-Desktop
+Installable and online-first.
 
-Full navigation
-
-Tablet
-
-Collapsible navigation
-
-Mobile
-
-Drawer menu
-
-Stacked cards
-
-Responsive tables
-
-Large touch targets
+PWA navigation follows exactly the same role/module rules.
 
 ---
 
-# **26\. Progressive Web App**
+# 27. Accessibility
 
-PWA requirements
-
-Install prompt
-
-Offline page
-
-App icon
-
-Splash screen
-
-Standalone mode
-
-Responsive layouts
-
-Version 1 remains online-first.
+Target WCAG 2.1 AA.
 
 ---
 
-# **27\. Accessibility**
+# 28. Error Pages
 
-Target WCAG 2.1 AA compliance.
-
-Requirements
-
-Keyboard navigation
-
-Visible focus indicators
-
-Colour contrast
-
-Screen reader labels
-
-Descriptive buttons
-
-Accessible forms
-
-Avoid colour-only communication.
+401/403/404/419/429/500/503 must not disclose sensitive resource details.
 
 ---
 
-# **28\. Error Pages**
+# 29. Reusable Components
 
-Provide branded pages for:
+Recommended reusable components include:
 
-401
-
-403
-
-404
-
-419
-
-429
-
-500
-
-503
-
-Each page should explain the issue in plain language and provide navigation back to a safe location.
+- Status badge
+- Customer-scoped selector
+- Location selector
+- Barcode display
+- Movement history
+- Audit timeline
+- Notification panel
+- Summary cards
+- My Company tabs
 
 ---
 
-# **29\. Reusable Components**
+# 30. Page Layout Standard
 
-Create reusable Filament components for:
+Use:
 
-Status badges
-
-Customer selector
-
-Location selector
-
-Barcode display
-
-Barcode print button
-
-Movement history panel
-
-Audit timeline
-
-Notification panel
-
-Confirmation dialog
-
-Summary cards
-
-Avoid duplicating UI logic.
+Page Title  
+↓  
+Breadcrumb  
+↓  
+Allowed Quick Actions  
+↓  
+Summary Cards  
+↓  
+Filters  
+↓  
+Main Content
 
 ---
 
-# **30\. Page Layout Standard**
+# 31. Report Selector UX
 
-Every page follows this structure:
+The selector must contain only reports the user may execute.
 
-Page Title
+### Stock Inventory User
 
-↓
+Inventory reports only.
 
-Breadcrumb
+### Document Tracking User
 
-↓
+Document reports only.
 
-Quick Actions
+### Company Admin
 
-↓
+Only enabled/authorized operational report families.
 
-Summary Cards (optional)
+Billing reports only with Billing View.
 
-↓
+Audit reports only when authorized and always own-customer.
 
-Filters
-
-↓
-
-Main Table or Form
-
-↓
-
-Recent Activity (optional)
-
-↓
-
-Audit Information (optional)
+Prefer complete omission of unauthorized report types.
 
 ---
 
-# **31\. Future Enhancements**
+# 32. UI Quality Checklist
 
-Reserved for future versions:
+Before release:
 
-Dark Mode
-
-Custom themes
-
-Multi-language interface
-
-Custom dashboards
-
-Drag-and-drop widgets
-
-AI assistant sidebar
-
-Voice search
-
-Offline data entry
-
-Advanced barcode camera overlay
+- Correct role navigation
+- Correct module navigation
+- No platform items visible to customer roles
+- My Company tabs filtered
+- No customer selector for tenant users
+- Report selector filtered
+- Direct access protection separately tested
+- Responsive
+- Accessible
+- Consistent
 
 ---
 
-# **32\. UI Quality Checklist**
+# 33. Summary
 
-Every page should satisfy the following before release:
-
-✓ Consistent layout
-
-✓ Correct colours
-
-✓ Responsive on desktop, tablet and mobile
-
-✓ Accessible labels
-
-✓ Validation messages
-
-✓ Loading indicators
-
-✓ Empty state
-
-✓ Error handling
-
-✓ Keyboard navigation
-
-✓ Matches design system
+DMIMS UI presents only functions the authenticated user is entitled to use while backend authorization independently enforces the same boundary.
 
 ---
 
-# **33\. Summary**
-
-The DMIMS Design System establishes a consistent, professional user experience across the entire platform.
-
-By following these standards, developers can:
-
-* Build faster through reusable patterns.  
-* Deliver a consistent interface across all modules.  
-* Reduce user training requirements.  
-* Improve accessibility and maintainability.  
-* Ensure the application remains scalable as new modules are added.
-
----
-
-# **Document History**
+# Document History
 
 | Version | Date | Description |
-| ----- | ----- | ----- |
+|---|---|---|
 | 1.0 | June 2026 | Initial UI/UX & Design System Specification |
-
+| 1.1 | 24 August 2026 | Added role-aware My Company, platform-only customer boundary and filtered reports/navigation |

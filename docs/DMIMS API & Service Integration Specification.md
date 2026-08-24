@@ -1,758 +1,297 @@
-# **DMIMS API & Service Integration Specification**
+# DMIMS API & Service Integration Specification
 
-**Datamation Inventory Management System (DMIMS)**
-
-Version 1.0
-
----
-
-# **Document Purpose**
-
-This document defines the API strategy and service integration architecture for DMIMS.
-
-Although Version 1 is primarily a Laravel/Filament web application, the system is designed to support future integrations with:
-
-* Mobile applications  
-* ERP systems  
-* Accounting software  
-* AI services  
-* Warehouse Management Systems (WMS)  
-* RFID devices  
-* Barcode scanners  
-* Microsoft 365  
-* SAP  
-* Power BI  
-* Third-party applications
-
-This document provides a stable interface specification for future development.
+**Datamation Inventory Management System (DMIMS)**  
+**Version:** 1.1  
+**Updated:** 24 August 2026
 
 ---
 
-# **1\. API Design Principles**
+# 1. API Design Principles
 
-DMIMS APIs follow these principles:
+DMIMS APIs must be:
 
-* RESTful architecture  
-* Resource-oriented URLs  
-* Stateless requests  
-* JSON request and response bodies  
-* Versioned endpoints  
-* Secure authentication  
-* Consistent error handling  
-* Multi-tenant security  
-* Audit logging
+- Authenticated
+- Versioned
+- Tenant-aware
+- Permission-aware
+- Module-aware
+- Audited
+- Secure by default
 
 ---
 
-# **2\. API Base URL**
+# 2. API Base URL
 
-Production
+Use versioned `/api/v1` endpoints as implemented/extended.
 
-https://dmims.datamationgroup.com/api/v1
-
-Future versions
-
-/api/v2  
-/api/v3
-
-Never introduce breaking changes inside the same API version.
-
-Currently implemented (see `routes/api.php`): three narrow, read-only, Sanctum-token-authenticated endpoints under `/api/v1` — `GET /barcodes/{barcode}`, `GET /products/{product}/stock`, `GET /exports/{exportNo}`. Everything else in this document (Sections 8–11 onward) is the target interface design for future development, not yet implemented, unless stated otherwise.
+Existing endpoint status remains governed by the repository code.
 
 ---
 
-# **3\. Authentication**
+# 3. Authentication
 
-Implemented today
+Use configured Laravel Sanctum/token architecture for implemented APIs.
 
-Laravel Sanctum personal access tokens, issued via the `dmims:issue-api-token` artisan command. Tokens default to the `api:read` ability and a configurable expiration (`SANCTUM_TOKEN_EXPIRATION`, default 365 days). `routes/api.php` enforces `auth:sanctum`, `business-access` and `abilities:api:read` on every `/api/v1` route.
-
-Future authentication methods
-
-OAuth2
-
-Future Enterprise
-
-Azure AD
-
-Google Workspace
-
-Microsoft Entra ID
-
-Single Sign-On
+Future authentication mechanisms must preserve the same customer context rules.
 
 ---
 
-# **4\. API Headers**
+# 4. Headers
 
-Required
-
-Accept: application/json  
-Content-Type: application/json  
-Authorization: Bearer \<token\>
-
-Optional
-
-X-Correlation-ID  
-X-Request-ID
+Use standard JSON/Authorization headers.
 
 ---
 
-# **5\. Standard Response Format**
+# 5. Response Format
 
-Successful response
+Use consistent success/error payloads.
 
-{  
-    "success": true,  
-    "message": "Operation completed successfully.",  
-    "data": {}  
-}
-
-Validation error
-
-{  
-    "success": false,  
-    "message": "Validation failed.",  
-    "errors": {}  
-}
-
-Server error
-
-{  
-    "success": false,  
-    "message": "Unexpected server error."  
-}
+Never reveal another customer's resource existence.
 
 ---
 
-# **6\. Standard HTTP Status Codes**
+# 6. HTTP Status Codes
 
-| Code | Meaning |
-| ----- | ----- |
-| 200 | Success |
-| 201 | Created |
-| 204 | No Content |
-| 400 | Bad Request |
-| 401 | Unauthenticated |
-| 403 | Forbidden |
-| 404 | Not Found |
-| 409 | Conflict |
-| 422 | Validation Error |
-| 429 | Too Many Requests |
-| 500 | Server Error |
+Use standard HTTP semantics.
+
+Unauthorized = 401.
+
+Authenticated but forbidden = 403.
+
+Use 404 where appropriate to avoid resource enumeration.
 
 ---
 
-# **7\. Customer Security**
+# 7. Customer Security
 
-Every request must resolve:
+Every request resolves:
 
-Authenticated User
-
-↓
-
-Customer Context
-
-↓
-
-Permissions
-
-↓
-
-Subscription
-
-↓
-
-License
-
-↓
-
-Module
-
-↓
-
-Business Rules
-
-↓
-
+Authenticated User  
+↓  
+Platform / Customer Context  
+↓  
+Resource Scope  
+↓  
+Permission  
+↓  
+Subscription  
+↓  
+License  
+↓  
+Module  
+↓  
+Business Rules  
+↓  
 Database
 
-The client must never submit customer\_id.
+The client must never determine trusted customer ownership.
 
-The backend derives customer context from the authenticated user.
+## API Resource Scope
 
----
+### PLATFORM_ONLY
 
-# **8\. Product API**
+Customer API tokens cannot access platform administration endpoints.
 
-GET
+### TENANT_STRICT
 
-/api/v1/products
+Customer API queries use exact authenticated customer:
 
-Returns
+```text
+customer_id = authenticated user's customer_id
+```
 
-Paged product list.
+Never include NULL platform records.
 
----
+### TENANT_WITH_GLOBAL_DEFAULTS
 
-GET
-
-/api/v1/products/{id}
-
-Returns
-
-Single product.
+Global/default records may be returned only when the endpoint specification explicitly permits them.
 
 ---
 
-POST
+# 8. Product API
 
-/api/v1/products
-
-Creates
-
-Product
+Any existing/future product endpoints use TENANT_STRICT.
 
 ---
 
-PUT
+# 9. Inventory Operations API
 
-/api/v1/products/{id}
+Receive/transfer/out/adjust operations require:
 
-Updates
-
-Product
-
----
-
-DELETE
-
-/api/v1/products/{id}
-
-Soft deletes product.
+- Customer ownership
+- Inventory module
+- Permission
+- Subscription/license access
+- Transaction
+- Movement log
+- Audit
 
 ---
 
-# **9\. Inventory Operations API**
+# 10. Document Tracking API
 
-Receive In
-
-POST /stock/receive
-
-Transfer
-
-POST /stock/transfer
-
-Stock Out
-
-POST /stock/out
-
-Adjustment
-
-POST /stock/adjustment
-
-Each operation must:
-
-Validate
-
-↓
-
-Check Access
-
-↓
-
-Run Database Transaction
-
-↓
-
-Write Movement
-
-↓
-
-Write Audit
-
-↓
-
-Return Response
+All file/box APIs are TENANT_STRICT and require Document Tracking permissions.
 
 ---
 
-# **10\. Document Tracking API**
+# 11. Barcode API
 
-Receive File
-
-POST /documents/files/receive
-
-Transfer File
-
-POST /documents/files/transfer
-
-Move Out File
-
-POST /documents/files/move-out
-
-Return File
-
-POST /documents/files/return
-
-Receive Box
-
-POST /documents/boxes/receive
-
-Transfer Box
-
-POST /documents/boxes/transfer
-
-Move Out Box
-
-POST /documents/boxes/move-out
-
-Return Box
-
-POST /documents/boxes/return
+Lookup/scan must validate customer ownership before returning entity details.
 
 ---
 
-# **11\. Barcode API**
+# 12. Billing API
 
-Generate Barcode
+Customer-facing billing endpoints, if introduced, are own-customer read-only unless explicitly approved otherwise.
 
-POST /barcodes/generate
-
-Lookup Barcode
-
-GET /barcodes/{barcode}
-
-Print Barcode
-
-POST /barcodes/print
-
-Scan Barcode
-
-POST /barcodes/scan
-
-The scan workflow:
-
-Barcode
-
-↓
-
-Registry Lookup
-
-↓
-
-Customer Validation
-
-↓
-
-Permission Validation
-
-↓
-
-Determine Entity Type
-
-↓
-
-Return Entity
-
-↓
-
-Write Scan Log
+Mutation remains platform administration in Version 1.
 
 ---
 
-# **12\. Billing API**
+# 13. Reporting API
 
-Future endpoints
+Each report is authorized independently.
 
-Invoices
+Required checks may include:
 
-Payments
+- Authenticated user
+- Customer context
+- Reports module
+- Required operational module
+- Required permission
+- Effective `allowed_reports`
+- License mode
+- Tenant ownership
 
-Outstanding balances
+Generic report access does not expose every report family.
 
-Payment history
+Examples:
 
-Billing summaries
-
-Version 1 remains manual through the administrative interface.
-
----
-
-# **13\. Reporting API**
-
-Future reports
-
-Inventory Summary
-
-Stock Movement
-
-Low Stock
-
-Document Reports
-
-Billing Reports
-
-Audit Reports
-
-Exports
-
-CSV
-
-Excel
-
-PDF
+Inventory report → Inventory access.  
+Document report → Document Tracking access.  
+Billing report → Billing View + billing permission.  
+Audit report → audit permission + exact customer scope.  
+Platform reports → Datamation platform roles only.
 
 ---
 
-# **14\. Notification API**
+# 14. Notification API
 
-Future endpoints
-
-Unread notifications
-
-Mark as read
-
-Notification history
-
-Push notifications
+Customer notifications use TENANT_STRICT.
 
 ---
 
-# **15\. File Upload API**
+# 15. File Upload API
 
-Supported uploads
-
-Payment proof
-
-Import files
-
-Barcode templates
-
-Future
-
-Document attachments
-
-Maximum upload size configured through Laravel validation.
+Uploads must validate ownership, permission and file security.
 
 ---
 
-# **16\. Import API**
+# 16. Import API
 
-Future endpoints
-
-Products
-
-Locations
-
-Opening Stock
-
-Boxes
-
-Document Files
-
-Workflow
-
-Upload
-
-↓
-
-Validation
-
-↓
-
-Preview
-
-↓
-
-Confirmation
-
-↓
-
-Import
-
-↓
-
-Audit
+Imports require exact customer context, module access, permission, limits and audit.
 
 ---
 
-# **17\. Export API**
+# 17. Export API
 
-Export formats
+Exports reuse the same authorization as corresponding report/resource view.
 
-CSV
-
-Excel
-
-PDF
-
-Print
-
-Every export generates an audit record.
+Every export is audited.
 
 ---
 
-# **18\. Webhooks**
+# 18. Webhooks
 
-Future outbound webhooks
-
-Subscription renewed
-
-License changed
-
-Payment received
-
-Stock below threshold
-
-Document moved out
-
-Document returned
-
-Backup completed
-
-Webhook payloads should include:
-
-Event
-
-Timestamp
-
-Customer ID
-
-Entity Type
-
-Entity ID
-
-Correlation ID
+Future webhook events must use trusted server-derived customer ownership.
 
 ---
 
-# **19\. External Integrations**
+# 19. External Integrations
 
-Planned integrations
-
-Microsoft 365
-
-SAP
-
-Power BI
-
-Azure AD
-
-Google Workspace
-
-ERP systems
-
-RFID readers
-
-Barcode scanners
-
-AI assistants
-
-OCR engines
-
-Future integrations must use Services rather than directly accessing Models.
+Integrations must use services and must not bypass access-control/business rules.
 
 ---
 
-# **20\. Mobile Application Support**
+# 20. Mobile Application Support
 
-Future mobile applications should use the same REST API.
-
-Supported functions
-
-Barcode scanning
-
-Inventory lookup
-
-Stock transfer
-
-Document tracking
-
-Notifications
-
-Offline synchronization (future version)
+Mobile clients inherit identical authorization semantics.
 
 ---
 
-# **21\. API Rate Limiting**
+# 21. API Rate Limiting
 
-Implemented today
+Retain configured rate limiting.
 
-`/api/v1/*` is throttled via the `api` rate limiter (`throttle:api` middleware), configured through `API_RATE_LIMIT_PER_MINUTE` (default 60 requests per minute per authenticated user). See `app/Providers/AppServiceProvider.php`.
-
-Large exports
-
-Queued
+Authorization is independent of rate limiting.
 
 ---
 
-# **22\. API Versioning**
+# 22. API Versioning
 
-Versioning strategy
-
-/api/v1
-
-/api/v2
-
-Do not remove or change existing endpoints within the same version.
-
-Breaking changes require a new version.
+Breaking API changes require new API version.
 
 ---
 
-# **23\. Error Handling**
+# 23. Error Handling
 
-Errors should be:
-
-Consistent
-
-Readable
-
-Machine-parseable
-
-Never expose stack traces.
-
-Unexpected exceptions should be logged.
+Consistent, machine-readable and non-leaking.
 
 ---
 
-# **24\. Correlation IDs**
+# 24. Correlation IDs
 
-Every request should support:
-
-X-Correlation-ID
-
-This value should be stored in logs and audit records to simplify troubleshooting across distributed systems.
+Use where implemented/appropriate for audit/troubleshooting.
 
 ---
 
-# **25\. Future GraphQL Support**
+# 25. Future GraphQL
 
-The architecture allows a GraphQL endpoint in the future.
-
-Potential endpoint
-
-/graphql
-
-This would enable richer mobile and reporting applications without changing the underlying business services.
+Any GraphQL implementation must preserve per-field/resource tenant authorization.
 
 ---
 
-# **26\. API Security**
+# 26. API Security
 
 Every endpoint must:
 
-Authenticate the user.
-
-Resolve customer context.
-
-Authorize the request.
-
-Validate input.
-
-Execute business rules.
-
-Write audit logs.
-
-Return a consistent response.
-
-Never expose data from another customer.
+- Authenticate
+- Resolve context
+- Apply resource scope
+- Authorize
+- Validate
+- Execute service rules
+- Audit critical actions
 
 ---
 
-# **27\. Service Integration Principles**
+# 27. Service Integration Principles
 
-All integrations must communicate through the Service layer.
-
-External systems must never:
-
-* Write directly to database tables.  
-* Bypass validation.  
-* Ignore subscription or license rules.  
-* Bypass audit logging.
-
-The Service layer remains the single entry point for all business operations.
+External systems never write directly to database tables.
 
 ---
 
-# **28\. API Lifecycle**
+# 28. API Lifecycle
 
-New Endpoint
-
-↓
-
-Architecture Review
-
-↓
-
-Security Review
-
-↓
-
-Implementation
-
-↓
-
-Testing
-
-↓
-
-Documentation
-
-↓
-
-Release
-
-↓
-
-Monitoring
-
-↓
-
-Version Management
+Architecture/security review precedes release.
 
 ---
 
-# **29\. Future Event Architecture**
+# 29. Future Event Architecture
 
-DMIMS is designed to evolve toward event-driven integration.
-
-Examples
-
-ProductCreated
-
-StockReceived
-
-StockTransferred
-
-FileMovedOut
-
-PaymentRecorded
-
-SubscriptionRenewed
-
-LicenseSuspended
-
-These events may later be published to queues, webhooks or message brokers without changing the core business logic.
+Events must carry trusted server-derived tenant context.
 
 ---
 
-# **30\. Summary**
+# 30. Summary
 
-The DMIMS API architecture is designed to:
-
-* Support future integrations without redesign.  
-* Keep all business logic inside Services.  
-* Maintain strict customer isolation.  
-* Provide consistent request and response formats.  
-* Enable mobile applications, AI agents, ERP integrations and analytics platforms through stable, versioned interfaces.
+APIs must enforce the same platform/customer and report/module boundaries as the Filament UI.
 
 ---
 
-# **Document History**
+# Document History
 
 | Version | Date | Description |
-| ----- | ----- | ----- |
+|---|---|---|
 | 1.0 | June 2026 | Initial API & Service Integration Specification |
-
+| 1.1 | 24 August 2026 | Added explicit API resource scope and report-family authorization requirements |

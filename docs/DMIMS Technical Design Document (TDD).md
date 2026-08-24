@@ -1,942 +1,436 @@
-# **DMIMS Technical Design Document (TDD)**
+# DMIMS Technical Design Document (TDD)
 
-**Datamation Inventory Management System**
-
-Version 1.0
-
----
-
-# **Document Purpose**
-
-This document defines the technical implementation of the Datamation Inventory Management System (DMIMS).
-
-It provides developers with the complete software design including:
-
-* Application architecture  
-* Directory structure  
-* Models  
-* Services  
-* Middleware  
-* Filament Resources  
-* Database relationships  
-* Coding standards  
-* Development conventions
-
-The objective is to ensure every developer builds the system consistently and according to best practices.
+**Datamation Inventory Management System**  
+**Version:** 1.1  
+**Updated:** 24 August 2026
 
 ---
 
-# **1\. Technical Stack**
+# Document Purpose
+
+Defines the technical implementation standards for DMIMS.
+
+---
+
+# 1. Technical Stack
 
 | Layer | Technology |
-| ----- | ----- |
+|---|---|
 | Backend | Laravel 13 |
 | Admin Panel | Filament 5 |
 | Language | PHP 8.4+ |
-| Database | MariaDB 11 (MySQL 8 compatible) |
-| Authentication | Laravel \+ Filament |
+| Database | MariaDB / MySQL compatible |
+| Authentication | Laravel + Filament |
 | Permissions | Spatie Laravel Permission |
-| Frontend | Blade \+ Tailwind CSS \+ Alpine.js |
+| Frontend | Blade + Tailwind CSS + Alpine.js |
 | Build Tool | Vite |
 | Queue | Database Queue |
-| Cache | File Cache (Redis-ready) |
-| Web Server | Apache (PHP-FPM) |
-| Runtime | PHP-FPM |
-| Operating System | Ubuntu 24.04 LTS |
+| Cache | File Cache, Redis-ready |
+| Server | Ubuntu 24.04 + Apache + PHP-FPM |
 
 ---
 
-# **2\. Project Directory Structure**
+# 2. Directory Structure
 
-app/  
-├── Actions/  
-├── Console/  
-├── Enums/  
-├── Events/  
-├── Exceptions/  
-├── Filament/  
-│   ├── Resources/  
-│   ├── Pages/  
-│   ├── Widgets/  
-│   └── Clusters/  
-├── Helpers/  
-├── Http/  
-│   ├── Controllers/  
-│   ├── Middleware/  
-│   ├── Requests/  
-│   └── Resources/  
-├── Jobs/  
-├── Mail/  
-├── Models/  
-├── Notifications/  
-├── Observers/  
-├── Providers/  
-├── Services/  
-├── Traits/  
-└── ViewModels/
+Use existing DMIMS Laravel structure under:
+
+- app/Filament
+- app/Http
+- app/Models
+- app/Services
+- app/Traits
+- app/Observers
+- app/Jobs
+- resources
+- routes
+- tests
+- docs
+
+Reuse existing architecture.
 
 ---
 
-# **3\. Laravel Design Rules**
+# 3. Laravel Design Rules
 
-## **Controllers**
+Controllers remain thin.
 
-Controllers should only:
+Business logic belongs in services.
 
-* Validate requests  
-* Call services  
-* Return responses
+Models hold relationships/scopes/casts.
 
-Do not place business logic inside controllers.
+Middleware handles cross-cutting validation.
+
+Filament resources must enforce authorization server-side.
+
+Never rely only on UI visibility.
+
+## 3.1 Resource Scope Classification
+
+Each resource/page must explicitly identify one logical access scope:
+
+- PLATFORM_ONLY
+- TENANT_STRICT
+- TENANT_WITH_GLOBAL_DEFAULTS
+
+### TENANT_STRICT
+
+For non-platform users:
+
+```php
+$query->where('customer_id', auth()->user()->customer_id);
+```
+
+Do not append `orWhereNull('customer_id')`.
+
+### TENANT_WITH_GLOBAL_DEFAULTS
+
+Only explicitly approved resources may use:
+
+```php
+$query->where(function ($query) use ($user) {
+    $query
+        ->where('customer_id', $user->customer_id)
+        ->orWhereNull('customer_id');
+});
+```
+
+### PLATFORM_ONLY
+
+Customer users fail authorization even if they possess a similarly named generic permission.
+
+Platform-only status must be enforced server-side.
 
 ---
 
-## **Models**
+# 4. Required Models
 
-Models contain:
+Core:
 
-* Relationships  
-* Scopes  
-* Accessors  
-* Mutators  
-* Casts
+- Customer
+- User
+- Module
+- CustomerModule
+- SubscriptionPlan
+- CustomerSubscription
+- SubscriptionLog
+- License
+- LicenseLog
+- BillingRecord
+- BillingPayment
+- BillingLog
+- Setting
+- AuditLog
+- Notification
 
-Avoid complex business rules.
+Inventory:
+
+- Category
+- Product
+- ProductLocationStock
+- StockMovement
+- StockAlert
+- Location
+- LocationType
+
+Document:
+
+- Box
+- DocumentType
+- DocumentFile
+- DocumentMovementLog
+
+Barcode:
+
+- BarcodeRegistry
+- BarcodeScanLog
 
 ---
 
-## **Services**
+# 5. Required Services
 
-All business logic belongs inside Services.
+Use existing:
+
+- AccessControlService
+- ModuleAccessService
+- LicenseService
+- BillingService
+- PaymentService
+- BarcodeService
+- ScannerService
+- StockMovementService
+- DocumentMovementService
+- AuditService
+- NotificationService
+- ImportService
+- ReportExportService
+- BackupService
+
+Subscription lifecycle may remain split across AccessControlService and subscription observer architecture.
+
+---
+
+# 6. Required Middleware
+
+Applicable middleware includes:
+
+- Auth
+- User active
+- Company assigned/active
+- Business access
+- Subscription validation
+- License validation
+- Module validation
+- Activity logging
+
+Middleware order must ensure authentication/session exists before business-access checks.
+
+---
+
+# 7. Filament Resources
+
+Resources must not infer customer visibility from permission names alone.
+
+## 7.1 Platform-Only Resources
 
 Examples:
 
-* Product creation  
-* Stock transfer  
-* Barcode generation  
-* Billing updates  
-* Subscription validation
+- SubscriptionPlanResource
+- ModuleResource
+- Platform settings
+- BackupResource
+- Other platform administration
 
----
+Customer users must not register navigation or pass direct authorization.
 
-## **Middleware**
-
-Middleware performs cross-cutting checks.
+## 7.2 Strict Tenant Resources
 
 Examples:
 
-* Authentication  
-* Company context  
-* Active subscription  
-* Active license  
-* Module enabled  
-* Audit logging
+- UserResource customer user view
+- CustomerModuleResource
+- CustomerSubscriptionResource
+- License customer record
+- BillingRecordResource
+- AuditLogResource
+- Operational resources
+
+Query ownership must be exact.
+
+## 7.3 Customer-Facing Presentation
+
+Customer users should not receive separate platform-style navigation entries for customer modules/subscriptions/licenses.
+
+Where permitted, relevant information should be composed into:
+
+**My Company**
+
+Panels:
+
+- Profile
+- Users
+- Enabled Modules
+- Subscription Summary
+- License Status
+- Billing
+- Audit
+
+Every panel independently authorizes access.
+
+Do not duplicate business logic.
 
 ---
 
-## **Authorization**
+# 8. Naming Standards
 
-Every CRUD operation must be protected using Filament resource authorization (`BaseResource::can()` / `permissionFor()`).
+Use Laravel conventions:
 
-Never rely only on hidden buttons.
-
----
-
-# **4\. Required Models**
-
-## **Core Models**
-
-Customer
-
-User
-
-Module
-
-CustomerModule
-
-SubscriptionPlan
-
-CustomerSubscription
-
-SubscriptionLog
-
-License
-
-LicenseLog
-
-BillingRecord
-
-BillingPayment
-
-BillingLog
-
-Setting
-
-AuditLog
-
-Notification
+- plural snake_case tables
+- PascalCase models
+- `Service` suffix
+- explicit permission names
+- explicit scope semantics
 
 ---
 
-## **Inventory Models**
+# 9. Database Transactions
 
-Category
-
-Product
-
-ProductLocationStock
-
-StockMovement
-
-StockAlert
-
-Location
-
-LocationType
+Use transactions for critical multi-table operations including inventory/document movement, billing updates, renewals and barcode registration.
 
 ---
 
-## **Document Models**
+# 10. Error Handling
 
-Box
-
-DocumentType
-
-DocumentFile
-
-DocumentMovementLog
-
----
-
-## **Barcode Models**
-
-BarcodeRegistry
-
-BarcodeScanLog
-
----
-
-# **5\. Required Services**
-
-The following services must exist.
-
-## **CompanyContextService**
-
-Purpose
-
-Determines the active company.
-
-Responsibilities
-
-* Resolve customer  
-* Apply customer scope  
-* Prevent cross-company access
-
----
-
-## **AccessControlService**
-
-Central security service.
-
-Responsibilities
-
-* Login validation  
-* View permission  
-* Export permission  
-* Operational permission  
-* Effective limits  
-* Effective access mode
-
-No module should duplicate these checks.
-
----
-
-## **Subscription Lifecycle (AccessControlService + CustomerSubscriptionObserver)**
-
-There is no dedicated `SubscriptionService` class. Subscription lifecycle is handled by:
-
-* `AccessControlService` — current subscription, plan limits, grace period  
-* `CustomerSubscriptionObserver` — syncs enabled modules and logs subscription changes on create/update/delete
-
----
-
-## **LicenseService**
-
-Responsibilities
-
-* Current license  
-* Suspension  
-* Revocation  
-* Expiry  
-* Technical access mode
-
----
-
-## **BillingService**
-
-Responsibilities
-
-* Invoice creation  
-* Outstanding balance  
-* Manual billing  
-* Billing status
-
----
-
-## **PaymentService**
-
-Responsibilities
-
-* Payment recording  
-* Partial payments  
-* Balance calculation  
-* Payment history
-
----
-
-## **BarcodeService**
-
-Responsibilities
-
-* Barcode generation  
-* Registration  
-* Validation  
-* Printing  
-* Lookup
-
----
-
-## **ScannerService**
-
-Responsibilities
-
-* Scan processing  
-* Type detection  
-* Permission validation  
-* Action routing
-
----
-
-## **StockMovementService**
-
-Responsibilities
-
-Receive-In
-
-Transfer
-
-Stock Out
-
-Adjustment
-
-Returns
-
-Inventory validation
-
-Transactions
-
-Audit
-
----
-
-## **DocumentMovementService**
-
-Responsibilities
-
-Receive
-
-Transfer
-
-Move-Out
-
-Return
-
-History
-
-Transactions
-
-Audit
-
----
-
-## **LocationService**
-
-Responsibilities
-
-Manage shared locations.
-
-Validate location hierarchy.
-
-Prevent invalid parent relationships.
-
----
-
-## **NotificationService**
-
-Responsibilities
-
-System notifications.
-
-Customer notifications.
-
-Email notifications (future).
-
----
-
-## **AuditService**
-
-Responsibilities
-
-Write immutable audit records.
-
-Centralize audit creation.
-
----
-
-## **ImportService**
-
-Responsibilities
-
-CSV import.
-
-Excel import.
-
-Validation.
-
-Error reporting.
-
----
-
-## **ReportExportService**
-
-Responsibilities
-
-CSV
-
-Excel
-
-PDF
-
-Print View
-
----
-
-## **BackupService**
-
-Responsibilities
-
-Database backup.
-
-Storage backup.
-
-Restore support.
-
----
-
-# **6\. Required Middleware**
-
-EnsureAuthenticated
-
-EnsureUserIsActive
-
-EnsureCompanyAssigned
-
-EnsureCompanyActive
-
-EnsureSubscriptionValid
-
-EnsureLicenseAllowsAccess
-
-EnsureModuleEnabled
-
-SetCompanyContext
-
-LogUserActivity
-
-All middleware should be registered using Laravel's middleware aliases.
-
----
-
-# **7\. Filament Resources**
-
-Every module should have a corresponding Filament Resource.
-
-Examples
-
-CustomerResource
-
-UserResource
-
-ModuleResource
-
-SubscriptionPlanResource
-
-CustomerSubscriptionResource
-
-LicenseResource
-
-BillingRecordResource
-
-PaymentResource
-
-CategoryResource
-
-LocationResource
-
-ProductResource
-
-StockMovementResource
-
-BoxResource
-
-DocumentFileResource
-
-BarcodeRegistryResource
-
-AuditLogResource
-
-NotificationResource
-
----
-
-# **8\. Naming Standards**
-
-## **Database Tables**
-
-Plural snake\_case
-
-Examples
-
-products
-
-document\_files
-
-billing\_records
-
----
-
-## **Models**
-
-Singular PascalCase
-
-Example
-
-Product
-
-DocumentFile
-
-BillingRecord
-
----
-
-## **Services**
-
-Suffix with Service
-
-ProductService
-
-BarcodeService
-
-AuditService
-
----
-
-## **Controllers**
-
-Suffix with Controller
-
----
-
-## **Requests**
-
-Suffix with Request
-
----
-
-## **Jobs**
-
-Suffix with Job
-
----
-
-# **9\. Database Transactions**
-
-Mandatory for:
-
-Stock Receive-In
-
-Stock Transfer
-
-Stock Out
-
-Stock Adjustment
-
-File Transfer
-
-Box Transfer
-
-Subscription Renewal
-
-License Renewal
-
-Billing Update
-
-Barcode Registration
-
-If any operation fails, the transaction must roll back completely.
-
----
-
-# **10\. Error Handling**
-
-All services should:
-
-Throw typed exceptions.
-
-Avoid returning false.
+Throw typed exceptions where appropriate.
 
 Log unexpected errors.
 
-Provide user-friendly messages.
+Return user-safe messages.
 
-Never expose stack traces in production.
-
----
-
-# **11\. Logging**
-
-Log:
-
-System errors
-
-Failed logins
-
-Queue failures
-
-Import failures
-
-Export failures
-
-Unhandled exceptions
-
-Use Laravel logging channels.
+Do not leak existence of another tenant's records.
 
 ---
 
-# **12\. Validation Standards**
+# 11. Logging
 
-Always validate:
+Log system errors, failed login, queue failures, import/export failures and unexpected exceptions.
 
-Required fields
-
-Maximum length
-
-Unique constraints
-
-Foreign keys
-
-Dates
-
-Numeric ranges
-
-File uploads
-
-Barcode format
-
-Never trust frontend validation alone.
+Audit critical business actions separately.
 
 ---
 
-# **13\. Database Relationships**
+# 12. Validation Standards
 
-Examples
+Validate server-side:
 
-Customer
-
-hasMany Users
-
-hasMany Products
-
-hasMany Boxes
-
-hasMany Files
-
-hasMany BillingRecords
-
-hasMany Licenses
-
-hasMany Subscriptions
+- Required fields
+- Length
+- Uniqueness
+- Foreign keys
+- Dates
+- Numbers
+- Files
+- Barcode format
+- Customer ownership
+- Role and platform boundary
 
 ---
 
-Product
+# 13. Database Relationships
 
-belongsTo Category
+All customer-owned relationships must maintain same-customer integrity.
 
-belongsTo Customer
-
-belongsTo Default Location
-
-hasMany StockMovements
+Relationship/select queries must not enumerate records from another customer or platform-only resources.
 
 ---
 
-Location
+# 14. Queue Jobs
 
-belongsTo Customer
+Jobs carrying customer work must derive/use trusted customer ownership created server-side.
 
-belongsTo Parent Location
-
-hasMany Child Locations
-
-hasMany Product Stocks
-
-hasMany Boxes
+Do not trust user-supplied `customer_id` embedded in job payloads.
 
 ---
 
-Box
+# 15. Performance Guidelines
 
-belongsTo Customer
+Use eager loading, pagination, indexes, caching and streaming/queues for large workloads.
 
-belongsTo Current Location
-
-hasMany Document Files
-
-hasMany Movement Logs
+Authorization queries should be efficient and indexed.
 
 ---
 
-DocumentFile
-
-belongsTo Customer
-
-belongsTo Current Box
-
-belongsTo Document Type
-
-hasMany Movement Logs
-
----
-
-# **14\. Queue Jobs (Future)**
-
-Email notifications
-
-Large imports
-
-Large exports
-
-Scheduled reports
-
-Barcode generation
-
-Backup
-
-Cleanup
-
-AI processing
-
----
-
-# **15\. Performance Guidelines**
-
-Always:
-
-Use eager loading.
-
-Paginate tables.
-
-Index frequently queried columns.
-
-Cache static reference data.
-
-Avoid N+1 queries.
-
-Use database transactions efficiently.
-
-Keep queries simple.
-
----
-
-# **16\. Security Guidelines**
-
-Never expose:
-
-.env
-
-APP\_KEY
-
-Database credentials
-
-API secrets
+# 16. Security Guidelines
 
 Use:
 
-CSRF protection
+- CSRF
+- Session security
+- Rate limiting
+- Resource authorization
+- Middleware
+- Validation
+- Parameterized queries
+- Secure uploads
+- HTTPS
 
-Rate limiting
+Never expose secrets.
 
-Filament resource authorization (`BaseResource::can()` / `permissionFor()`)
-
-Middleware
-
-Input validation
-
-Parameterized queries
-
-Secure file uploads
-
-HTTPS in production
+Never use navigation visibility as sole security.
 
 ---
 
-# **17\. Testing Requirements**
+# 17. Testing Requirements
 
-Each module should include:
+Each module requires feature, unit, permission, validation, transaction and regression tests.
 
-Feature Tests
+## Mandatory Access-Control Regression Tests
 
-Unit Tests
-
-Permission Tests
-
-Validation Tests
-
-Transaction Tests
-
-Regression Tests
-
-Target minimum coverage:
-
-80%
+- TENANT_STRICT excludes `customer_id = NULL`.
+- Customer Admin cannot enumerate platform users.
+- Company Admin audit query excludes platform logs.
+- Platform-only resources are inaccessible to customer roles.
+- Stock role cannot run Document reports.
+- Document role cannot run Inventory reports.
+- Billing reports fail when Billing View is disabled.
+- Direct report generation fails for unauthorized report code.
+- Global search cannot leak platform/other-tenant records.
 
 ---
 
-# **18\. Code Quality**
+# 18. ReportExportService Design
 
-Required tools
+Each report definition must declare sufficient authorization metadata.
 
-Laravel Pint
+Recommended fields:
 
-PHPStan
+```text
+group
+platform_only
+required_permission
+required_module
+required_report_entitlement
+```
 
-PHP CS Fixer (optional)
+`view reports` controls entry to Reports, not all report content.
 
-Composer Audit
+`availableTo()` and generation must enforce the same effective authorization.
 
-Static analysis should pass before merging.
-
----
-
-# **19\. Development Workflow**
-
-Developer creates feature branch.
-
-↓
-
-Implement feature.
-
-↓
-
-Run tests.
-
-↓
-
-Run Pint.
-
-↓
-
-Review code.
-
-↓
-
-Submit Pull Request.
-
-↓
-
-Code Review.
-
-↓
-
-Merge into main.
+Never rely only on filtering the dropdown.
 
 ---
 
-# **20\. Definition of Done**
+# 19. Development Workflow
 
-A feature is considered complete only when:
+Follow:
 
-✓ Business requirements implemented
-
-✓ Customer isolation enforced
-
-✓ Resource authorization implemented
-
-✓ Validation completed
-
-✓ Audit logging added
-
-✓ Transactions added
-
-✓ Tests written
-
-✓ UI completed
-
-✓ Documentation updated
-
-✓ Code reviewed
-
-✓ No critical warnings
+Understand  
+↓  
+Discover  
+↓  
+Prioritize  
+↓  
+Implement root cause  
+↓  
+Test  
+↓  
+Security review  
+↓  
+Documentation update  
+↓  
+Release
 
 ---
 
-# **21\. Future Technical Enhancements**
+# 20. Definition of Done
 
-The design supports future additions without significant restructuring:
+A change is complete only when:
 
-* REST API  
-* GraphQL API  
-* Mobile application  
-* Offline synchronization  
-* RFID support  
-* QR code support  
-* OCR integration  
-* AI document classification  
-* AI inventory forecasting  
-* Event-driven architecture  
-* Redis cache  
-* Elasticsearch  
-* Multi-language  
-* Multi-currency  
-* SSO (Azure AD, Google)  
-* Webhooks  
-* Public API for customers
+- Business requirement implemented
+- Customer isolation enforced
+- Resource authorization implemented
+- Tests pass
+- Static analysis passes
+- UI correct
+- Docs updated
+- No Critical/High gaps remain in scope
 
 ---
 
-# **22\. Technical Design Summary**
+# 21. Future Enhancements
 
-The DMIMS architecture follows these engineering principles:
-
-* Service-oriented business logic  
-* Multi-tenant architecture  
-* Security by default  
-* Immutable audit history  
-* Thin controllers  
-* Reusable services  
-* Database transaction integrity  
-* Resource-based authorization  
-* Modular feature design  
-* Future-ready scalability
-
-This document serves as the primary implementation reference for all DMIMS developers.
+Future APIs, mobile, SSO, AI, GraphQL and integration layers must reuse the same access-control model.
 
 ---
 
-# **Document History**
+# 22. Technical Design Summary
+
+DMIMS uses explicit resource scope, defense in depth, service-oriented business logic and strict platform/customer separation.
+
+---
+
+# Document History
 
 | Version | Date | Description |
-| ----- | ----- | ----- |
+|---|---|---|
 | 1.0 | June 2026 | Initial Technical Design Document |
-
+| 1.1 | 24 August 2026 | Added explicit resource scopes, customer My Company composition and report authorization metadata |

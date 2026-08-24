@@ -1,853 +1,435 @@
-# **DMIMS System Architecture Document (SAD)**
+# DMIMS System Architecture Document (SAD)
 
-**Datamation Inventory Management System**
-
-Version 1.0
-
----
-
-# **1\. Purpose**
-
-This document describes the complete architecture of the Datamation Inventory Management System (DMIMS).
-
-It explains how every module fits together, how data flows through the system, and the architectural principles developers must follow.
-
-This document complements the Developer Blueprint by explaining **how the system is built**, rather than **what features it contains**.
+**Datamation Inventory Management System**  
+**Version:** 1.1  
+**Updated:** 24 August 2026
 
 ---
 
-# **2\. Architecture Overview**
+# 1. Purpose
 
-DMIMS is a multi-tenant Laravel web application built using a layered architecture.
-
-Users
-
-↓
-
-Browser
-
-↓
-
-Laravel Routes
-
-↓
-
-Middleware
-
-↓
-
-Controllers / Filament Resources
-
-↓
-
-Services
-
-↓
-
-Models
-
-↓
-
-Database
-
-Every request follows this same flow.
-
-Business logic must never bypass the Service layer.
+This document describes the architecture of DMIMS and the rules developers must follow.
 
 ---
 
-# **3\. High-Level System Architecture**
+# 2. Architecture Overview
 
-                   DMIMS Platform
+DMIMS is a multi-tenant Laravel application.
 
-                  \+------------------+  
-                  |  Browser / PWA   |  
-                  \+---------+--------+  
-                            |  
-                    HTTPS / Cloudflare  
-                            |  
-                  \+---------v--------+  
-                  |      Apache      |  
-                  \+---------+--------+  
-                            |  
-                     PHP-FPM / Laravel  
-                            |  
-         \+------------------+------------------+  
-         |                                     |  
-    Filament Admin                     Public Web  
-         |                                     |  
-         \+------------------+------------------+  
-                            |  
-                      Application Layer  
-                            |  
-     \+------------------------------------------------------+  
-     |                  Service Layer                       |  
-     \+------------------------------------------------------+  
-     | Company Context Service                             |  
-     | Access Control Service                              |  
-     | Subscription Service                               |  
-     | License Service                                    |  
-     | Billing Service                                    |  
-     | Payment Service                                    |  
-     | Barcode Service                                    |  
-     | Scanner Service                                    |  
-     | Stock Movement Service                             |  
-     | Document Movement Service                          |  
-     | Notification Service                               |  
-     | Audit Service                                      |  
-     | Report Export Service                              |  
-     \+------------------------------------------------------+  
-                            |  
-                     Eloquent Models  
-                            |  
-                     MariaDB (MySQL-compatible)
+Browser / PWA  
+↓  
+Laravel / Filament  
+↓  
+Authentication  
+↓  
+Authorization  
+↓  
+Customer / Platform Context  
+↓  
+Resource Scope  
+↓  
+Subscription / License / Module / Permission  
+↓  
+Service Layer  
+↓  
+Eloquent Models  
+↓  
+MariaDB  
+↓  
+Audit
+
+Business actions must not bypass this flow.
 
 ---
 
-# **4\. Technology Architecture**
+# 3. High-Level System Architecture
 
-Backend
+DMIMS contains two presentation boundaries:
 
-Laravel 13
+## Platform Boundary
 
-Admin Framework
+For authorized Datamation roles.
 
-Filament 5
+Includes:
 
-Programming Language
+- Platform customer administration
+- Platform users
+- Roles/permissions
+- Module catalogue
+- Subscription Plans
+- License management
+- Billing administration
+- Platform reports
+- Platform audit
+- Backup/restore
+- Settings
 
-PHP 8.4+
+## Customer Boundary
 
-Database
+For customer roles.
 
-MariaDB 11 (MySQL 8 compatible)
+Includes only:
 
-Frontend
-
-Blade
-
-Tailwind CSS
-
-Alpine.js
-
-Build Tool
-
-Vite
-
-Authentication
-
-Laravel Authentication
-
-Filament Authentication
-
-Spatie Permission
-
-Deployment
-
-Ubuntu 24.04 LTS
-
-Apache
-
-PHP-FPM
-
-Supervisor
-
-Cron
-
-Cloudflare Tunnel
+- Own company presentation
+- Enabled operational modules
+- Role-permitted reports
+- Role-permitted billing/audit summaries
+- Own customer data
 
 ---
 
-# **5\. Multi-Tenant Architecture**
+# 4. Technology Architecture
 
-DMIMS is a shared application serving multiple customer companies.
-
-Every customer owns only their own data.
-
-DMIMS
-
-├── Customer A  
-│      Products  
-│      Boxes  
-│      Files  
-│      Billing  
-│  
-├── Customer B  
-│      Products  
-│      Boxes  
-│      Files  
-│  
-├── Customer C  
-│      Products  
-│      Boxes  
-│      Files  
-│  
-└── Datamation Platform
-
-Every customer-owned table includes:
-
-customer\_id
-
-The authenticated user's customer\_id determines what records may be accessed.
+- Laravel 13
+- Filament 5
+- PHP 8.4+
+- MariaDB
+- Blade / Tailwind / Alpine
+- Vite
+- Spatie Permission
+- Ubuntu 24.04
+- Apache / PHP-FPM
+- Supervisor
+- Cloudflare Tunnel
 
 ---
 
-# **6\. Request Lifecycle**
+# 5. Multi-Tenant Architecture
 
-Every HTTP request follows this sequence.
+Every customer-owned table includes `customer_id`.
 
-Browser
+The authenticated user's customer context determines customer-owned records.
 
-↓
+Never trust request-provided `customer_id`.
 
-Route
+## 5.1 Tenant Scope Architecture
 
-↓
+DMIMS uses three explicit scope classifications.
 
-Authentication
+### PLATFORM_ONLY
 
-↓
+Accessible only to authorized platform roles.
 
-Authorization
+### TENANT_STRICT
 
-↓
+For customer users:
 
-Company Context
+```text
+customer_id = authenticated user's customer_id
+```
 
-↓
+No implicit `OR customer_id IS NULL`.
 
-Subscription Check
+This is the default for customer-owned data.
 
-↓
+### TENANT_WITH_GLOBAL_DEFAULTS
 
-License Check
+Only for explicitly approved shared reference data:
 
-↓
+```text
+customer_id = authenticated user's customer_id
+OR customer_id IS NULL
+```
 
-Module Check
+This is opt-in.
 
-↓
+## Architectural Rule
 
-Permission Check
+A generic reusable tenant scope must never automatically append `OR customer_id IS NULL` for every customer resource.
 
-↓
+Global/default records must be deliberately declared.
 
-Business Service
+---
 
-↓
+# 6. Request Lifecycle
 
-Database
-
-↓
-
-Audit Log
-
-↓
-
+Browser  
+↓  
+Route  
+↓  
+Authentication  
+↓  
+Role / Permission Validation  
+↓  
+Platform / Customer Context  
+↓  
+Resource Scope Validation  
+↓  
+Company Status  
+↓  
+Subscription  
+↓  
+License  
+↓  
+Module  
+↓  
+Business Permission  
+↓  
+Service  
+↓  
+Database  
+↓  
+Audit  
+↓  
 Response
 
-No business action should bypass these checks.
+---
+
+# 7. Layered Architecture
+
+## Presentation Layer
+
+Filament Resources, Pages, Widgets, Forms and Tables.
+
+Presentation components do not define security on their own.
+
+## Service Layer
+
+Business rules and cross-module operations.
+
+## Model Layer
+
+Relationships, casts and scopes.
+
+## Database Layer
+
+Constraints, indexes, transactions, soft deletes and immutable history.
 
 ---
 
-# **7\. Layered Architecture**
+# 8. Core Services
 
-## **Presentation Layer**
+Core security/business services include:
 
-Responsibilities
+- AccessControlService
+- ModuleAccessService
+- LicenseService
+- BillingService
+- PaymentService
+- BarcodeService
+- ScannerService
+- StockMovementService
+- DocumentMovementService
+- NotificationService
+- AuditService
+- ReportExportService
+- ImportService
+- BackupService
 
-* Filament Resources  
-* Forms  
-* Tables  
-* Widgets  
-* Pages  
-* Blade Views
-
-Must not contain business logic.
-
----
-
-## **Controller Layer**
-
-Responsibilities
-
-* Receive request  
-* Validate request  
-* Call Service  
-* Return response
-
-Controllers should remain thin.
+No module should duplicate the access-control decision independently.
 
 ---
 
-## **Service Layer**
+# 9. Security Architecture
 
-Contains all business rules.
+Every request must pass appropriate layers.
 
-Examples
+Authorization applies before data reaches presentation.
 
-AccessControlService
+## Customer Presentation Boundary
 
-CustomerSubscriptionObserver
+The same access model controls:
 
-LicenseService
+Navigation  
+↓  
+Dashboard  
+↓  
+Global Search  
+↓  
+Resource Queries  
+↓  
+Relations  
+↓  
+Actions  
+↓  
+Reports / Exports  
+↓  
+API  
+↓  
+Jobs
 
-BillingService
-
-BarcodeService
-
-MovementService
-
-NotificationService
-
-AuditService
-
-Services may call other services but should avoid circular dependencies.
-
----
-
-## **Model Layer**
-
-Represents database tables.
-
-Models should contain:
-
-* Relationships  
-* Accessors  
-* Mutators  
-* Scopes
-
-Heavy business logic belongs in Services.
+The absence of a menu item is not sufficient protection.
 
 ---
 
-## **Database Layer**
+# 10. Customer Isolation
 
-Stores all persistent data.
+Isolation is enforced at:
 
-Responsibilities
+- Query/model layer
+- Filament resource authorization
+- Middleware
+- Service layer
+- Relationship/select queries
+- Report/export layer
+- API
+- UI
 
-* Constraints  
-* Foreign keys  
-* Indexes  
-* Transactions  
-* Soft deletes  
-* Immutable history tables
-
----
-
-# **8\. Core Services**
-
-## **CompanyContextService**
-
-Determines the active customer.
-
-Provides customer isolation.
+TENANT_STRICT is the default for customer-owned data.
 
 ---
 
-## **AccessControlService**
+# 11. Module Architecture
 
-Central authorization engine.
+Disabled modules are:
 
-Checks:
+- Hidden
+- Route blocked
+- Direct URL blocked
+- Service blocked
+- Report blocked
 
-* User Status  
-* Company Status  
-* Subscription  
-* License  
-* Modules  
-* Permissions  
-* Limits
+## 11.1 Customer Administration Architecture
 
-No module should implement these checks independently.
+Customer-facing company administration uses a consolidated:
 
----
+**My Company**
 
-## **Subscription Lifecycle (AccessControlService + CustomerSubscriptionObserver)**
+interface.
 
-There is no dedicated `SubscriptionService` class. Responsibility is split:
+Possible panels:
 
-* `AccessControlService` — subscription lookup, plan limits, grace periods  
-* `CustomerSubscriptionObserver` — syncs enabled modules on subscription create/update/delete
+- Profile
+- Users
+- Enabled Modules
+- Subscription
+- License Status
+- Billing
+- Audit
 
----
+This is a presentation composition over existing authoritative resources/services.
 
-## **LicenseService**
+Do not duplicate business data or business logic.
 
-Responsible for
-
-* Technical access  
-* Suspension  
-* Revocation  
-* Expiry  
-* Access mode
+Platform resources remain separate for authorized Datamation users.
 
 ---
 
-## **BillingService**
+# 12. Movement Architecture
 
-Handles
+Three models:
 
-Invoices
+- Internal Transfer
+- External Receive-In
+- External Move-Out
 
-Outstanding balances
-
-Manual billing
-
-Payment tracking
+External locations are not fake DMIMS locations.
 
 ---
 
-## **StockMovementService**
+# 13. Barcode Architecture
 
-Handles
-
-Receive-In
-
-Stock Out
-
-Transfer
-
-Adjustment
-
-Transactions
-
-Audit
-
----
-
-## **DocumentMovementService**
-
-Handles
-
-File movement
-
-Box movement
-
-External transfers
-
-Returns
-
-Movement history
+Barcode  
+↓  
+Registry  
+↓  
+Type  
+↓  
+Customer Validation  
+↓  
+Module/Permission Validation  
+↓  
+Allowed Action  
+↓  
+Scan Log
 
 ---
 
-## **BarcodeService**
+# 14. Audit Architecture
 
-Handles
+Audit records are immutable.
 
-Barcode generation
+Platform audit events and customer audit events are distinct by customer ownership.
 
-Registration
+For customer audit access:
 
-Printing
+```text
+audit_logs.customer_id = authenticated user's customer_id
+```
 
-Lookup
-
-Validation
-
----
-
-## **NotificationService**
-
-Creates notifications.
-
-Routes notifications to appropriate users.
+Platform `NULL` audit rows are excluded.
 
 ---
 
-## **AuditService**
+# 15. Database Transactions
 
-Logs all important actions.
-
-No module writes directly into audit\_logs.
+Mandatory for multi-table operations and all critical movements, billing, renewal and barcode registration operations.
 
 ---
 
-# **9\. Security Architecture**
+# 16. Background Processing
 
-Every request must pass through:
-
-Authentication
-
-↓
-
-Authorization
-
-↓
-
-Customer Isolation
-
-↓
-
-Subscription Validation
-
-↓
-
-License Validation
-
-↓
-
-Module Validation
-
-↓
-
-Permission Validation
-
-↓
-
-Business Logic
-
-↓
-
-Audit Logging
+Future/background jobs must preserve authenticated/derived tenant context and must never accept arbitrary customer ownership from untrusted payloads.
 
 ---
 
-# **10\. Customer Isolation**
+# 17. PWA Architecture
 
-Isolation is enforced at multiple layers.
+Online-first.
 
-Database
-
-↓
-
-Model
-
-↓
-
-Resource Authorization
-
-↓
-
-Middleware
-
-↓
-
-Service
-
-↓
-
-UI
-
-Even if one layer fails, another layer must prevent unauthorized access.
+Role/module navigation remains identical in security semantics across browser and installed PWA.
 
 ---
 
-# **11\. Module Architecture**
+# 18. Production Architecture
 
-Modules are independently enabled.
-
-Examples
-
-Stock Inventory
-
-Document Tracking
-
-Barcode
-
-Reports
-
-Import/Export
-
-Audit
-
-Billing
-
-When disabled
-
-* Menu hidden  
-* Route blocked  
-* Direct URL blocked  
-* Service blocked
+Internet  
+↓  
+Cloudflare  
+↓  
+Cloudflare Tunnel  
+↓  
+Ubuntu  
+↓  
+Apache / PHP-FPM  
+↓  
+Laravel  
+↓  
+MariaDB  
+↓  
+Storage / Backup
 
 ---
 
-# **12\. Movement Architecture**
+# 19. Design Principles
 
-Three movement models exist.
-
-Internal Transfer
-
-DMIMS
-
-↓
-
-DMIMS
-
-External Receive-In
-
-External
-
-↓
-
-DMIMS
-
-External Move-Out
-
-DMIMS
-
-↓
-
-External
-
-No fake locations should ever be created.
+- Single Responsibility
+- Separation of Concerns
+- Multi-Tenant by Design
+- Security by Default
+- Least Privilege
+- Fail Closed
+- Audit Everything
+- Immutable History
+- Reuse existing architecture
 
 ---
 
-# **13\. Barcode Architecture**
+# 20. Future Architecture
 
-Barcode
-
-↓
-
-Barcode Registry
-
-↓
-
-Determine Type
-
-↓
-
-Verify Customer
-
-↓
-
-Verify Permission
-
-↓
-
-Execute Action
-
-↓
-
-Log Scan
-
-Supported types
-
-Product
-
-Location
-
-Box
-
-Document File
+Future APIs, mobile apps, reporting integrations, Power BI, AI, webhooks and external services must inherit the same `PLATFORM_ONLY`, `TENANT_STRICT` and `TENANT_WITH_GLOBAL_DEFAULTS` model.
 
 ---
 
-# **14\. Audit Architecture**
+# 21. Architecture Principles Summary
 
-Every significant business action generates an immutable audit record.
+Never trust browser customer_id.
 
-Examples
+Use exact tenant scope for customer-owned records.
 
-Login
+Do not expose platform resources to customers.
 
-Logout
+Never rely only on hidden navigation.
 
-Create
+Authorize reports by underlying module and permission.
 
-Update
-
-Delete
-
-Transfer
-
-Payment
-
-Subscription
-
-License
-
-Import
-
-Export
-
-Backup
-
-Restore
-
-Audit records must never be modified.
+Keep documentation synchronized.
 
 ---
 
-# **15\. Database Transactions**
-
-Database transactions are mandatory for
-
-Stock movements
-
-Document movements
-
-Billing updates
-
-Subscription renewals
-
-License renewals
-
-Barcode registration
-
-Any process involving multiple table updates
-
----
-
-# **16\. Background Processing**
-
-Future queue jobs
-
-Notification delivery
-
-Large imports
-
-Large exports
-
-Scheduled reports
-
-Backup
-
-Cleanup
-
-Email sending
-
----
-
-# **17\. Progressive Web App Architecture**
-
-Components
-
-Manifest
-
-Service Worker
-
-Offline Page
-
-Responsive Layout
-
-Install Prompt
-
-Current Version
-
-Online-first architecture.
-
-Future versions may support offline synchronization.
-
----
-
-# **18\. Production Architecture**
-
-Internet
-
-↓
-
-Cloudflare
-
-↓
-
-Cloudflare Tunnel
-
-↓
-
-Ubuntu Server
-
-↓
-
-Apache
-
-↓
-
-PHP-FPM
-
-↓
-
-Laravel
-
-↓
-
-MariaDB
-
-↓
-
-Storage
-
-↓
-
-Backups
-
----
-
-# **19\. Design Principles**
-
-The project follows these principles.
-
-Single Responsibility Principle
-
-Separation of Concerns
-
-Service-Oriented Business Logic
-
-Multi-Tenant by Design
-
-Security by Default
-
-Audit Everything
-
-Immutable History
-
-Least Privilege Access
-
-Fail Securely
-
-Scalable Architecture
-
----
-
-# **20\. Future Architecture**
-
-The architecture has been designed to support future enhancements without major redesign.
-
-Potential additions include:
-
-* REST API  
-* GraphQL API  
-* Mobile applications  
-* Offline synchronization  
-* RFID integration  
-* QR code support  
-* OCR document indexing  
-* AI-powered document classification  
-* AI inventory forecasting  
-* Microsoft 365 integration  
-* SAP integration  
-* Power BI integration  
-* Webhooks  
-* Event-driven architecture  
-* Redis caching  
-* Horizontal scaling  
-* Multi-language support  
-* Multi-currency support
-
----
-
-# **21\. Architecture Principles Summary**
-
-Developers should always remember:
-
-* Never trust browser-submitted customer\_id.  
-* Keep controllers thin.  
-* Put business rules in Services.  
-* Use database transactions for multi-table updates.  
-* Audit all critical actions.  
-* Enforce customer isolation at every layer.  
-* Treat movement logs as immutable.  
-* Build reusable components instead of duplicating logic.  
-* Design for future scalability.
-
----
-
-# **Document History**
+# Document History
 
 | Version | Date | Description |
-| ----- | ----- | ----- |
+|---|---|---|
 | 1.0 | June 2026 | Initial System Architecture Document |
-
+| 1.1 | 24 August 2026 | Added explicit resource scope architecture and My Company presentation boundary |

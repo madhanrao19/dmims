@@ -1,526 +1,402 @@
-# **DMIMS Business Rules & Functional Specification**
+# DMIMS Business Rules & Functional Specification
 
-**Datamation Inventory Management System (DMIMS)**
-
-Version 1.0
-
----
-
-# **Document Purpose**
-
-This document defines the business rules that govern the behaviour of the DMIMS application.
-
-It explains how the system should behave from a business perspective rather than a programming perspective.
-
-Whenever there is uncertainty during development, the rules in this document take precedence over implementation assumptions.
+**Datamation Inventory Management System (DMIMS)**  
+**Version:** 1.1  
+**Updated:** 24 August 2026
 
 ---
 
-# **1\. Core Business Principles**
+# Document Purpose
 
-DMIMS is built around six fundamental principles.
+This document defines the business rules that govern DMIMS from a business perspective.
 
-1. Multi-tenant architecture  
-2. Complete customer data isolation  
-3. Immutable inventory and document history  
-4. Subscription-based commercial control  
-5. License-based technical access control  
-6. Full auditability of important actions
+Whenever there is uncertainty during development, these rules take precedence over implementation assumptions.
+
+---
+
+# 1. Core Business Principles
+
+DMIMS is built around:
+
+1. Multi-tenant architecture
+2. Complete customer data isolation
+3. Immutable inventory and document history
+4. Subscription-based commercial control
+5. License-based technical access control
+6. Full auditability
+7. Least-privilege customer presentation
+8. Platform/customer administrative separation
 
 These principles must never be violated.
 
 ---
 
-# **2\. Customer Isolation**
-
-## **Purpose**
+# 2. Customer Isolation
 
 Every customer company operates independently inside the same DMIMS platform.
 
 No customer may access another customer's information.
 
+Every customer-owned record contains `customer_id`.
+
+The authenticated user's customer context determines what customer-owned records may be accessed.
+
+Never trust `customer_id` submitted by the browser.
+
+## 2.1 Customer Data Scope Rule
+
+### TENANT_STRICT
+
+For customer-owned data:
+
+```text
+customer_id = authenticated user's customer_id
+```
+
+Never automatically include `customer_id IS NULL`.
+
+This applies to customer users, operational records, customer subscriptions, licenses, billing, customer audit logs and other customer-owned records.
+
+### TENANT_WITH_GLOBAL_DEFAULTS
+
+`customer_id IS NULL` may be customer-visible only where the relevant table explicitly supports shared global/default reference records.
+
+Global/default visibility is opt-in.
+
+### PLATFORM_ONLY
+
+Platform administration data must not be visible to customer users.
+
+Examples include:
+
+- Subscription Plans
+- Platform Module catalogue
+- Platform users
+- Platform settings
+- Backup / Restore
+- Platform audit logs
+
 ---
 
-## **Rule**
+# 3. User Management Rules
 
-Every customer-owned record contains:
-
-customer\_id
-
-Every database query must be filtered using the authenticated user's customer\_id unless the user is a Datamation Super Admin.
-
----
-
-## **Super Admin**
-
-Can view all companies.
-
-Can manage all companies.
-
-Can switch between customers.
-
----
-
-## **Company User**
-
-Can only access records belonging to their assigned customer.
-
-Attempts to access another customer's records must be rejected.
-
----
-
-# **3\. User Management Rules**
-
-Users belong to one of two groups.
-
-## **Platform Users**
+## Platform Users
 
 Datamation employees.
 
-customer\_id \= NULL
+Normally:
 
-Examples
+```text
+customer_id = NULL
+is_platform_user = true
+```
 
-Datamation Super Admin
+Platform roles:
 
-Datamation Management
+- Datamation Super Admin
+- Datamation Management
 
-The `is_platform_user` flag must always match whether the user holds one of
-these two roles; server-side enforced on every create/edit
-(`UserResource::enforcePlatformRoleConsistency()`), not left to form input.
+`is_platform_user` must match actual platform-tier role membership.
 
----
-
-## **Company Users**
+## Company Users
 
 Assigned to exactly one customer.
 
-Cannot create platform users.
+Cannot:
 
-Cannot change another company's users.
+- Create platform users
+- Assign platform roles
+- View platform users
+- Change another company's users
+- Change customer ownership through crafted requests
 
----
-
-## **User Status**
-
-Pending
-
-Active
-
-Inactive
-
-Suspended
-
-Locked
-
-Archived
+Customer user listing is TENANT_STRICT.
 
 ---
 
-## **Login Rules**
+# 4. Company Status Rules
 
-Only Active users may log in.
+Statuses:
 
-Locked users must complete an administrator reset before regaining access.
+- Trial
+- Active
+- Near Expiry
+- Expired
+- Suspended
+- Cancelled
+- Archived
 
-Archived users may never log in.
+Trial and Active allow normal access subject to subscription, license, module and permission.
 
----
+Near Expiry remains operational but shows reminders.
 
-# **4\. Company Status Rules**
+Expired is controlled by subscription grace and license.
 
-A customer company has one status.
+Suspended blocks operational actions and may permit view-only.
 
-Trial
-
-Active
-
-Near Expiry
-
-Expired
-
-Suspended
-
-Cancelled
-
-Archived
+Cancelled and Archived are terminal/restricted states.
 
 ---
 
-## **Behaviour**
+# 5. Role-Based Permissions
 
-### **Trial**
-
-Normal access within subscribed limits.
-
----
-
-### **Active**
-
-Full access according to subscription, license and permissions.
-
----
-
-### **Near Expiry**
-
-Normal operation.
-
-Show reminders.
-
----
-
-### **Expired**
-
-Controlled by subscription grace period and license.
-
----
-
-### **Suspended**
-
-Operational actions blocked.
-
-View-only access if permitted by license.
-
----
-
-### **Archived**
-
-Hidden from normal operational lists.
-
-No new transactions permitted.
-
----
-
-# **5\. Role-Based Permissions**
-
-## **Datamation Super Admin**
+## Datamation Super Admin
 
 Full system control.
 
----
+## Datamation Management
 
-## **Datamation Management**
+Read-only platform analytics.
 
-Read-only analytics.
+## Company Admin
 
-Cannot modify operational data.
+Manages own company only.
 
----
+## Company Supervisor
 
-## **Company Admin**
+Operational oversight and limited administration.
 
-Manages own company.
-
----
-
-## **Company Supervisor**
-
-Operational oversight.
-
-Limited administration.
-
----
-
-## **Stock Inventory User**
+## Stock Inventory User
 
 Inventory only.
 
----
+## Document Tracking User
 
-## **Document Tracking User**
+Document Tracking only.
 
-Document module only.
+## Viewer
 
----
+Read-only access to permitted operational modules.
 
-## **Viewer**
+## 5.1 Customer Navigation Rule
 
-Read-only.
+Customer navigation must reflect effective access.
 
----
+Customer-facing administration is consolidated under:
 
-# **6\. Access Control Rules**
+**My Company**
 
-Before allowing any operational action, DMIMS must evaluate:
+Possible tabs:
 
-User Status
+- Company Profile
+- Company Users
+- Enabled Modules
+- Subscription Summary
+- License Status
+- Billing
+- Customer Audit Logs
 
-↓
+Each tab remains independently role- and entitlement-controlled.
 
-Company Status
+Customer users must not see:
 
-↓
-
-Subscription Status
-
-↓
-
-License Status
-
-↓
-
-Module Enabled
-
-↓
-
-Permission Granted
-
-↓
-
-Usage Limits
-
-Only when all checks succeed may the action continue.
+- Multi-customer Customer Management
+- Platform Users
+- Roles & Permissions
+- Module catalogue management
+- Subscription Plans
+- License Management
+- Backup / Restore
+- Platform Settings
+- Platform Reports
+- Platform Audit Logs
 
 ---
 
-# **7\. Subscription Rules**
+# 6. Access Control Rules
+
+Before allowing any operation, evaluate:
+
+User Status  
+↓  
+Customer / Platform Context  
+↓  
+Resource Scope  
+↓  
+Company Status  
+↓  
+Subscription Status  
+↓  
+License Status  
+↓  
+Module Enabled  
+↓  
+Permission Granted  
+↓  
+Report Entitlement or Usage Limit
+
+Only when all mandatory checks succeed may the action continue.
+
+---
+
+# 7. Subscription Rules
 
 A subscription defines commercial entitlement.
 
 It controls:
 
-* Plan  
-* Modules  
-* Limits  
-* Billing cycle  
-* Validity period  
-* Grace period
+- Plan
+- Modules
+- Limits
+- Billing cycle
+- Validity period
+- Grace period
+- Allowed reports
 
-A subscription does **not** directly determine whether the customer can technically use the system.
+Subscription does not alone determine final technical access.
 
----
+## Subscription Plans
 
-## **Subscription Status**
+Subscription Plans are platform master data.
 
-Trial
+Customers cannot browse or manage the platform Subscription Plan catalogue.
 
-Active
+Authorized Company Admin/Supervisor users may only see their own effective subscription summary.
 
-Near Expiry
+## Subscription Limits
 
-Expired Grace
+May define:
 
-Expired
+- Maximum users
+- Maximum products
+- Maximum document files
+- Maximum archive boxes
+- Enabled modules
+- Allowed reports
 
-Cancelled
-
----
-
-## **Subscription Limits**
-
-The subscription may define limits for:
-
-Maximum users
-
-Maximum products
-
-Maximum document files
-
-Maximum archive boxes
-
-Maximum reports
-
-Maximum enabled modules
+If a limit is reached, prevent creation of additional records while preserving permitted access to existing records.
 
 ---
 
-## **Limit Rule**
+# 8. License Rules
 
-If a subscription limit is exceeded, the system must prevent creation of additional records while allowing existing records to remain accessible, subject to license restrictions.
+License determines technical system access.
 
----
+Statuses:
 
-# **8\. License Rules**
+- Active
+- Suspended
+- Expired
+- Revoked
 
-The license determines technical system access.
+Technical modes:
 
----
+- Full Access
+- View Only
+- Blocked
 
-## **License Status**
+Customers do not receive standalone License Management.
 
-Active
+Authorized Company Admin/Supervisor users may see a simplified own-customer License Status only.
 
-Suspended
-
-Expired
-
-Revoked
-
----
-
-## **Technical Access Modes**
-
-Full Access
-
-View Only
-
-Blocked
+Internal technical license configuration must not be exposed unnecessarily.
 
 ---
 
-## **Behaviour**
+# 9. Effective Access Rule
 
-Active
+Effective permission is the intersection of:
 
-Normal operation.
-
-Suspended
-
-Login permitted.
-
-Operational actions blocked.
-
-Viewing and exporting allowed.
-
-Expired
-
-Same as Suspended until renewed.
-
-Revoked
-
-Login denied unless an emergency override is granted by Datamation Super Admin.
-
----
-
-# **9\. Effective Access Rule**
-
-The effective permission is the combination of:
-
-Company Status
-
-AND
-
-User Status
-
-AND
-
-Subscription
-
-AND
-
-License
-
-AND
-
-Module
-
-AND
-
-Permission
-
-AND
-
-Usage Limits
+- Customer ownership
+- User status
+- Company status
+- Resource scope
+- Subscription
+- License
+- Enabled module
+- Role permission
+- Report entitlement
+- Usage limits
 
 Failure of any mandatory check denies the requested operation.
 
 ---
 
-# **10\. Module Rules**
+# 10. Module Rules
 
 Each customer has independently enabled modules.
 
-Examples
+Examples:
 
-Stock Inventory
+- Stock Inventory
+- Document Tracking
+- Barcode Scanning
+- Barcode Printing
+- Reports
+- Import / Export
+- Audit
+- Billing View
 
-Document Tracking
+If disabled:
 
-Barcode
+- Hide menu
+- Block route
+- Block direct URL
+- Block service execution
+- Block reports requiring the module
 
-Reports
+Customer module status may be shown read-only inside My Company.
 
-Audit
-
-Import / Export
-
-Backup
-
-Billing View
-
----
-
-If a module is disabled:
-
-* Hide the menu.  
-* Block direct URL access.  
-* Prevent service execution.  
-* Display an explanatory message.
+Viewing own enabled modules never grants access to the platform Module catalogue.
 
 ---
 
-# **11\. Inventory Rules**
+# 11. Inventory Rules
 
-Every product belongs to exactly one customer.
+Every product belongs to one customer.
 
-Every SKU must be unique within the customer.
-
-Every barcode must be unique within the customer.
+SKU and barcode are unique within customer.
 
 Negative stock is not permitted.
 
-Every stock movement must generate:
-
-* Stock movement record  
-* Audit log
+Every movement creates movement history and audit.
 
 ---
 
-# **12\. Stock Receive-In**
+# 12. Stock Receive-In
 
-Receive-In always increases available inventory.
+Receive-In increases available inventory.
 
-Source may be external.
+External source is allowed.
 
-Destination must be an internal DMIMS location.
+Destination must be an internal DMIMS location owned by the same customer.
 
 ---
 
-# **13\. Stock Out**
+# 13. Stock Out
 
-Stock Out decreases available inventory.
+Stock Out decreases inventory.
 
 Destination may be external.
 
-Available quantity must never become negative.
+Available quantity cannot become negative.
 
 ---
 
-# **14\. Internal Stock Transfer**
-
-Transfers inventory between two internal locations.
+# 14. Internal Stock Transfer
 
 Both locations must belong to the same customer.
 
-The total inventory quantity must remain unchanged.
+Total inventory remains unchanged.
 
 ---
 
-# **15\. Stock Adjustment**
+# 15. Stock Adjustment
 
-Adjustments require:
+Requires:
 
-Reason
+- Reason
+- User
+- Date
+- Audit record
 
-User
-
-Date
-
-Audit record
-
-Negative adjustments may not reduce inventory below zero.
+Negative adjustment cannot reduce stock below zero.
 
 ---
 
-# **16\. Shared Location Rules**
+# 16. Shared Location Rules
 
-Locations are shared by:
-
-Stock Inventory
-
-Document Tracking
-
-Locations are never duplicated.
+Locations are shared by Inventory and Document Tracking.
 
 Products occupy locations.
 
@@ -528,276 +404,212 @@ Boxes occupy locations.
 
 Files occupy boxes.
 
-Boxes are not locations.
+External destinations are never stored as fake DMIMS locations.
 
 ---
 
-# **17\. Archive Box Rules**
+# 17. Archive Box Rules
 
-Boxes may contain multiple document files.
+Boxes may contain multiple files.
 
-Boxes occupy one location.
+A box occupies one location.
 
-Moving a box changes the effective location of all contained files without updating each file record individually.
-
----
-
-# **18\. Document File Rules**
-
-Files always belong to one customer.
-
-Files may exist in one box at a time.
-
-Moving a file changes its box.
-
-Moving a box does not modify individual file records.
+Moving a box changes effective location of contained files without updating every file record.
 
 ---
 
-# **19\. External Movement Rules**
+# 18. Document File Rules
 
-External locations are not stored as DMIMS locations.
+Files belong to one customer.
 
-Instead, movement records capture:
+Files may belong to one box at a time.
 
-Source Type
+Moving a file changes its current box.
 
-Source Name
-
-Destination Type
-
-Destination Name
-
-Reference Number
-
-Contact Details
-
-This prevents unnecessary master data pollution.
+Moving a box does not update each file record.
 
 ---
 
-# **20\. Barcode Rules**
+# 19. External Movement Rules
 
-Every barcode is registered centrally.
+External locations are represented by structured movement fields, not fake location master records.
 
-Supported barcode types:
+---
 
-Product
+# 20. Barcode Rules
 
-Location
+Every barcode is centrally registered.
 
-Box
+Supported types:
 
-Document File
+- Product
+- Location
+- Box
+- Document File
 
 Unknown barcodes are logged.
 
-Barcodes from another customer must never reveal information.
+A barcode from another customer must not reveal information.
 
 ---
 
-# **21\. Import Rules**
+# 21. Import Rules
 
 Imports must:
 
-Validate all rows.
-
-Show validation errors.
-
-Allow preview.
-
-Reject duplicate keys.
-
-Respect subscription limits.
-
-Generate audit logs.
-
-Partial imports are not permitted.
+- Validate all rows
+- Preview before commit
+- Reject duplicates
+- Respect limits
+- Respect module/role access
+- Use exact tenant ownership
+- Generate audit logs
+- Roll back on failure where required
 
 ---
 
-# **22\. Export Rules**
+# 22. Export and Report Rules
 
 Exports require:
 
-Permission
+- Required operational permission
+- Required module
+- License allowing export
+- Customer ownership
+- Allowed report entitlement where applicable
 
-Module enabled
+A generic `view reports` permission does not authorize every report.
 
-License allowing export
+Examples:
 
-Every export generates an audit record.
+- Inventory reports require Inventory access.
+- Document reports require Document Tracking access.
+- Billing reports require Billing View and billing permission.
+- Audit reports require audit permission and exact customer scope.
+
+Every export creates an audit record.
 
 ---
 
-# **23\. Billing Rules**
+# 23. Billing Rules
 
-Billing is entirely manual.
-
-No payment gateway exists in Version 1\.
+Billing is manual in Version 1.
 
 Only Datamation Super Admin may:
 
-Create invoices.
+- Create invoices
+- Record payments
+- Update balances
+- Issue/cancel billing records
 
-Record payments.
+Company users may only view own billing when Billing View is enabled and their role permits it.
 
-Update balances.
-
-Mark invoices paid.
-
-Company users may only view billing information if the Billing View module is enabled.
+Billing is TENANT_STRICT.
 
 ---
 
-# **24\. Audit Rules**
+# 24. Audit Rules
 
-The following actions must always be audited:
+Audit critical actions including:
 
-Login
-
-Logout
-
-Failed Login
-
-Create
-
-Update
-
-Delete
-
-Role Changes
-
-Permission Changes
-
-Inventory Movements
-
-Document Movements
-
-Barcode Printing
-
-Barcode Scanning
-
-Imports
-
-Exports
-
-Subscription Changes
-
-License Changes
-
-Billing Updates
-
-Payments
-
-Backup
-
-Restore
+- Authentication
+- User changes
+- Role changes
+- Customer changes
+- Subscription changes
+- License changes
+- Billing/payment changes
+- Inventory/document movements
+- Barcode operations
+- Imports/exports
+- Backup/restore
 
 Audit entries are immutable.
 
----
+## Customer Audit Visibility
 
-# **25\. Notification Rules**
+Company Admin may view only:
 
-Notifications are generated for:
+```text
+customer_id = authenticated user's customer_id
+```
 
-Low stock
+Platform audit records with `customer_id = NULL` are never customer-visible.
 
-Subscription expiry
-
-License expiry
-
-Overdue invoices
-
-Payment updates
-
-Overdue returns
-
-Import failures
-
-Export completion
-
-Notifications are visible only within the owning customer unless they are platform-wide notifications.
+Other customer audit records are never customer-visible.
 
 ---
 
-# **26\. Progressive Web App Rules**
+# 25. Notification Rules
 
-The application supports installation as a PWA.
+Customer notifications remain within customer boundary.
 
-Version 1 remains online-first.
-
-Offline mode displays an informational page and prevents operational transactions.
-
-Future versions may support offline synchronization.
+Platform notifications are visible only to authorized Datamation platform users.
 
 ---
 
-# **27\. Security Rules**
+# 26. Progressive Web App Rules
+
+DMIMS remains online-first.
+
+Offline mode shows information only and prevents operational transactions.
+
+---
+
+# 27. Security Rules
 
 Developers must never:
 
-Trust customer\_id submitted by the browser.
-
-Disable authorization checks.
-
-Expose hidden routes.
-
-Modify audit history.
-
-Delete movement history.
-
-Bypass the AccessControlService.
+- Trust browser-submitted `customer_id`
+- Disable authorization
+- Rely only on hidden UI
+- Expose hidden routes
+- Modify audit history
+- Delete movement history
+- Bypass access-control services
+- Use generic `OR customer_id IS NULL` for TENANT_STRICT resources
 
 ---
 
-# **28\. Error Handling Rules**
+# 28. Error Handling Rules
 
-The system should:
-
-Provide clear error messages.
+Provide clear messages.
 
 Log unexpected failures.
 
 Rollback incomplete transactions.
 
-Avoid exposing technical details to end users.
+Never expose technical details or unauthorized resource existence.
 
 ---
 
-# **29\. Business Rule Hierarchy**
+# 29. Business Rule Hierarchy
 
-When multiple rules apply, precedence is:
+Precedence:
 
-1. System Security  
-2. Customer Isolation  
-3. License  
-4. Subscription  
-5. Module Availability  
-6. User Permission  
-7. Business Validation  
-8. User Interface
+1. System Security
+2. Customer Isolation
+3. Resource Scope
+4. License
+5. Subscription
+6. Module Availability
+7. User Permission
+8. Business Validation
+9. User Interface
 
-This ensures security always overrides convenience.
-
----
-
-# **30\. Summary**
-
-DMIMS is designed to:
-
-* Protect customer data through strict tenant isolation.  
-* Separate commercial entitlement (Subscription) from technical access (License).  
-* Preserve complete inventory and document history.  
-* Provide comprehensive auditability.  
-* Remain scalable for future growth while maintaining consistent business behaviour.
+Security always overrides convenience.
 
 ---
 
-# **Document History**
+# 30. Summary
+
+DMIMS protects customer data by strict tenant isolation, separates commercial entitlement from technical access, preserves immutable history, and presents customer users only with functions relevant to their company, role and purchased/enabled services.
+
+---
+
+# Document History
 
 | Version | Date | Description |
-| ----- | ----- | ----- |
+|---|---|---|
 | 1.0 | June 2026 | Initial Business Rules & Functional Specification |
-
+| 1.1 | 24 August 2026 | Added strict tenant scope, My Company model, platform-only subscription/license administration and report-family authorization |

@@ -1,1053 +1,347 @@
-# **DMIMS Database Dictionary**
+# DMIMS Database Dictionary
 
-**Datamation Inventory Management System (DMIMS)**
+**Datamation Inventory Management System (DMIMS)**  
+**Version:** 1.1  
+**Updated:** 24 August 2026
 
-Version 1.0
-
----
-
-# **Document Purpose**
-
-This document describes every database table used by DMIMS.
-
-For every table it defines:
-
-* Purpose  
-* Business ownership  
-* Relationships  
-* Fields  
-* Data types  
-* Constraints  
-* Indexes  
-* Validation rules  
-* Business rules  
-* Example data
-
-This document should always be updated whenever the database schema changes.
-
----
-
-# **Database Design Principles**
-
-DMIMS follows these principles:
-
-* Multi-tenant architecture  
-* Customer isolation  
-* Immutable movement history  
-* Soft deletes for master data  
-* Foreign key integrity  
-* Audit-first design  
-* Subscription and license separation
-
----
-
-# **Database Overview**
-
-## **Core Tables**
-
-customers
-
-users
-
-roles
-
-permissions
-
-model\_has\_roles
-
-model\_has\_permissions
-
-modules
-
-customer\_modules
-
-subscription\_plans
-
-customer\_subscriptions
-
-subscription\_logs
-
-licenses
-
-license\_logs
-
-billing\_records
-
-billing\_payments
-
-billing\_logs
-
-settings
-
-audit\_logs
-
-notifications
-
----
-
-## **Inventory Tables**
-
-location\_types
-
-locations
-
-categories
-
-products
-
-product\_location\_stocks
-
-stock\_movements
-
-stock\_alerts
-
----
-
-## **Document Tracking Tables**
-
-document\_types
-
-boxes
-
-document\_files
-
-document\_movement\_logs
-
----
-
-## **Barcode Tables**
-
-barcode\_registry
-
-barcode\_scan\_logs
-
----
-
-# **CUSTOMER TABLE**
-
-## **Table Name**
-
-customers
-
----
-
-## **Purpose**
-
-Stores every customer company using DMIMS.
-
-Every company is completely isolated from every other company.
-
----
-
-## **Primary Key**
-
-id
-
----
-
-## **Soft Delete**
-
-Yes
-
----
-
-## **Fields**
-
-| Column | Type | Nullable | Description |
-| ----- | ----- | ----- | ----- |
-| id | bigint | No | Primary Key |
-| company\_name | string | No | Customer company name |
-| company\_code | string | No | Unique company code |
-| registration\_no | string | Yes | Company registration number |
-| tin\_no | string | Yes | Tax identification number |
-| contact\_person | string | Yes | Primary contact |
-| email | string | Yes | Contact email |
-| phone | string | Yes | Contact phone |
-| address | text | Yes | Company address |
-| status | enum | No | Company status |
-| deployment\_type | string | No | Deployment model (default DatamationOnPremHosted) |
-| notes | text | Yes | Internal notes |
-| created\_by | bigint | Yes | User ID |
-| updated\_by | bigint | Yes | User ID |
-| created\_at | timestamp | No | Creation date |
-| updated\_at | timestamp | No | Last update |
-| deleted\_at | timestamp | Yes | Soft delete |
-
----
-
-## **Relationships**
-
-Customer
-
-hasMany Users
-
-hasMany Products
-
-hasMany Categories
-
-hasMany Locations
-
-hasMany Boxes
-
-hasMany Document Files
-
-hasMany Billing Records
-
-hasMany Licenses
-
-hasMany Subscriptions
-
-hasMany Notifications
-
----
-
-## **Indexes**
-
-Primary Key
-
-company\_code (Unique)
-
-status
-
-created\_at
-
----
-
-## **Business Rules**
-
-Company code must be unique.
-
-Archived companies cannot perform operations.
-
-Suspended companies cannot access operational functions.
-
-Customer records must never be hard deleted.
-
----
-
-## **Example**
-
-ID
-
-15
-
-Company
-
-ABC Manufacturing
-
-Company Code
-
-ABC001
-
-Status
-
-Active
-
-\====================================================
-
-# **USERS TABLE**
-
----
-
-## **Table Name**
-
-users
-
----
-
-## **Purpose**
-
-Stores all internal Datamation users and customer users.
-
----
-
-## **Soft Delete**
-
-Yes
-
----
-
-## **Fields**
-
-| Column | Type | Nullable | Description |
-| ----- | ----- | ----- | ----- |
-| id | bigint | No | Primary Key |
-| customer\_id | bigint | Yes | Owning company |
-| name | string | No | User name |
-| email | string | No | Login email |
-| username | string | Yes | Optional username |
-| employee\_id | string | Yes | Employee identifier |
-| phone | string | Yes | Contact number |
-| department\_id | bigint | Yes | Owning department |
-| job\_title | string | Yes | Job title |
-| password | string | No | Hashed password |
-| status | enum | No | User status |
-| is\_platform\_user | boolean | No | Datamation user flag |
-| last\_login\_at | datetime | Yes | Last login |
-| created\_by | bigint | Yes | User ID |
-| updated\_by | bigint | Yes | User ID |
-| deleted\_at | timestamp | Yes | Soft delete |
-
----
-
-## **Relationships**
-
-belongsTo Customer
-
-belongsTo Department
-
-belongsToMany Roles
-
-hasMany Audit Logs
-
-hasMany Notifications
-
----
-
-## **Business Rules**
-
-Internal users
-
-customer\_id \= NULL
-
-is\_platform\_user \= true
-
-Company users
-
-customer\_id \= Company ID
-
-is\_platform\_user \= false
-
-Email must be unique.
-
-Inactive users cannot log in.
-
----
-
-## **Indexes**
-
-email (Unique)
-
-customer\_id
-
-status
-
-last\_login\_at
-
-\====================================================
-
-# **MODULES TABLE**
-
----
-
-## **Purpose**
-
-Stores all available system modules.
-
----
-
-## **Example Modules**
-
-Stock Inventory
-
-Document Tracking
-
-Barcode
-
-Reports
-
-Audit
-
-Import Export
-
-Backup Restore
-
-Billing View
-
----
-
-## **Relationships**
-
-hasMany Customer Modules
-
----
-
-## **Business Rules**
-
-Module names are unique.
-
-Inactive modules cannot be assigned.
-
-\====================================================
-
-# **CUSTOMER\_MODULES TABLE**
-
----
-
-## **Purpose**
-
-Enables or disables modules for each customer.
-
----
-
-## **Composite Unique Key**
-
-customer\_id
-
-module\_id
-
----
-
-## **Business Rules**
-
-One module assignment per customer.
-
-Disabling a module immediately prevents access.
-
-\====================================================
-
-# **SUBSCRIPTION\_PLANS TABLE**
-
----
-
-## **Purpose**
-
-Defines reusable subscription plans.
-
----
-
-## **Key Fields**
-
-plan\_code
-
-plan\_name
-
-max\_users
-
-max\_products
-
-max\_document\_files
-
-max\_boxes
-
-enabled\_modules
-
-allowed\_reports
-
-billing\_cycle
-
-price
-
-status
-
 ---
-
-## **Relationships**
-
-hasMany Customer Subscriptions
-
----
-
-## **Business Rules**
-
-Plans are templates.
-
-Customer subscriptions copy values from plans.
-
-Inactive plans cannot be assigned.
-
-\====================================================
-
-# **CUSTOMER\_SUBSCRIPTIONS TABLE**
-
----
-
-## **Purpose**
-
-Stores the active subscription assigned to a customer.
-
----
-
-## **Relationships**
-
-belongsTo Customer
-
-belongsTo Subscription Plan
-
----
-
-## **Business Rules**
-
-Controls:
-
-Users
-
-Products
 
-Boxes
+# Document Purpose
 
-Files
+This document describes DMIMS database ownership and application access semantics.
 
-Modules
+Schema field-level definitions remain governed by actual Laravel migrations.
 
-Billing Cycle
-
-Grace Period
-
-Does NOT control final technical access.
-
-That responsibility belongs to the License.
-
-\====================================================
-
-# **LICENSES TABLE**
-
 ---
 
-## **Purpose**
+# Database Design Principles
 
-Controls technical access to DMIMS.
+DMIMS follows:
 
----
-
-## **Technical Access Modes**
-
-Full Access
+- Multi-tenant architecture
+- Customer isolation
+- Immutable movement history
+- Soft deletes for master data
+- Foreign key integrity
+- Audit-first design
+- Subscription/license separation
+- Explicit access-scope classification
 
-View Only
-
-Blocked
-
 ---
-
-## **Status Mapping**
 
-Active
+# Data Access Scope Classification
 
-↓
+## PLATFORM_ONLY
 
-Full Access
+Platform-owned/master data.
 
-Suspended
+Examples:
 
-↓
+- roles
+- permissions
+- modules
+- subscription_plans
+- platform settings
 
-View Only
+Customer users cannot directly browse these tables as platform administration resources.
 
-Expired
+## TENANT_STRICT
 
-↓
+Customer-owned records.
 
-View Only
+Customer query rule:
 
-Revoked
+```text
+customer_id = authenticated user's customer_id
+```
 
-↓
+Examples:
 
-Blocked
+- customer users
+- customer_modules
+- customer_subscriptions
+- subscription_logs
+- licenses
+- license_logs
+- billing_records
+- billing_payments
+- billing_logs
+- locations
+- categories
+- products
+- product_location_stocks
+- stock_movements
+- stock_alerts
+- boxes
+- document_files
+- document_movement_logs
+- barcode_registry
+- barcode_scan_logs
+- audit_logs
+- customer notifications
 
----
-
-## **Business Rules**
-
-Every customer should have one active license.
-
-License overrides subscription access when necessary.
-
-\====================================================
-
-# **BILLING\_RECORDS TABLE**
+`customer_id IS NULL` is not part of a customer query for these resources.
 
----
-
-## **Purpose**
-
-Stores invoices and billing records.
+## TENANT_WITH_GLOBAL_DEFAULTS
 
----
-
-## **Relationships**
+Tables explicitly designed to contain global and customer-specific reference records.
 
-belongsTo Customer
+Examples:
 
-belongsTo Subscription
+- document_types where `customer_id` may be NULL
+- settings where approved global values are customer-readable
 
-belongsTo License
+NULL does not automatically mean customer-visible.
 
-hasMany Payments
-
 ---
-
-## **Business Rules**
 
-Manual billing only.
+# CUSTOMERS
 
-No payment gateway.
+Purpose: stores customer companies.
 
-Only Datamation Super Admin may modify billing.
+Platform Customer Management is PLATFORM_ONLY.
 
-\====================================================
+Customer users may view own company through My Company where authorized.
 
-# **BILLING\_PAYMENTS TABLE**
-
 ---
 
-## **Purpose**
+# USERS
 
-Stores manual payment entries.
-
----
+Purpose: stores platform and customer users.
 
-## **Payment Methods**
+Platform users:
 
-Bank Transfer
+```text
+customer_id = NULL
+is_platform_user = true
+```
 
-Cash
+Customer users:
 
-Cheque
+```text
+customer_id = owning customer
+is_platform_user = false
+```
 
-Online Transfer
+## Access Rules
 
-Internal Adjustment
+When a customer administrator lists users:
 
-Waived
+```text
+users.customer_id = authenticated_user.customer_id
+```
 
-Other
+Platform users must never be included.
 
 ---
-
-## **Business Rules**
-
-Payments update billing balances.
-
-Payment history must remain immutable.
 
-\====================================================
+# MODULES
 
-# **LOCATIONS TABLE**
+Platform module catalogue.
 
----
+Scope: PLATFORM_ONLY.
 
-## **Purpose**
+Customers may see only their own enabled module assignments, not the module management resource.
 
-Stores physical storage locations.
-
 ---
-
-## **Relationships**
 
-belongsTo Customer
+# CUSTOMER_MODULES
 
-belongsTo Parent Location
+Purpose: customer module assignments.
 
-belongsTo Location Type
+Scope: TENANT_STRICT.
 
-hasMany Product Stocks
-
-hasMany Boxes
-
 ---
-
-## **Business Rules**
 
-Shared between Inventory and Document Tracking.
+# SUBSCRIPTION_PLANS
 
-Never create external locations.
+Purpose: reusable platform plan templates.
 
-Use movement tables for external destinations.
+Scope: PLATFORM_ONLY.
 
-\====================================================
+Customer users do not browse this table/resource.
 
-# **PRODUCTS TABLE**
-
----
-
-## **Purpose**
-
-Stores inventory items.
-
 ---
-
-## **Relationships**
 
-belongsTo Customer
+# CUSTOMER_SUBSCRIPTIONS
 
-belongsTo Category
+Purpose: actual subscription assigned to customer.
 
-belongsTo Default Location
+Scope: TENANT_STRICT.
 
-hasMany Stock Movements
+Customers may see own summary where permitted.
 
 ---
 
-## **Unique Constraints**
+# SUBSCRIPTION_LOGS
 
-customer\_id \+ sku
+Scope: TENANT_STRICT.
 
-customer\_id \+ barcode
+Immutable history.
 
 ---
 
-## **Business Rules**
+# LICENSES
 
-SKU unique per company.
+Scope: TENANT_STRICT as data ownership.
 
-Barcode unique per company.
+Full management is platform-only.
 
-\====================================================
+Customer-facing presentation is simplified License Status.
 
-# **PRODUCT\_LOCATION\_STOCKS TABLE**
-
----
-
-## **Purpose**
-
-Stores inventory balance per location.
-
 ---
-
-## **Composite Unique Key**
-
-customer\_id
 
-product\_id
+# LICENSE_LOGS
 
-location\_id
+Scope: TENANT_STRICT.
 
-\====================================================
+Not directly customer-editable.
 
-# **STOCK\_MOVEMENTS TABLE**
-
----
-
-## **Purpose**
-
-Stores immutable inventory history.
-
 ---
-
-## **Movement Types**
 
-The `movement_type` column stores these enum values (label — stored value):
+# BILLING_RECORDS
 
-Opening Balance — `opening_balance`
+Scope: TENANT_STRICT.
 
-Receive In — `stock_in`
+Customer users may only view own records when Billing View is enabled.
 
-Stock Out — `stock_out`
+Only Datamation Super Admin modifies billing.
 
-Internal Transfer — `transfer`
-
-Adjustment — `adjustment`
-
-Return — `return`
-
-Disposal — `disposal`
-
 ---
-
-## **Business Rules**
-
-Never delete.
 
-Never edit.
+# BILLING_PAYMENTS / BILLING_LOGS
 
-Always use transactions.
+Scope: TENANT_STRICT.
 
-\====================================================
+Manual platform-controlled payment administration.
 
-# **BOXES TABLE**
-
----
-
-## **Purpose**
-
-Stores archive boxes.
-
 ---
-
-## **Relationships**
 
-belongsTo Customer
+# LOCATIONS
 
-belongsTo Current Location
+Scope: TENANT_STRICT.
 
-hasMany Document Files
+Shared by Inventory and Documents.
 
 ---
 
-## **Business Rules**
+# CATEGORIES / PRODUCTS / PRODUCT_LOCATION_STOCKS
 
-Moving a box must NOT update every file.
+Scope: TENANT_STRICT.
 
-File location is derived from the box.
+Unique keys and quantities remain scoped by customer.
 
-\====================================================
-
-# **DOCUMENT\_FILES TABLE**
-
----
-
-## **Purpose**
-
-Stores physical document files.
-
 ---
-
-## **Relationships**
 
-belongsTo Customer
+# STOCK_MOVEMENTS / STOCK_ALERTS
 
-belongsTo Current Box
+Scope: TENANT_STRICT.
 
-belongsTo Document Type
+Movement history immutable.
 
 ---
 
-## **Business Rules**
+# BOXES / DOCUMENT_FILES / DOCUMENT_MOVEMENT_LOGS
 
-Moving a file changes its current box.
+Scope: TENANT_STRICT.
 
-Moving a box does not update every file.
+Movement history immutable.
 
-\====================================================
-
-# **DOCUMENT\_MOVEMENT\_LOGS TABLE**
-
----
-
-## **Purpose**
-
-Stores immutable movement history.
-
 ---
-
-## **Actions**
-
-Receive File
-
-Receive Box
-
-Transfer File
-
-Transfer Box
-
-Move Out File
 
-Move Out Box
+# DOCUMENT_TYPES
 
-Return File
+May support global defaults and customer-specific records.
 
-Return Box
+Scope: TENANT_WITH_GLOBAL_DEFAULTS only if actual implementation/business rule supports `customer_id = NULL` global records.
 
-Correction
-
 ---
-
-## **Business Rules**
-
-Never modify.
-
-Corrections are separate movement records.
-
-\====================================================
-
-# **BARCODE\_REGISTRY TABLE**
 
----
+# BARCODE_REGISTRY / BARCODE_SCAN_LOGS
 
-## **Purpose**
+Scope: TENANT_STRICT.
 
-Central lookup table for every barcode.
+Cross-customer barcode lookup must not reveal information.
 
 ---
-
-## **Barcode Types**
-
-Product
 
-Location
+# AUDIT_LOGS
 
-Box
+Purpose: immutable audit trail.
 
-Document File
+## Ownership Meaning
 
----
-
-## **Business Rules**
+`customer_id` populated:
 
-Barcode unique within customer.
+Customer-related audit event.
 
-Stores print count.
+`customer_id = NULL`:
 
-Stores last scanned timestamp.
+Platform-level audit event.
 
-\====================================================
+## Customer Access Rule
 
-# **BARCODE\_SCAN\_LOGS TABLE**
+Company Admin may query only:
 
----
+```text
+customer_id = authenticated user's customer_id
+```
 
-## **Purpose**
+Platform NULL logs must never be included in customer audit queries.
 
-Stores every barcode scan.
+Other-customer logs must never be included.
 
 ---
-
-## **Scan Results**
 
-Found
+# NOTIFICATIONS
 
-Unknown
+Customer notifications:
 
-Inactive
+TENANT_STRICT.
 
-Permission Denied
+Platform notifications:
 
-\====================================================
+Platform-only.
 
-# **AUDIT\_LOGS TABLE**
-
----
-
-## **Purpose**
-
-Stores complete system audit trail.
-
 ---
-
-## **Business Rules**
 
-Immutable.
+# SETTINGS
 
-Never edited.
-
-Never deleted.
-
-Generated only through AuditService.
-
-\====================================================
-
-# **NOTIFICATIONS TABLE**
-
----
+May contain platform and customer-specific settings.
 
-## **Purpose**
+Customer visibility of NULL/global settings must be explicitly approved per setting group.
 
-Stores user and system notifications.
+Do not expose all global settings by default.
 
 ---
 
-## **Business Rules**
+# Foreign Key Standards
 
-Customer notifications stay inside customer boundary.
+Maintain referential integrity.
 
-Platform notifications are visible only to Datamation users.
+History tables should not cascade delete.
 
-\====================================================
+Tenant-owned relationships must preserve same-customer integrity.
 
-# **SETTINGS TABLE**
-
 ---
 
-## **Purpose**
+# Index Standards
 
-Stores platform-wide and customer-specific settings.
+Index customer ownership and frequently queried authorization/filter columns.
 
 ---
-
-## **Rules**
-
-customer\_id \= NULL
-
-Platform setting
-
-customer\_id filled
-
-Customer-specific setting
-
-\====================================================
-
-# **Foreign Key Standards**
-
-Every foreign key must use constrained() where possible.
-
-Deletes should follow:
-
-Master Data
-
-Restrict
-
-History Tables
-
-No cascade delete
-
-Movement Logs
-
-Never cascade delete
-
-\====================================================
-
-# **Index Standards**
-
-Every table should index:
-
-customer\_id
-
-status
-
-created\_at
-
-updated\_at
-
-Foreign keys
-
-Frequently searched fields
-
-\====================================================
-
-# **Database Naming Standards**
-
-Tables
-
-Plural snake\_case
-
-Columns
-
-snake\_case
-
-Foreign Keys
-
-singular\_id
-
-Boolean
-
-is\_
-
-Dates
-
-\_at suffix
-
-\====================================================
 
-# **Database Design Principles Summary**
+# Database Design Summary
 
-The DMIMS database is designed to provide:
+Database nullability is not an authorization rule.
 
-* Complete customer isolation  
-* High performance  
-* Referential integrity  
-* Immutable history  
-* Scalable architecture  
-* Secure access control  
-* Efficient reporting  
-* Future expansion without redesign
+Application access is determined by explicit resource-scope classification plus role/module/subscription/license authorization.
 
 ---
 
-# **Document History**
+# Document History
 
 | Version | Date | Description |
-| ----- | ----- | ----- |
+|---|---|---|
 | 1.0 | June 2026 | Initial Database Dictionary |
-
+| 1.1 | 24 August 2026 | Added explicit platform/tenant scope semantics and strict audit/user access rules |
