@@ -4,6 +4,30 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.39] - 2026-08-24
+
+### Fixed — My Company "Profile" page rendered completely blank
+
+`App\Filament\Clusters\MyCompany\Pages\Overview` (the "Profile" tab) defined
+a `form()` schema but never embedded it anywhere: `Filament\Pages\Page::content()`
+returns the page's content schema untouched by default, so with no override
+the page's default view (`filament-panels::pages.page`, which just renders
+`{{ $this->content }}`) had nothing to display. Every other form-driven
+custom page in the app (`BarcodeScanner`, `Reports`) sidesteps this with its
+own Blade view that renders `{{ $this->form }}` directly; `Overview` had
+neither a custom view nor a `content()` override, so the tab list showed but
+the company details never did. Added the standard Filament `content()`
+override (`Form::make([EmbeddedSchema::make('form')])`, the same pattern
+`Filament\Auth\Pages\EditProfile` uses) so the nine read-only fields
+(company name, code, registration/TIN no., contact, email, phone, address,
+status) now render.
+
+### Fixed — Scan Center's "Scan & Open" button sized oddly against the input
+
+The button had no width class, so it rendered at its intrinsic content
+width instead of matching the barcode input field above it. Added
+`w-full justify-center` to `resources/views/filament/pages/barcode-scanner.blade.php`.
+
 ## [2.1.38] - 2026-08-24
 
 ### Fixed — customer module gating gaps in Customer Modules / My Company nav

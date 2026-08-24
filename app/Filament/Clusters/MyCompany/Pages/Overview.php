@@ -9,6 +9,8 @@ use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Pages\Page;
+use Filament\Schemas\Components\EmbeddedSchema;
+use Filament\Schemas\Components\Form;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Arr;
 
@@ -68,6 +70,16 @@ class Overview extends Page implements HasForms
         $customer = self::ownCompany();
 
         $this->form->fill($customer ? Arr::only($customer->attributesToArray(), self::VISIBLE_FIELDS) : []);
+    }
+
+    // Base Page::content() returns the schema untouched, so without this
+    // override the default 'filament-panels::pages.page' view has nothing
+    // to render — the form() schema below is never embedded into the page.
+    public function content(Schema $schema): Schema
+    {
+        return $schema->components([
+            Form::make([EmbeddedSchema::make('form')]),
+        ]);
     }
 
     public function form(Schema $schema): Schema
