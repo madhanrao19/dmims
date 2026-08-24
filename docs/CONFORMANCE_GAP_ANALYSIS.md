@@ -204,7 +204,7 @@ so both are covered. Feature-tested in `tests/Feature/ReportExportServiceTest.ph
 
 ---
 
-# 8. WIP — Customer Navigation Consolidation
+# 8. ✅ Implemented — Customer Navigation Consolidation
 
 Approved customer-facing structure:
 
@@ -231,6 +231,87 @@ Standalone customer exposure of:
 - Platform Audit Logs
 
 is not permitted.
+
+### ✅ Implemented (24 August 2026)
+
+`App\Filament\Clusters\MyCompany` groups the seven tabs above under one
+navigation entry (`app/Filament/Clusters/MyCompany.php` +
+`app/Filament/Clusters/MyCompany/Pages/*.php`). Per TDD §7.3's "do not
+duplicate business logic," each list-style tab (Users, Enabled Modules,
+Subscription, Billing, Audit Logs) reuses its underlying resource's own
+`can('viewAny')` and `table()`/`getEloquentQuery()` verbatim via
+`Pages\Concerns\HasEmbeddedResourceTable`, so a tab is exactly as visible
+and exactly as scoped as clicking directly into that resource always was —
+no new authorization logic was written for these five. Profile is a
+read-only display of the customer's own row (`Overview.php`); License
+Status reuses the existing `MyLicenseStatusWidget`.
+
+The five underlying resources (`UserResource`, `CustomerModuleResource`,
+`CustomerSubscriptionResource`, `BillingRecordResource`,
+`AuditLogResource`) got a new `BaseResource::$customerFacingViaMyCompany`
+flag that hides only their standalone top-level nav entry for non-platform
+users — their routes, `can()` and `getEloquentQuery()` are unchanged, so
+row actions inside a My Company tab (e.g. "Edit" on a user) still work.
+Platform users are unaffected and keep using the dedicated resources for
+cross-tenant administration.
+
+A real-browser Playwright pass plus an independent security review of this
+build caught and fixed five further defects:
+
+1. **`MyLicenseStatusWidget::canView()` had no permission check**, so *any*
+   non-platform user — including Stock Inventory User, Document Tracking
+   User and Viewer, none of whom the matrix grants "Own License Status" —
+   could see the License Status tab, which was then the only tab keeping the
+   entire My Company cluster visible to those roles (Filament only hides a
+   Cluster's nav when *zero* sub-pages are accessible). Fixed by requiring
+   `view licensing`/`manage licensing`, matching §5's table exactly.
+2. **`CustomerResource` was missed from the `$customerFacingViaMyCompany`
+   sweep** — Company Admin/Supervisor still saw a standalone "Customers" nav
+   entry (correctly scoped to their own row, but duplicating the new
+   Profile tab). Fixed by adding the flag.
+3. **(High) BillingRecordResource's `ViewAction`/`EditAction` — the only two
+   row actions on any wrapped resource without an explicit `->authorize()`
+   call — were unauthorized on the embedded table.** A plain embedding Page
+   has no default action→resource-authorization mapping (only
+   `Filament\Resources\Pages\Page`, used by a resource's own pages, provides
+   one), so Filament's framework default of "allowed" applied: a Company
+   Admin holding `view billing` but not `manage billing` could reach Edit on
+   any invoice through this tab — bypassing the operational-permission and
+   license-mode checks `BaseResource::can()` enforces everywhere else. Fixed
+   by adding `HasEmbeddedResourceTable::getDefaultActionAuthorizationResponse()`,
+   mirroring `Filament\Resources\Pages\Page`'s own mapping exactly but
+   failing closed (deny) for any action type not explicitly mapped, so a
+   future action added to any wrapped resource is denied by default rather
+   than silently allowed. The same gap meant `ViewAction`/`EditAction`
+   opened with no fields at all (no default schema resolver either); fixed
+   alongside via `getDefaultActionSchemaResolver()`, applying the
+   authorization fix *first* so the schema fix couldn't turn "empty modal"
+   into "unauthorized write of arbitrary fields."
+4. **`Overview::mount()` filled the page's public Livewire `$data` property
+   from the customer's full `attributesToArray()`**, serialising every
+   column — including `notes` (internal Datamation commentary about the
+   tenant) and `deployment_type` — to the browser regardless of which nine
+   fields the disabled form actually renders. Fixed to fill only the
+   displayed fields, driven from one list both `mount()` and `form()` share
+   so they can't drift apart again.
+5. **`MyCompany` (the cluster itself) didn't override `canAccess()`**,
+   so its own route defaulted to allowed (Filament's base `Page` default)
+   rather than matching `shouldRegisterNavigation()`'s tenant-only check —
+   reachable-but-empty for a platform user (and threw an unhandled 500 via
+   an unrelated Livewire/redirect interaction), though every sub-page still
+   independently re-checked its own access, so no tab content was ever
+   exposed. Fixed by overriding `canAccess()` to match.
+6. **(Low, pre-existing, more exposed by this change)
+   `AuditLogResource`'s module filter dropdown queried the model directly**
+   (`AuditLog::query()->distinct()->pluck('module', ...)`), bypassing
+   `getEloquentQuery()`'s tenant scope and disclosing which modules every
+   other customer on the platform uses. Fixed to query through
+   `static::getEloquentQuery()`.
+
+All six are covered by `tests/Feature/MyCompanyClusterTest.php` and
+`tests/Feature/MyLicenseStatusWidgetTest.php`, and (3) was additionally
+verified in a real browser: the Edit action confirmed hidden and the View
+modal confirmed to render real invoice fields for a Company Admin.
 
 ---
 
@@ -357,17 +438,17 @@ Do not mark these gaps conformant until:
 # 12. Status
 
 **Documentation target state:** ✅ Approved and synchronized (matrix v1.2)
-**Implementation:** ✅ Items 2–7 (§2–§7 above) implemented; all §10a findings
-(H1–H3, M1–M3) fixed or resolved; §8 (My Company nav consolidation) remains
-the only open item, tracked as WIP
+**Implementation:** ✅ All items in this document (§2–§10a) are implemented,
+including §8 (My Company navigation consolidation)
 **Regression verification:** ✅ automated test suite green (Pest/PHPUnit);
 Pint clean; Larastan/PHPStan clean; independent security-reviewer and
-qa-tester passes completed 24 August 2026; real-browser Playwright
-verification completed for the platform-only lockdown, audit-log scoping,
-and full existing role-QA suite (`tests/playwright/role-qa.spec.js`, all
-role/permission assertions pass unchanged)
-**Production-ready for this access-control change:** ⚠️ Conditional — every
-item in this document's scope is implemented, tested, and reviewed; the
-full "My Company" navigation consolidation (§8) is a separate, larger UI
-feature not yet built and remains the only reason this is not called fully
-conformant to the approved target state.
+qa-tester passes completed 24 August 2026 for both the access-control
+hardening and the My Company cluster; real-browser Playwright verification
+completed for the platform-only lockdown, audit-log scoping, the full
+existing role-QA suite (`tests/playwright/role-qa.spec.js`, all
+role/permission assertions pass unchanged), and My Company's per-role tab
+visibility (which caught and fixed one real defect — see §8)
+**Production-ready for this access-control change:** every item named in
+this document is implemented, automated-tested, and independently
+reviewed. This document only tracks the 24 August 2026 access-control
+review's scope — it does not certify the platform as a whole.

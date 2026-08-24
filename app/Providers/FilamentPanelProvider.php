@@ -73,6 +73,7 @@ class FilamentPanelProvider extends PanelProvider
             ->sidebarCollapsibleOnDesktop()
             ->maxContentWidth(Width::Full)
             ->discoverResources(app_path('Filament/Resources'), 'App\\Filament\\Resources')
-            ->discoverPages(app_path('Filament/Pages'), 'App\\Filament\\Pages');
+            ->discoverPages(app_path('Filament/Pages'), 'App\\Filament\\Pages')
+            ->discoverClusters(app_path('Filament/Clusters'), 'App\\Filament\\Clusters');
     }
 }

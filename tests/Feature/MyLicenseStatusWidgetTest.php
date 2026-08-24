@@ -6,6 +6,7 @@ use App\Filament\Widgets\MyLicenseStatusWidget;
 use App\Models\Customer;
 use App\Models\License;
 use App\Models\User;
+use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -21,13 +22,30 @@ class MyLicenseStatusWidgetTest extends TestCase
         $this->assertFalse(MyLicenseStatusWidget::canView());
     }
 
-    public function test_widget_is_visible_to_customer_users(): void
+    /**
+     * Security & Access Control Matrix §5: "Own License Status: View" is
+     * granted to Company Admin/Supervisor, not every customer role.
+     */
+    public function test_widget_is_visible_to_company_admin(): void
     {
+        $this->seed(RolesAndPermissionsSeeder::class);
         $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACM', 'status' => 'active']);
         $user = User::factory()->create(['customer_id' => $customer->id, 'is_platform_user' => false, 'status' => 'active']);
+        $user->assignRole('Company Admin');
         $this->actingAs($user);
 
         $this->assertTrue(MyLicenseStatusWidget::canView());
+    }
+
+    public function test_widget_is_hidden_from_a_role_without_licensing_permission(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACM', 'status' => 'active']);
+        $user = User::factory()->create(['customer_id' => $customer->id, 'is_platform_user' => false, 'status' => 'active']);
+        $user->assignRole('Stock Inventory User');
+        $this->actingAs($user);
+
+        $this->assertFalse(MyLicenseStatusWidget::canView());
     }
 
     public function test_widget_reports_no_license_when_none_exists(): void

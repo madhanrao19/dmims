@@ -33,6 +33,20 @@ abstract class BaseResource extends Resource
      */
     protected static bool $platformOnly = false;
 
+    /**
+     * TDD §7.3 / Security & Access Control Matrix §5: when true, a
+     * non-platform user reaches this resource's data through the My Company
+     * cluster (App\Filament\Clusters\MyCompany) instead of a standalone
+     * top-level navigation entry. The resource's own routes, pages and
+     * can()/getEloquentQuery() are unchanged and still fully functional
+     * (My Company's tabs embed this resource's own table() directly, and
+     * row actions like Edit still link to this resource's own edit route) —
+     * only the duplicate sidebar entry is hidden. Platform users are
+     * unaffected: they keep using the resource directly for cross-tenant
+     * administration.
+     */
+    protected static bool $customerFacingViaMyCompany = false;
+
     protected static ?string $permission = null;
 
     /**
@@ -321,6 +335,10 @@ abstract class BaseResource extends Resource
         }
 
         if (static::$platformOnly) {
+            return false;
+        }
+
+        if (static::$customerFacingViaMyCompany) {
             return false;
         }
 

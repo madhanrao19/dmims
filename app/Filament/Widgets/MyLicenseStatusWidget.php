@@ -8,12 +8,14 @@ use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 
 /**
- * Security & Access Control Matrix §8: customer users get only a simplified
- * own-license status summary (status, access mode, validity, expiry
- * warning) — never the standalone License Management resource, which now
- * requires a platform user (see LicenseResource::$platformOnly). Internal
- * technical fields (server fingerprint, installation id, deployment mode)
- * are intentionally not surfaced here.
+ * Security & Access Control Matrix §5/§8: only Company Admin/Supervisor get
+ * "Own License Status: View" — not Stock/Document/Viewer, who hold no
+ * licensing permission. Customer users get only this simplified own-license
+ * status summary (status, access mode, validity, expiry warning) — never
+ * the standalone License Management resource, which now requires a
+ * platform user (see LicenseResource::$platformOnly). Internal technical
+ * fields (server fingerprint, installation id, deployment mode) are
+ * intentionally not surfaced here.
  */
 class MyLicenseStatusWidget extends StatsOverviewWidget
 {
@@ -21,7 +23,11 @@ class MyLicenseStatusWidget extends StatsOverviewWidget
     {
         $user = auth()->user();
 
-        return (bool) ($user && ! $user->is_platform_user && $user->customer_id);
+        if (! $user || $user->is_platform_user || ! $user->customer_id) {
+            return false;
+        }
+
+        return $user->can('view licensing') || $user->can('manage licensing');
     }
 
     protected function getHeading(): ?string

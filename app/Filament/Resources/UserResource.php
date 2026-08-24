@@ -17,6 +17,10 @@ class UserResource extends BaseResource
 
     protected static bool $applyCustomerScope = true;
 
+    // Security & Access Control Matrix §5: customer users reach this via
+    // the My Company > Users tab instead of a standalone nav entry.
+    protected static bool $customerFacingViaMyCompany = true;
+
     protected static ?string $permission = 'manage users';
 
     // Security & Access Control Matrix §6: only Super Admin may delete a

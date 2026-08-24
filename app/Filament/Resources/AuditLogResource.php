@@ -20,6 +20,10 @@ class AuditLogResource extends BaseResource
     // "view reports" permission this used to be gated on.
     protected static ?string $permission = 'view audit logs';
 
+    // Security & Access Control Matrix §5: customer users reach this via
+    // the My Company > Audit Logs tab instead of a standalone nav entry.
+    protected static bool $customerFacingViaMyCompany = true;
+
     protected static string|\BackedEnum|null $navigationIcon = null;
 
     protected static string|\UnitEnum|null $navigationGroup = 'Platform';
@@ -43,8 +47,14 @@ class AuditLogResource extends BaseResource
                 Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable(),
             ])
             ->filters([
+                // Security review finding (24 August 2026): AuditLog::query()
+                // is unscoped (no BelongsToCustomer — see §3.2's note that
+                // audit logs are scoped via BaseResource, not the model), so
+                // this must go through static::getEloquentQuery() explicitly
+                // or the filter's own option list leaks which modules every
+                // other tenant on the platform uses.
                 Tables\Filters\SelectFilter::make('module')
-                    ->options(AuditLog::query()->distinct()->pluck('module', 'module')->toArray()),
+                    ->options(static::getEloquentQuery()->distinct()->pluck('module', 'module')->toArray()),
             ]);
     }
 

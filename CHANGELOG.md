@@ -6,6 +6,29 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — "My Company" navigation consolidation for customer-facing administration
+
+Implements `docs/CONFORMANCE_GAP_ANALYSIS.md` §8 / Security & Access Control
+Matrix §5: a new `App\Filament\Clusters\MyCompany` groups Profile, Users,
+Enabled Modules, Subscription, License Status, Billing and Audit Logs under
+one navigation entry for Company Admin/Supervisor, replacing scattered
+standalone resource nav entries (`UserResource`, `CustomerModuleResource`,
+`CustomerSubscriptionResource`, `BillingRecordResource`, `AuditLogResource`,
+`CustomerResource` — all now hidden from tenant users' sidebar via a new
+`BaseResource::$customerFacingViaMyCompany` flag; their routes and
+authorization are unchanged). Each tab reuses its underlying resource's own
+`can()`/`table()` rather than duplicating authorization logic.
+
+A real-browser Playwright pass and an independent security review during
+this build found and fixed six defects before release, the most serious
+being that `BillingRecordResource`'s View/Edit row actions had no
+authorization at all when embedded outside their normal resource page — a
+Company Admin without `manage billing` could reach Edit on any invoice. See
+`docs/CONFORMANCE_GAP_ANALYSIS.md` §8 for the full list.
+
+No database schema changes. No breaking changes for platform users, who
+continue using the existing dedicated resources unchanged.
+
 ### Changed — customer access-control tightened to the approved least-privilege model (High)
 
 Implements the customer-facing access-control review documented in

@@ -18,6 +18,12 @@ class CustomerResource extends BaseResource
 
     protected static ?string $permission = 'manage customers';
 
+    // Security & Access Control Matrix §5: customer users reach their own
+    // company via the My Company > Profile tab instead of a standalone
+    // "Customers" nav entry (which would otherwise show for Company Admin/
+    // Supervisor, who both hold `view customers`).
+    protected static bool $customerFacingViaMyCompany = true;
+
     protected static string|\BackedEnum|null $navigationIcon = null;
 
     protected static string|\UnitEnum|null $navigationGroup = 'Platform';

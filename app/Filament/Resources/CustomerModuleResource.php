@@ -15,6 +15,10 @@ class CustomerModuleResource extends BaseResource
 
     protected static bool $applyCustomerScope = true;
 
+    // Security & Access Control Matrix §5: customer users reach this via
+    // the My Company > Enabled Modules tab instead of a standalone nav entry.
+    protected static bool $customerFacingViaMyCompany = true;
+
     protected static ?string $permission = 'manage subscriptions';
 
     protected static string|\BackedEnum|null $navigationIcon = null;

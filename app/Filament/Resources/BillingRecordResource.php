@@ -26,6 +26,10 @@ class BillingRecordResource extends BaseResource
 
     protected static string|array $routeMiddleware = [EnsureModuleEnabled::class.':billing_view'];
 
+    // Security & Access Control Matrix §5: customer users reach this via
+    // the My Company > Billing tab instead of a standalone nav entry.
+    protected static bool $customerFacingViaMyCompany = true;
+
     protected static ?string $permission = 'manage billing';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Billing';
