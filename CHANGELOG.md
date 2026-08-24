@@ -4,7 +4,7 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [2.1.37] - 2026-08-24
 
 ### Fixed — duplicate-record submissions crashed instead of showing a validation error
 
