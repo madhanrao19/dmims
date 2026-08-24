@@ -16,6 +16,19 @@ class LocationTypeResource extends BaseResource
 
     protected static string|array $routeMiddleware = [EnsureModuleEnabled::class.':stock_inventory'];
 
+    // Security review follow-up (CONFORMANCE_GAP_ANALYSIS §10a H3): the
+    // location_types table has no customer_id column at all — it is
+    // structurally platform-wide reference data, the same shape as
+    // ModuleResource, not tenant-owned. Any tenant holding `manage
+    // inventory` (Company Admin, Supervisor, Stock Inventory User) could
+    // previously rename/delete a location type other tenants' Location
+    // rows reference. Locking this to platform-only does not affect a
+    // tenant's ability to *select* an existing location type when creating
+    // a Location (LocationResource's relationship() select queries the
+    // model directly, not through this resource) — only the admin CRUD
+    // screen for the shared catalogue itself.
+    protected static bool $platformOnly = true;
+
     protected static ?string $permission = 'manage inventory';
 
     protected static string|\BackedEnum|null $navigationIcon = null;

@@ -4,11 +4,13 @@ namespace Tests\Feature;
 
 use App\Filament\Resources\AuditLogResource;
 use App\Filament\Resources\LicenseResource;
+use App\Filament\Resources\LocationTypeResource;
 use App\Filament\Resources\SubscriptionPlanResource;
 use App\Filament\Resources\UserResource;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\License;
+use App\Models\LocationType;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -121,6 +123,27 @@ class CustomerAccessScopeTest extends TestCase
         $this->assertFalse(LicenseResource::canGloballySearch());
     }
 
+    /**
+     * Security review follow-up (CONFORMANCE_GAP_ANALYSIS §10a H3):
+     * location_types has no customer_id column — it is platform-wide
+     * reference data, the same shape as the module catalogue. A tenant
+     * holding `manage inventory` (Company Admin here) must not be able to
+     * browse/edit/delete it, even though they can still select an existing
+     * type when creating their own Location.
+     */
+    public function test_customer_user_cannot_manage_location_types(): void
+    {
+        $customer = Customer::create(['company_name' => 'Alpha', 'company_code' => 'A', 'status' => 'active']);
+        $admin = $this->companyAdmin($customer);
+        $type = LocationType::create(['type_code' => 'SHELF', 'type_name' => 'Shelf', 'status' => 'active']);
+
+        $this->actingAs($admin);
+
+        $this->assertFalse(LocationTypeResource::can('viewAny'));
+        $this->assertFalse(LocationTypeResource::can('update', $type));
+        $this->assertFalse(LocationTypeResource::can('delete', $type));
+    }
+
     public function test_platform_user_retains_full_access(): void
     {
         $customer = Customer::create(['company_name' => 'Alpha', 'company_code' => 'A', 'status' => 'active']);
@@ -141,6 +164,7 @@ class CustomerAccessScopeTest extends TestCase
         $this->assertTrue(LicenseResource::can('viewAny'));
         $this->assertTrue(LicenseResource::can('view', $license));
         $this->assertTrue(AuditLogResource::can('view', $platformLog));
+        $this->assertTrue(LocationTypeResource::can('viewAny'));
         $this->assertContains($plan->id, SubscriptionPlanResource::getEloquentQuery()->pluck('id')->all());
     }
 }

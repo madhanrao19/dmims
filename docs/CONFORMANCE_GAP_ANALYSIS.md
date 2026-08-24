@@ -299,36 +299,42 @@ High and three Medium findings. Fixed same-day unless noted:
   `TenantScopeTest`. The underlying data-integrity gap (the `customer_id`
   Select on `UserResource`'s form has no `->required()`) is not yet closed —
   tracked below.
-- **H3 (open, not fixed this pass):** `LocationTypeResource` (`manage
-  inventory`) is global master data with no `customer_id` column, but has no
-  `$platformOnly`/read-only restriction — a Stock Inventory User at any
-  tenant can edit/delete a location type other tenants' `locations` rows
-  reference. Not in this pass's named implementation scope (§9) and left
-  open pending a decision on intended behaviour: platform-only, or
-  tenant-read/platform-write. Recommend resolving before the next access-
-  control pass.
-- **M1 (partially fixed):** `$platformOnly` is now also set on
-  `ModuleResource` and `BackupResource` (verified zero live behaviour change
-  — no tenant role holds `manage modules`/`manage settings`/`view
-  modules`/`view settings`). `SettingResource` was deliberately left as
-  `TENANT_WITH_GLOBAL_DEFAULTS` (not `$platformOnly`), matching §3.3's own
-  "Explicitly approved global Settings/reference values" example, in case a
-  tenant-readable-settings permission is granted in future; it is currently
-  inert for the same reason. `LocationTypeResource` remains open (see H3).
+- **H3 (fixed 24 August 2026, follow-up pass):** `LocationTypeResource`
+  (`manage inventory`) is global master data — the `location_types` table has
+  no `customer_id` column at all, the same shape as the module catalogue —
+  but had no `$platformOnly`/read-only restriction, so a Stock Inventory
+  User at any tenant could edit/delete a location type other tenants'
+  `locations` rows reference. Resolved as PLATFORM_ONLY (matching the module
+  catalogue precedent): `LocationTypeResource::$platformOnly = true`. A
+  tenant can still *select* an existing location type when creating a
+  Location (`LocationResource`'s `relationship()` select queries the model
+  directly, not through this resource) — only the admin CRUD screen for the
+  shared catalogue is now platform-only. Added to §3.1 in the Security &
+  Access Control Matrix (v1.2). Regression test:
+  `CustomerAccessScopeTest::test_customer_user_cannot_manage_location_types`.
+- **M1 (fixed):** `$platformOnly` is now also set on `ModuleResource`,
+  `BackupResource`, and `LocationTypeResource` (verified zero live behaviour
+  change for the first two — no tenant role holds `manage modules`/`manage
+  settings`/`view modules`/`view settings`). `SettingResource` was
+  deliberately left as `TENANT_WITH_GLOBAL_DEFAULTS` (not `$platformOnly`),
+  matching §3.3's own "Explicitly approved global Settings/reference values"
+  example, in case a tenant-readable-settings permission is granted in
+  future; it is currently inert for the same reason.
 - **M2 (fixed):** `$platformOnly` is now also enforced in
   `BaseResource::getEloquentQuery()` (`whereRaw('1 = 0')`), not just
   `can()`/`shouldRegisterNavigation()`, as defence in depth for any future
   relation manager/select query.
-- **M3 (documented, not resolved):** the Security & Access Control Matrix
-  classifies "Licenses"/"License logs" as both §3.1 PLATFORM_ONLY (line ~132)
-  and §3.2 TENANT_STRICT (line ~160). This pass resolved it as: `License`
-  administration (`LicenseResource`) is §3.1 platform-only; `LicenseLog`
-  (history/audit trail) stays §3.2 tenant-readable, since Company Admin/
-  Supervisor already hold `view licensing` and the matrix's own §14 Audit
-  Permissions section implies own-tenant history access is intended. The
-  matrix itself has not been edited to remove the ambiguity — recommend
-  amending §3.2 to read "licence *status/history*, not administration" on
-  the next documentation pass.
+- **M3 (fixed 24 August 2026, follow-up pass):** the Security & Access
+  Control Matrix classified "Licenses" under both §3.1 PLATFORM_ONLY and
+  §3.2 TENANT_STRICT. Resolved in the matrix itself (v1.2): §3.1 now reads
+  "License administration" (the standalone `LicenseResource` — create,
+  renew, suspend, revoke, technical configuration, internal fields); §3.2
+  now reads "License status/history" (read-only status/access-mode/
+  validity/expiry plus the license log/audit trail, via Dashboard/My
+  Company — `LicenseLogResource` and `MyLicenseStatusWidget`, both already
+  implemented this way). No code change was needed — the implementation
+  already matched this split; only the matrix's own self-contradiction was
+  fixed.
 
 ---
 
@@ -350,17 +356,18 @@ Do not mark these gaps conformant until:
 
 # 12. Status
 
-**Documentation target state:** ✅ Approved and synchronized
-**Implementation:** ✅ Items 2–7 (§2–§7 above) implemented; §8 (My Company nav
-consolidation) remains WIP; H3/M1(LocationTypeResource)/M3 from §10a remain open
-**Regression verification:** ✅ 173/173 automated tests pass (Pest/PHPUnit);
+**Documentation target state:** ✅ Approved and synchronized (matrix v1.2)
+**Implementation:** ✅ Items 2–7 (§2–§7 above) implemented; all §10a findings
+(H1–H3, M1–M3) fixed or resolved; §8 (My Company nav consolidation) remains
+the only open item, tracked as WIP
+**Regression verification:** ✅ automated test suite green (Pest/PHPUnit);
 Pint clean; Larastan/PHPStan clean; independent security-reviewer and
 qa-tester passes completed 24 August 2026; real-browser Playwright
 verification completed for the platform-only lockdown, audit-log scoping,
 and full existing role-QA suite (`tests/playwright/role-qa.spec.js`, all
 role/permission assertions pass unchanged)
-**Production-ready for this access-control change:** ⚠️ Conditional — the
-items above are implemented, tested, and reviewed; H3 (LocationTypeResource)
-and the full "My Company" navigation consolidation (§8) remain open and
-should be resolved before this is called fully conformant to the approved
-target state.
+**Production-ready for this access-control change:** ⚠️ Conditional — every
+item in this document's scope is implemented, tested, and reviewed; the
+full "My Company" navigation consolidation (§8) is a separate, larger UI
+feature not yet built and remains the only reason this is not called fully
+conformant to the approved target state.

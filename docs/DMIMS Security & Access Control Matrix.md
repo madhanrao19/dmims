@@ -1,8 +1,8 @@
 # DMIMS Security & Access Control Matrix
 
 **Datamation Inventory Management System (DMIMS)**  
-**Version:** 1.1  
-**Updated:** 24 August 2026
+**Version:** 1.2  
+**Updated:** 24 August 2026 (§3 clarified same day — see Document History)
 
 ---
 
@@ -128,14 +128,23 @@ Examples:
 - Platform users
 - Roles and permissions
 - Module catalogue
+- Location type catalogue
 - Subscription Plans
-- License management
+- License administration (create, renew, suspend, revoke, reactivate,
+  technical access mode, limits, module/report overrides — the standalone
+  License Management resource, including internal technical fields such as
+  server fingerprint, installation id and deployment configuration)
 - Platform settings
 - Backup / Restore
 - Platform reports
 - Platform audit logs
 
 Only authorized Datamation platform roles may access these resources.
+
+License administration is intentionally listed both here and, in a
+narrower read-only form, under §3.2 — see the note there. This is the only
+resource with a split classification; every other example belongs to
+exactly one scope class.
 
 ## 3.2 TENANT_STRICT
 
@@ -157,8 +166,10 @@ Examples:
 - Customer modules
 - Customer subscriptions
 - Subscription logs
-- Licenses
-- License logs
+- License status/history (read-only: status, access mode, valid from/to,
+  expiry warning, and the license log/audit trail — via Dashboard/My
+  Company, not the administrative License Management resource, which is
+  §3.1 PLATFORM_ONLY)
 - Billing records
 - Billing payments
 - Billing logs
@@ -644,3 +655,4 @@ QA must verify:
 |---|---|---|
 | 1.0 | June 2026 | Initial Security & Access Control Matrix |
 | 1.1 | 24 August 2026 | Added explicit resource-scope classifications, My Company boundary, strict audit/user isolation, platform-only Subscription Plans/License management and report-family authorization |
+| 1.2 | 24 August 2026 | Resolved a self-contradiction where "Licenses" appeared under both §3.1 PLATFORM_ONLY and §3.2 TENANT_STRICT: split into License *administration* (§3.1, the standalone resource) and License *status/history* (§3.2, read-only). Added the Location type catalogue to §3.1 (implemented as `LocationTypeResource::$platformOnly`; see CONFORMANCE_GAP_ANALYSIS.md §10a H3) |
