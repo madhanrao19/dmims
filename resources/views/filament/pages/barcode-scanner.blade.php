@@ -20,9 +20,11 @@
             <div class="space-y-4">
                 {{ $this->form }}
 
-                <x-filament::button type="submit" icon="heroicon-o-magnifying-glass" class="w-full justify-center">
-                    Scan & Open
-                </x-filament::button>
+                <div class="flex justify-center pt-2">
+                    <x-filament::button type="submit" icon="heroicon-o-magnifying-glass">
+                        Scan & Open
+                    </x-filament::button>
+                </div>
             </div>
         </x-filament::section>
     </form>

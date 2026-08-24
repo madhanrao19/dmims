@@ -4,6 +4,28 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.40] - 2026-08-24
+
+### Fixed — Scan Center / Reports action buttons, and broken avatar image
+
+- Scan Center's "Scan & Open" and Reports' "Download CSV" buttons sat flush
+  against the field above them and stuck to the left edge instead of reading
+  as a clear, centered call-to-action. Both are now wrapped in a
+  `flex justify-center` row with top padding, separating them from the
+  toggle/select above and centering them under the form.
+- Renamed the Reports button label from "Download CSV" to "Download" (the
+  format is already chosen via the Format select right above it, so
+  hardcoding "CSV" in the label was misleading once Excel/PDF are wired up).
+- The top-right avatar rendered as a broken image with garbled alt text.
+  Filament's default `UiAvatarsProvider` builds a URL to the external
+  ui-avatars.com API, which fails wherever the deployment can't reach it
+  (offline dev, firewalled staging/production). `User` now implements
+  `Filament\Models\Contracts\HasAvatar` and generates a single-letter avatar
+  (e.g. "M" for Madhan Rao) as an inline SVG data URI — no network call,
+  works identically in every environment.
+
+No database changes. Verified: full suite (197 tests) passes.
+
 ## [2.1.39] - 2026-08-24
 
 ### Fixed — My Company "Profile" page rendered completely blank

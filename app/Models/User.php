@@ -9,6 +9,7 @@ use Filament\Auth\MultiFactor\App\Concerns\InteractsWithAppAuthenticationRecover
 use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthentication;
 use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthenticationRecovery;
 use Filament\Models\Contracts\FilamentUser;
+use Filament\Models\Contracts\HasAvatar;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -17,7 +18,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
-class User extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery
+class User extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery, HasAvatar
 {
     use Auditable, HasApiTokens, HasFactory, HasRoles, InteractsWithAppAuthentication, InteractsWithAppAuthenticationRecovery, Notifiable, SoftDeletes;
 
@@ -54,6 +55,26 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     public function hasAppAuthenticationEnabled(): bool
     {
         return filled($this->app_authentication_secret);
+    }
+
+    /**
+     * Filament's default UiAvatarsProvider calls out to ui-avatars.com; that
+     * external request fails in offline/firewalled deployments and renders
+     * as a broken image. A locally-generated single-letter SVG needs no
+     * network access and matches every environment.
+     */
+    public function getFilamentAvatarUrl(): ?string
+    {
+        $initial = mb_strtoupper(mb_substr(trim((string) ($this->name ?: $this->email)), 0, 1)) ?: '?';
+
+        $svg = <<<SVG
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40">
+                <rect width="40" height="40" rx="20" fill="#4f46e5" />
+                <text x="50%" y="50%" dy=".35em" text-anchor="middle" font-family="sans-serif" font-size="18" fill="#ffffff">{$initial}</text>
+            </svg>
+            SVG;
+
+        return 'data:image/svg+xml;base64,'.base64_encode($svg);
     }
 
     /**
