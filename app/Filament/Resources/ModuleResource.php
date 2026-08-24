@@ -13,6 +13,11 @@ class ModuleResource extends BaseResource
 {
     protected static ?string $model = Module::class;
 
+    // Security & Access Control Matrix §3.1: the module catalogue is
+    // platform master data. No tenant role currently holds `manage
+    // modules`/`view modules`, so this is defence in depth, not a live fix.
+    protected static bool $platformOnly = true;
+
     protected static ?string $permission = 'manage modules';
 
     protected static string|\BackedEnum|null $navigationIcon = null;

@@ -42,7 +42,15 @@ class AccessControlService
             return true;
         }
 
-        if ($user->customer_id && ! $this->companyActive($user->customer_id)) {
+        // A non-platform user with no customer_id is a data-integrity defect
+        // (every tenant-scoped guard below treats "no customer_id" as
+        // "unscoped", which would otherwise grant this account full
+        // cross-tenant read access) — fail closed rather than let it log in.
+        if (! $user->customer_id) {
+            return false;
+        }
+
+        if (! $this->companyActive($user->customer_id)) {
             return false;
         }
 

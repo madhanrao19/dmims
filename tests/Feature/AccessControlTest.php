@@ -173,6 +173,21 @@ class AccessControlTest extends TestCase
         }
     }
 
+    /**
+     * Security review regression (H2): a non-platform user with no
+     * customer_id is a data-integrity defect — every tenant-scoped guard
+     * (BelongsToCustomer scope, BaseResource) treats "no customer_id" as
+     * "unscoped", which would otherwise grant this account cross-tenant
+     * read access. canLogin() must fail closed instead.
+     */
+    public function test_non_platform_user_with_no_customer_id_cannot_login(): void
+    {
+        $access = app(AccessControlService::class);
+        $orphan = User::factory()->create(['is_platform_user' => false, 'customer_id' => null, 'status' => 'active']);
+
+        $this->assertFalse($access->canLogin($orphan));
+    }
+
     public function test_platform_user_is_never_restricted_by_license(): void
     {
         $access = app(AccessControlService::class);

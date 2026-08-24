@@ -34,7 +34,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class ReportExportService
 {
     /**
-     * @return array<string, array{label: string, group: string, platform: bool, permission?: string}>
+     * @return array<string, array{label: string, group: string, platform: bool, permission?: string, module?: string}>
      */
     public static function definitions(): array
     {
@@ -43,36 +43,41 @@ class ReportExportService
             'customer_summary' => ['label' => 'Customer Summary', 'group' => 'Platform', 'platform' => true],
             'subscription_summary' => ['label' => 'Subscription Summary', 'group' => 'Platform', 'platform' => true],
             'license_summary' => ['label' => 'License Summary', 'group' => 'Platform', 'platform' => true],
-            'billing_summary' => ['label' => 'Billing Summary', 'group' => 'Platform', 'platform' => false, 'permission' => 'view billing'],
-            'payment_summary' => ['label' => 'Payment Summary', 'group' => 'Platform', 'platform' => false, 'permission' => 'view billing'],
-            'outstanding_balance' => ['label' => 'Outstanding Balance', 'group' => 'Platform', 'platform' => false, 'permission' => 'view billing'],
+            'billing_summary' => ['label' => 'Billing Summary', 'group' => 'Platform', 'platform' => false, 'permission' => 'view billing', 'module' => 'billing_view'],
+            'payment_summary' => ['label' => 'Payment Summary', 'group' => 'Platform', 'platform' => false, 'permission' => 'view billing', 'module' => 'billing_view'],
+            'outstanding_balance' => ['label' => 'Outstanding Balance', 'group' => 'Platform', 'platform' => false, 'permission' => 'view billing', 'module' => 'billing_view'],
             'audit_summary' => ['label' => 'Audit Report', 'group' => 'Platform', 'platform' => true],
             'module_usage' => ['label' => 'Module Usage', 'group' => 'Platform', 'platform' => true],
-            // Inventory reports
-            'inventory_summary' => ['label' => 'Inventory Summary', 'group' => 'Inventory', 'platform' => false],
-            'low_stock' => ['label' => 'Low Stock', 'group' => 'Inventory', 'platform' => false],
-            'stock_movement' => ['label' => 'Stock Movement', 'group' => 'Inventory', 'platform' => false],
-            'stock_value' => ['label' => 'Stock Value', 'group' => 'Inventory', 'platform' => false],
-            // Document reports
-            'file_master' => ['label' => 'File Master', 'group' => 'Document', 'platform' => false],
-            'box_master' => ['label' => 'Box Master', 'group' => 'Document', 'platform' => false],
-            'files_by_box' => ['label' => 'Files by Box', 'group' => 'Document', 'platform' => false],
-            'boxes_by_location' => ['label' => 'Boxes by Location', 'group' => 'Document', 'platform' => false],
-            'movement_history' => ['label' => 'Movement History', 'group' => 'Document', 'platform' => false],
-            'external_movement' => ['label' => 'External Movement', 'group' => 'Document', 'platform' => false],
-            'overdue_returns' => ['label' => 'Overdue Returns', 'group' => 'Document', 'platform' => false],
+            // Inventory reports (Security & Access Control Matrix §13: Stock
+            // Inventory module + View Inventory capability)
+            'inventory_summary' => ['label' => 'Inventory Summary', 'group' => 'Inventory', 'platform' => false, 'permission' => 'view inventory', 'module' => 'stock_inventory'],
+            'low_stock' => ['label' => 'Low Stock', 'group' => 'Inventory', 'platform' => false, 'permission' => 'view inventory', 'module' => 'stock_inventory'],
+            'stock_movement' => ['label' => 'Stock Movement', 'group' => 'Inventory', 'platform' => false, 'permission' => 'view inventory', 'module' => 'stock_inventory'],
+            'stock_value' => ['label' => 'Stock Value', 'group' => 'Inventory', 'platform' => false, 'permission' => 'view inventory', 'module' => 'stock_inventory'],
+            // Document reports (Security & Access Control Matrix §13:
+            // Document Tracking module + View Documents capability)
+            'file_master' => ['label' => 'File Master', 'group' => 'Document', 'platform' => false, 'permission' => 'view documents', 'module' => 'document_tracking'],
+            'box_master' => ['label' => 'Box Master', 'group' => 'Document', 'platform' => false, 'permission' => 'view documents', 'module' => 'document_tracking'],
+            'files_by_box' => ['label' => 'Files by Box', 'group' => 'Document', 'platform' => false, 'permission' => 'view documents', 'module' => 'document_tracking'],
+            'boxes_by_location' => ['label' => 'Boxes by Location', 'group' => 'Document', 'platform' => false, 'permission' => 'view documents', 'module' => 'document_tracking'],
+            'movement_history' => ['label' => 'Movement History', 'group' => 'Document', 'platform' => false, 'permission' => 'view documents', 'module' => 'document_tracking'],
+            'external_movement' => ['label' => 'External Movement', 'group' => 'Document', 'platform' => false, 'permission' => 'view documents', 'module' => 'document_tracking'],
+            'overdue_returns' => ['label' => 'Overdue Returns', 'group' => 'Document', 'platform' => false, 'permission' => 'view documents', 'module' => 'document_tracking'],
         ];
     }
 
     /**
      * Reports a user may run: platform-only reports require a platform user;
-     * a report with a 'permission' key (e.g. billing) additionally requires
-     * that permission for non-platform users — Security & Access Control
-     * Matrix §9 restricts billing data to SA/Management/Company Admin/
-     * Company Supervisor, not every role holding the generic "view reports"
-     * permission that gates this screen itself.
+     * a report with a 'permission' key additionally requires that permission
+     * (checked against both the `manage X`/`view X` pair, since holding
+     * `manage inventory` etc. doesn't separately grant `view inventory` —
+     * see BaseResource::viewPermission()), and a report with a 'module' key
+     * additionally requires that module be enabled for the user's customer.
+     * Security & Access Control Matrix §13: a report family requires its
+     * underlying operational module + permission, not just the generic
+     * "view reports" permission that gates the Reports screen itself.
      *
-     * @return array<string, array{label: string, group: string, platform: bool, permission?: string}>
+     * @return array<string, array{label: string, group: string, platform: bool, permission?: string, module?: string}>
      */
     public static function availableTo($user): array
     {
@@ -87,7 +92,26 @@ class ReportExportService
                     return true;
                 }
 
-                return ! isset($def['permission']) || (bool) $user?->can($def['permission']);
+                if (! $user) {
+                    return false;
+                }
+
+                if (isset($def['permission'])) {
+                    $manage = str_starts_with($def['permission'], 'view ')
+                        ? 'manage '.substr($def['permission'], strlen('view '))
+                        : $def['permission'];
+
+                    if (! $user->can($def['permission']) && ! $user->can($manage)) {
+                        return false;
+                    }
+                }
+
+                if (isset($def['module']) && $user->customer_id
+                    && ! app(AccessControlService::class)->moduleEnabled($user->customer_id, $def['module'])) {
+                    return false;
+                }
+
+                return true;
             },
         );
     }

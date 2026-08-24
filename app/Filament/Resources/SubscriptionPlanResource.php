@@ -13,6 +13,12 @@ class SubscriptionPlanResource extends BaseResource
 {
     protected static ?string $model = SubscriptionPlan::class;
 
+    // Security & Access Control Matrix §3.1 / §7: Subscription Plans are
+    // platform master data. Customer roles hold `view subscriptions` for
+    // their own subscription summary (CustomerSubscriptionResource), not to
+    // browse the plan catalogue.
+    protected static bool $platformOnly = true;
+
     protected static ?string $permission = 'manage subscriptions';
 
     protected static string|\BackedEnum|null $navigationIcon = null;

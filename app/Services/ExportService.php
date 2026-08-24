@@ -10,7 +10,6 @@ use App\Models\Location;
 use App\Models\Product;
 use App\Models\StockMovement;
 use DateTimeInterface;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -122,11 +121,14 @@ class ExportService
 
         $query = $model::query();
 
-        // Scope to the customer when the model is tenant-bound.
+        // Scope to the customer when the model is tenant-bound. This runs on
+        // the queue worker (RunExport job), where there's no authenticated
+        // user and BelongsToCustomer's global scope is therefore skipped —
+        // this is the only tenant guard in that path, so it must match the
+        // model's own TENANT_STRICT default (Security & Access Control
+        // Matrix §3.2): exact customer_id match, no `OR customer_id IS NULL`.
         if ($customerId && in_array('customer_id', (new $model)->getFillable(), true)) {
-            $query->where(function (Builder $q) use ($customerId) {
-                $q->where('customer_id', $customerId)->orWhereNull('customer_id');
-            });
+            $query->where('customer_id', $customerId);
         }
 
         $query->chunk(500, function ($records) use ($handle, $columns) {

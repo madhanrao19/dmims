@@ -18,6 +18,10 @@ class DocumentTypeResource extends BaseResource
 
     protected static bool $applyCustomerScope = true;
 
+    // Security & Access Control Matrix §3.3: shared/default document types
+    // (customer_id = null) remain visible alongside the tenant's own.
+    protected static bool $includeGlobalCustomerDefaults = true;
+
     protected static ?string $permission = 'manage documents';
 
     protected static string|\BackedEnum|null $navigationIcon = null;

@@ -21,6 +21,11 @@ class BackupResource extends BaseResource
 
     protected static bool $applyCustomerScope = false;
 
+    // Security & Access Control Matrix §3.1: Backup/Restore is platform
+    // master data. No tenant role currently holds `manage settings`/`view
+    // settings`, so this is defence in depth, not a live fix.
+    protected static bool $platformOnly = true;
+
     protected static ?string $permission = 'manage settings';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Platform';

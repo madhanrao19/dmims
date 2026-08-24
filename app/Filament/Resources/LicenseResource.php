@@ -15,6 +15,13 @@ class LicenseResource extends BaseResource
 
     protected static bool $applyCustomerScope = true;
 
+    // Security & Access Control Matrix §3.1 / §8: standalone License
+    // Management (incl. internal technical fields such as server
+    // fingerprint/installation id) is platform-only. Customer roles keep
+    // `view licensing` for a simplified own-license status summary
+    // elsewhere (Dashboard), not this administrative resource.
+    protected static bool $platformOnly = true;
+
     protected static ?string $permission = 'manage licensing';
 
     protected static string|\BackedEnum|null $navigationIcon = null;

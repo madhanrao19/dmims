@@ -4,6 +4,70 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed — customer access-control tightened to the approved least-privilege model (High)
+
+Implements the customer-facing access-control review documented in
+`docs/CONFORMANCE_GAP_ANALYSIS.md` (24 August 2026) and
+`docs/DMIMS Security & Access Control Matrix.md` v1.1.
+
+- **Resource scoping is now TENANT_STRICT by default.** `App\Models\Concerns\BelongsToCustomer`
+  and `App\Filament\Resources\BaseResource` used to scope every tenant-scoped
+  model/resource as `customer_id = tenant OR customer_id IS NULL`. The
+  default is now exact `customer_id = tenant` — a `customer_id IS NULL`
+  record (platform-owned or shared) is no longer automatically visible to
+  customer users. Only `DocumentType` and `Setting` (and their Filament
+  resources) explicitly opt back into the old NULL-inclusive behaviour
+  (TENANT_WITH_GLOBAL_DEFAULTS), matching the matrix's §3.3 examples.
+  - Closes: Customer Company Admin could see platform (`customer_id = NULL`)
+    audit log rows and platform users in the Users resource.
+- **Subscription Plans and License Management are now platform-only.**
+  `SubscriptionPlanResource` and `LicenseResource` previously granted
+  Company Admin/Company Supervisor read-only access via their `view
+  subscriptions`/`view licensing` permissions. Both resources now require a
+  platform user (`BaseResource::$platformOnly`), regardless of permission.
+  A new read-only `MyLicenseStatusWidget` on the Dashboard shows a customer's
+  own license status/access mode/expiry (no internal technical fields) as a
+  replacement.
+- **Report authorization now checks the underlying operational module and
+  permission**, not just the generic `view reports` permission every tenant
+  role holds. Inventory reports require `view inventory`/`manage inventory`
+  and the Stock Inventory module enabled; Document reports require `view
+  documents`/`manage documents` and the Document Tracking module enabled;
+  Billing reports additionally require the Billing View module enabled.
+  - Closes: a Document Tracking User could previously run Inventory reports
+    (and vice versa for Stock Inventory User and Document reports).
+
+No database schema changes. No breaking API changes. Existing tenant-owned
+data is unaffected — this only removes over-broad `NULL`/platform-wide
+visibility that customer roles should never have had.
+
+### Fixed — High: two tenant-isolation gaps found reviewing the change above
+
+An independent security review of the change above (same day) found two
+further High-severity gaps in the existing (pre-change) tenant-isolation
+mechanism itself, both fixed:
+
+- **A tenant "manage" role could hijack a shared global-default record**
+  (e.g. rename or delete a Document Type every tenant relies on) —
+  `TENANT_WITH_GLOBAL_DEFAULTS` was accidentally read/write, not read-only.
+  `BaseResource::can()` now denies all write actions on a `customer_id =
+  NULL` record for non-platform users; `BelongsToCustomer`'s `updating` hook
+  now cancels the save as a second line of defence.
+- **A non-platform user with `customer_id = NULL`** (a data-integrity
+  defect — e.g. a platform admin who forgot to select a company when
+  creating a tenant user) previously fell through every tenant-scoping
+  guard to "unscoped", granting full cross-tenant read access.
+  `AccessControlService::canLogin()`, `BelongsToCustomer`'s global scope, and
+  `BaseResource` now fail closed (deny login / return no rows) for this
+  state instead.
+
+See `docs/CONFORMANCE_GAP_ANALYSIS.md` §10a for the full review, including
+two items intentionally left open for a follow-up pass (`LocationTypeResource`
+has no platform-only/read-only guard on its global master data; the matrix
+itself has a self-contradictory classification for License data).
+
 ## [2.1.36] - 2026-08-23
 
 ### Fixed — Critical: tenant Company Admin could hold platform-wide access

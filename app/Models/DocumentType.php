@@ -17,4 +17,12 @@ class DocumentType extends Model
     {
         return $this->belongsTo(Customer::class);
     }
+
+    // Security & Access Control Matrix §3.3 (TENANT_WITH_GLOBAL_DEFAULTS):
+    // shared/default document types (customer_id = null) remain visible to
+    // every tenant alongside their own.
+    protected static function includesGlobalCustomerDefaults(): bool
+    {
+        return true;
+    }
 }

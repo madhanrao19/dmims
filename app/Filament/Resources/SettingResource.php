@@ -15,6 +15,13 @@ class SettingResource extends BaseResource
 
     protected static bool $applyCustomerScope = true;
 
+    // Security & Access Control Matrix §3.3: explicitly approved global
+    // reference settings (customer_id = null) remain visible alongside the
+    // tenant's own overrides. No customer role currently holds `manage
+    // settings`/`view settings`, so this resource is platform-only in
+    // practice regardless of this flag.
+    protected static bool $includeGlobalCustomerDefaults = true;
+
     protected static ?string $permission = 'manage settings';
 
     protected static string|\BackedEnum|null $navigationIcon = null;

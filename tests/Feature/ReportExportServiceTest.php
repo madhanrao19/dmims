@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\Customer;
+use App\Models\CustomerModule;
 use App\Models\Location;
+use App\Models\Module;
 use App\Models\Product;
 use App\Models\ProductLocationStock;
 use App\Models\User;
@@ -15,6 +17,21 @@ use Tests\TestCase;
 class ReportExportServiceTest extends TestCase
 {
     use RefreshDatabase;
+
+    private function enableModule(Customer $customer, string $moduleCode): void
+    {
+        $module = Module::firstOrCreate(
+            ['module_code' => $moduleCode],
+            ['module_name' => $moduleCode, 'status' => 'active'],
+        );
+
+        CustomerModule::create([
+            'customer_id' => $customer->id,
+            'module_id' => $module->id,
+            'is_enabled' => true,
+            'enabled_at' => now(),
+        ]);
+    }
 
     private function seedInventory(): Customer
     {
@@ -98,7 +115,12 @@ class ReportExportServiceTest extends TestCase
 
     public function test_platform_reports_are_hidden_from_customer_users(): void
     {
-        $customerUser = User::factory()->create(['is_platform_user' => false, 'status' => 'active']);
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACM', 'status' => 'active']);
+        $this->enableModule($customer, 'stock_inventory');
+
+        $customerUser = User::factory()->create(['is_platform_user' => false, 'customer_id' => $customer->id, 'status' => 'active']);
+        $customerUser->assignRole('Stock Inventory User');
         $platformUser = User::factory()->create(['is_platform_user' => true, 'status' => 'active']);
 
         $customerReports = ReportExportService::availableTo($customerUser);
@@ -107,6 +129,46 @@ class ReportExportServiceTest extends TestCase
         $this->assertArrayNotHasKey('customer_summary', $customerReports);
         $this->assertArrayHasKey('inventory_summary', $customerReports);
         $this->assertArrayHasKey('customer_summary', $platformReports);
+    }
+
+    /**
+     * Regression: Security & Access Control Matrix §13/§7 requires each
+     * report family's underlying operational module + permission, not just
+     * the generic "view reports" permission every tenant role holds.
+     */
+    public function test_inventory_reports_require_inventory_permission_and_module(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACM', 'status' => 'active']);
+        $this->enableModule($customer, 'stock_inventory');
+        $this->enableModule($customer, 'document_tracking');
+
+        $documentUser = User::factory()->create(['is_platform_user' => false, 'customer_id' => $customer->id, 'status' => 'active']);
+        $documentUser->assignRole('Document Tracking User');
+
+        $stockUser = User::factory()->create(['is_platform_user' => false, 'customer_id' => $customer->id, 'status' => 'active']);
+        $stockUser->assignRole('Stock Inventory User');
+
+        $documentReports = ReportExportService::availableTo($documentUser);
+        $stockReports = ReportExportService::availableTo($stockUser);
+
+        $this->assertArrayNotHasKey('inventory_summary', $documentReports, 'Document Tracking User should not run Inventory reports');
+        $this->assertArrayHasKey('file_master', $documentReports);
+
+        $this->assertArrayNotHasKey('file_master', $stockReports, 'Stock Inventory User should not run Document reports');
+        $this->assertArrayHasKey('inventory_summary', $stockReports);
+    }
+
+    public function test_inventory_reports_require_the_module_to_be_enabled(): void
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACM', 'status' => 'active']);
+        // Stock Inventory module intentionally not enabled for this customer.
+
+        $stockUser = User::factory()->create(['is_platform_user' => false, 'customer_id' => $customer->id, 'status' => 'active']);
+        $stockUser->assignRole('Stock Inventory User');
+
+        $this->assertArrayNotHasKey('inventory_summary', ReportExportService::availableTo($stockUser));
     }
 
     /**
@@ -120,6 +182,8 @@ class ReportExportServiceTest extends TestCase
     {
         $this->seed(RolesAndPermissionsSeeder::class);
         $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACM', 'status' => 'active']);
+        $this->enableModule($customer, 'stock_inventory');
+        $this->enableModule($customer, 'billing_view');
 
         $stockUser = User::factory()->create(['is_platform_user' => false, 'customer_id' => $customer->id, 'status' => 'active']);
         $stockUser->assignRole('Stock Inventory User');

@@ -14,6 +14,25 @@ abstract class BaseResource extends Resource
 {
     protected static bool $applyCustomerScope = false;
 
+    /**
+     * Security & Access Control Matrix §3.3 (TENANT_WITH_GLOBAL_DEFAULTS):
+     * when true, a customer_id IS NULL record is also visible/reachable
+     * alongside the tenant's own rows. Default false means TENANT_STRICT
+     * (§3.2) — exact customer_id match only. Only set true where the matrix
+     * explicitly approves shared global defaults (e.g. Document Types).
+     */
+    protected static bool $includeGlobalCustomerDefaults = false;
+
+    /**
+     * Security & Access Control Matrix §3.1 (PLATFORM_ONLY): when true, no
+     * customer user may access this resource at all — regardless of any
+     * permission they hold (e.g. Subscription Plans, License Management).
+     * `view X`/`manage X` on these resources may still be granted to
+     * customer roles for other purposes (dashboards, own-record summaries),
+     * so permission checks alone can't express this restriction.
+     */
+    protected static bool $platformOnly = false;
+
     protected static ?string $permission = null;
 
     /**
@@ -96,13 +115,34 @@ abstract class BaseResource extends Resource
     {
         $query = parent::getEloquentQuery();
 
+        $user = auth()->user();
+
+        // Defence in depth alongside can()/shouldRegisterNavigation(): a
+        // platform-only resource (Security & Access Control Matrix §3.1)
+        // returns no rows at all for a non-platform user, independent of
+        // $applyCustomerScope — protects any future relation manager/select
+        // query against this resource that might bypass can().
+        if (static::$platformOnly && $user && ! $user->is_platform_user) {
+            return $query->whereRaw('1 = 0');
+        }
+
         if (! static::$applyCustomerScope) {
             return $query;
         }
 
-        $user = auth()->user();
+        if ($user && ! $user->is_platform_user) {
+            // Fail closed for a non-platform user with no customer_id (a
+            // data-integrity defect that should never log in — see
+            // AccessControlService::canLogin()) rather than falling through
+            // to an unscoped, cross-tenant query.
+            if (! $user->customer_id) {
+                return $query->whereRaw('1 = 0');
+            }
 
-        if ($user && ! $user->is_platform_user && $user->customer_id) {
+            if (! static::$includeGlobalCustomerDefaults) {
+                return $query->where('customer_id', $user->customer_id);
+            }
+
             return $query->where(function (Builder $query) use ($user) {
                 $query->where('customer_id', $user->customer_id)
                     ->orWhereNull('customer_id');
@@ -135,14 +175,42 @@ abstract class BaseResource extends Resource
             return false;
         }
 
+        if (static::$platformOnly && ! $user->is_platform_user) {
+            return false;
+        }
+
+        // A non-platform user with no customer_id is a data-integrity defect
+        // (should never log in — see AccessControlService::canLogin()); fail
+        // closed rather than let the tenant checks below be silently skipped.
+        if (! $user->is_platform_user && ! $user->customer_id) {
+            return false;
+        }
+
         // Tenant isolation, defence in depth: never authorise a record owned
         // by another customer (query scoping already hides them; this guards
-        // direct-ID access paths too). Null customer_id = platform-owned.
-        if ($record && ! $user->is_platform_user && $user->customer_id
-            && array_key_exists('customer_id', $record->getAttributes())
-            && $record->getAttribute('customer_id') !== null
-            && (int) $record->getAttribute('customer_id') !== (int) $user->customer_id) {
-            return false;
+        // direct-ID access paths too). Null customer_id = platform-owned,
+        // and is only readable when the resource explicitly opts into
+        // TENANT_WITH_GLOBAL_DEFAULTS (Security & Access Control Matrix §3.3)
+        // — that opt-in is READ-only: a shared/global default record must
+        // never be editable or deletable by a tenant user, or one tenant's
+        // "manage" role could rename/delete a record every other tenant
+        // relies on (BelongsToCustomer's creating/updating hooks would then
+        // silently re-own it to that tenant).
+        if ($record && ! $user->is_platform_user
+            && array_key_exists('customer_id', $record->getAttributes())) {
+            $recordCustomerId = $record->getAttribute('customer_id');
+
+            if ($recordCustomerId === null) {
+                $isWriteAction = in_array($action, static::WRITE_ACTIONS, true);
+
+                if (! static::$includeGlobalCustomerDefaults || $isWriteAction) {
+                    return false;
+                }
+            }
+
+            if ($recordCustomerId !== null && (int) $recordCustomerId !== (int) $user->customer_id) {
+                return false;
+            }
         }
 
         if ($user->is_platform_user) {
@@ -250,6 +318,10 @@ abstract class BaseResource extends Resource
 
         if ($user->is_platform_user) {
             return true;
+        }
+
+        if (static::$platformOnly) {
+            return false;
         }
 
         // show nav when the user can either manage or view the resource

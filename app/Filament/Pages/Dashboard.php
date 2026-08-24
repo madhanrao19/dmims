@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Widgets\MyLicenseStatusWidget;
 use App\Filament\Widgets\OperationalStatsOverview;
 use App\Filament\Widgets\PlatformStatsOverview;
 use App\Filament\Widgets\RecentActivityWidget;
@@ -20,6 +21,7 @@ class Dashboard extends FilamentDashboard
         return [
             PlatformStatsOverview::class,
             OperationalStatsOverview::class,
+            MyLicenseStatusWidget::class,
             RecentActivityWidget::class,
         ];
     }
