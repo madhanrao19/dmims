@@ -15,6 +15,12 @@ class LicenseLogResource extends BaseResource
 
     protected static bool $applyCustomerScope = true;
 
+    // Security & Access Control Matrix / Business Rules §8: "Customers do not
+    // receive standalone License Management" — same restriction as its
+    // sibling LicenseResource. Only the simplified own-customer License
+    // Status page (My Company) is customer-facing.
+    protected static bool $platformOnly = true;
+
     protected static ?string $permission = 'manage licensing';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Platform';

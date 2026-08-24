@@ -29,7 +29,10 @@ class BarcodeRegistryResource extends BaseResource
 {
     protected static ?string $model = BarcodeRegistry::class;
 
-    protected static string|array $routeMiddleware = [EnsureModuleEnabled::class.':stock_inventory'];
+    // Business Rules §10: Barcode Center is the Barcode Scanning module's
+    // feature (generate/register/reprint barcodes), not Stock Inventory —
+    // a customer can have Barcode Scanning enabled without Stock Inventory.
+    protected static string|array $routeMiddleware = [EnsureModuleEnabled::class.':barcode_scanning'];
 
     protected static bool $applyCustomerScope = true;
 

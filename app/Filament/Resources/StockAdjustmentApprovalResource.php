@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\StockAdjustmentApprovalResource\Pages;
+use App\Http\Middleware\EnsureModuleEnabled;
 use App\Models\StockAdjustmentApproval;
 use Filament\Forms;
 use Filament\Schemas\Schema;
@@ -14,6 +15,10 @@ class StockAdjustmentApprovalResource extends BaseResource
     protected static ?string $model = StockAdjustmentApproval::class;
 
     protected static bool $applyCustomerScope = true;
+
+    // Business Rules §10: stock adjustment approvals are a Stock Inventory
+    // module feature, same gate as StockMovementResource/ProductResource.
+    protected static string|array $routeMiddleware = [EnsureModuleEnabled::class.':stock_inventory'];
 
     protected static ?string $permission = 'manage inventory';
 

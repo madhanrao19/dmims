@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\StockAlertResource\Pages;
+use App\Http\Middleware\EnsureModuleEnabled;
 use App\Models\StockAlert;
 use Filament\Forms;
 use Filament\Schemas\Schema;
@@ -14,6 +15,10 @@ class StockAlertResource extends BaseResource
     protected static ?string $model = StockAlert::class;
 
     protected static bool $applyCustomerScope = true;
+
+    // Business Rules §10: stock alerts are a Stock Inventory module feature,
+    // same gate as StockMovementResource/ProductResource.
+    protected static string|array $routeMiddleware = [EnsureModuleEnabled::class.':stock_inventory'];
 
     protected static ?string $permission = 'manage inventory';
 

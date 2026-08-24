@@ -4,6 +4,42 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [2.1.38] - 2026-08-24
+
+### Fixed — customer module gating gaps in Customer Modules / My Company nav
+
+Reported while reviewing Madhan Inc's enabled modules (Document Tracking,
+Barcode Scanning, Barcode Printing, Reports, Billing View — Stock Inventory
+not enabled): the customer's My Company navigation showed resources that
+Business Rules §10 (Module Rules) and §8 (License Rules) say it shouldn't,
+and hid one it should have shown.
+
+- `LicenseLogResource` had no `$platformOnly` flag, unlike its sibling
+  `LicenseResource`. Business Rules §8: "Customers do not receive standalone
+  License Management" — only the simplified own-customer License Status page
+  is customer-facing. Company Admin/Supervisor held `view licensing` (granted
+  for License Status) which was also unlocking this separate, more detailed
+  audit-trail resource. Now `$platformOnly = true`, matching `LicenseResource`.
+- `StockAdjustmentApprovalResource` and `StockAlertResource` had no
+  `$routeMiddleware`, so `BaseResource::moduleEnabledForUser()` short-circuited
+  to always-enabled — unlike every other Stock Inventory resource
+  (`ProductResource`, `LocationResource`, `StockMovementResource`, etc.), which
+  all gate on `EnsureModuleEnabled::class.':stock_inventory'`. Both now carry
+  the same gate, so they correctly hide/block for a customer without Stock
+  Inventory enabled.
+- `BarcodeRegistryResource` ("Barcode Center") was gated on the
+  `stock_inventory` module instead of `barcode_scanning`, so a customer with
+  Barcode Scanning/Printing enabled but not Stock Inventory (e.g. Madhan Inc)
+  couldn't reach it even though they'd purchased the relevant module. Gate
+  corrected to `barcode_scanning`.
+
+No database schema changes. No breaking changes for customers whose enabled
+modules already include Stock Inventory — this only corrects the three
+resources' gating to match every other module-gated resource's existing
+pattern. Verified: `BarcodeCenterTest`, `ResourceFormRenderTest`,
+`MyCompanyClusterTest`, `AccessControlTest`, `BusinessAccessMiddlewareTest`
+(34 tests), and the full suite (197 tests) all pass.
+
 ## [2.1.37] - 2026-08-24
 
 ### Fixed — duplicate-record submissions crashed instead of showing a validation error
