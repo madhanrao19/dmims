@@ -13,9 +13,11 @@ use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Forms;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Validation\Rules\Unique;
 
 class BoxResource extends BaseResource
 {
@@ -54,8 +56,18 @@ class BoxResource extends BaseResource
                     ->relationship('customer', 'company_name')
                     ->searchable()
                     ->required(),
-                Forms\Components\TextInput::make('box_barcode')->required()->maxLength(150),
-                Forms\Components\TextInput::make('box_number')->required()->maxLength(100),
+                Forms\Components\TextInput::make('box_barcode')->required()->maxLength(150)
+                    ->unique(
+                        ignoreRecord: true,
+                        modifyRuleUsing: fn (Unique $rule, Get $get): Unique => $rule->where('customer_id', $get('customer_id')),
+                    )
+                    ->validationMessages(['unique' => 'This box barcode is already in use for the selected customer.']),
+                Forms\Components\TextInput::make('box_number')->required()->maxLength(100)
+                    ->unique(
+                        ignoreRecord: true,
+                        modifyRuleUsing: fn (Unique $rule, Get $get): Unique => $rule->where('customer_id', $get('customer_id')),
+                    )
+                    ->validationMessages(['unique' => 'This box number is already in use for the selected customer.']),
                 Forms\Components\Select::make('current_location_id')
                     ->relationship('currentLocation', 'location_name')
                     ->searchable()

@@ -5,9 +5,11 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\CustomerModuleResource\Pages;
 use App\Models\CustomerModule;
 use Filament\Forms;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Validation\Rules\Unique;
 
 class CustomerModuleResource extends BaseResource
 {
@@ -38,7 +40,19 @@ class CustomerModuleResource extends BaseResource
                 Forms\Components\Select::make('module_id')
                     ->relationship('module', 'module_name')
                     ->searchable()
-                    ->required(),
+                    ->required()
+                    // customer_modules has a unique(customer_id, module_id)
+                    // constraint the form never validated — submitting a
+                    // duplicate combination crashed with a raw
+                    // UniqueConstraintViolationException instead of a normal
+                    // inline validation error.
+                    ->unique(
+                        ignoreRecord: true,
+                        modifyRuleUsing: fn (Unique $rule, Get $get): Unique => $rule->where('customer_id', $get('customer_id')),
+                    )
+                    ->validationMessages([
+                        'unique' => 'Module access already exists for this customer.',
+                    ]),
                 Forms\Components\Toggle::make('is_enabled')
                     ->label('Enabled')
                     ->default(true),

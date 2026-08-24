@@ -8,9 +8,11 @@ use App\Http\Middleware\EnsureModuleEnabled;
 use App\Models\Product;
 use Filament\Actions\EditAction;
 use Filament\Forms;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Validation\Rules\Unique;
 
 class ProductResource extends BaseResource
 {
@@ -50,8 +52,18 @@ class ProductResource extends BaseResource
                     ->relationship('customer', 'company_name')
                     ->searchable()
                     ->required(),
-                Forms\Components\TextInput::make('sku')->required()->maxLength(100),
-                Forms\Components\TextInput::make('barcode')->maxLength(150),
+                Forms\Components\TextInput::make('sku')->required()->maxLength(100)
+                    ->unique(
+                        ignoreRecord: true,
+                        modifyRuleUsing: fn (Unique $rule, Get $get): Unique => $rule->where('customer_id', $get('customer_id')),
+                    )
+                    ->validationMessages(['unique' => 'This SKU is already in use for the selected customer.']),
+                Forms\Components\TextInput::make('barcode')->maxLength(150)
+                    ->unique(
+                        ignoreRecord: true,
+                        modifyRuleUsing: fn (Unique $rule, Get $get): Unique => $rule->where('customer_id', $get('customer_id')),
+                    )
+                    ->validationMessages(['unique' => 'This barcode is already in use for the selected customer.']),
                 Forms\Components\TextInput::make('product_name')->required()->maxLength(255),
                 Forms\Components\Textarea::make('description')->rows(3),
                 Forms\Components\Select::make('category_id')

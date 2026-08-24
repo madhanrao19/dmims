@@ -6,6 +6,33 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed — duplicate-record submissions crashed instead of showing a validation error
+
+Reported from a live Herd deployment: enabling an already-enabled module for
+a customer via `CustomerModuleResource` crashed with a raw
+`UniqueConstraintViolationException` (an unstyled Laravel error page in
+debug environments; a bare Livewire failure toast when `APP_DEBUG=false`,
+as production is configured — see `DEPLOYMENT_GUIDE.md`). The
+`customer_modules` table's `unique(customer_id, module_id)` constraint had
+no matching Filament form validation, so a duplicate submission reached the
+database instead of being rejected with a normal inline error.
+
+Audited every resource with a customer-scoped composite unique database
+constraint and found the same gap in six others. All seven now validate
+uniqueness in the form (scoped to the same customer) before submission,
+showing a plain "already exists" message instead of a crash:
+
+- `CustomerModuleResource` (customer + module)
+- `LocationResource` (customer + location code; customer + barcode)
+- `ProductResource` (customer + SKU; customer + barcode)
+- `BoxResource` (customer + box number; customer + box barcode)
+- `DocumentFileResource` (customer + file barcode)
+- `DocumentTypeResource` (customer + type code)
+- `SettingResource` (customer + setting group + setting key)
+
+No database schema changes. No breaking changes — this only rejects what
+the database was always going to reject anyway, earlier and more clearly.
+
 ### Added — "My Company" navigation consolidation for customer-facing administration
 
 Implements `docs/CONFORMANCE_GAP_ANALYSIS.md` §8 / Security & Access Control

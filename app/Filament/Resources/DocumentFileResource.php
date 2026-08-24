@@ -14,9 +14,11 @@ use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Forms;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Validation\Rules\Unique;
 
 class DocumentFileResource extends BaseResource
 {
@@ -51,7 +53,12 @@ class DocumentFileResource extends BaseResource
                     ->relationship('customer', 'company_name')
                     ->searchable()
                     ->required(),
-                Forms\Components\TextInput::make('file_barcode')->required()->maxLength(150),
+                Forms\Components\TextInput::make('file_barcode')->required()->maxLength(150)
+                    ->unique(
+                        ignoreRecord: true,
+                        modifyRuleUsing: fn (Unique $rule, Get $get): Unique => $rule->where('customer_id', $get('customer_id')),
+                    )
+                    ->validationMessages(['unique' => 'This file barcode is already in use for the selected customer.']),
                 Forms\Components\TextInput::make('file_reference_no')->maxLength(150),
                 Forms\Components\TextInput::make('title')->required()->maxLength(255),
                 Forms\Components\Select::make('document_type_id')

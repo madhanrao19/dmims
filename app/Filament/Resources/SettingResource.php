@@ -5,9 +5,11 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\SettingResource\Pages;
 use App\Models\Setting;
 use Filament\Forms;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Validation\Rules\Unique;
 
 class SettingResource extends BaseResource
 {
@@ -39,7 +41,14 @@ class SettingResource extends BaseResource
                     ->searchable()
                     ->required(),
                 Forms\Components\TextInput::make('setting_group')->required()->maxLength(100),
-                Forms\Components\TextInput::make('setting_key')->required()->maxLength(100),
+                Forms\Components\TextInput::make('setting_key')->required()->maxLength(100)
+                    ->unique(
+                        ignoreRecord: true,
+                        modifyRuleUsing: fn (Unique $rule, Get $get): Unique => $rule
+                            ->where('customer_id', $get('customer_id'))
+                            ->where('setting_group', $get('setting_group')),
+                    )
+                    ->validationMessages(['unique' => 'This setting key already exists in the selected group for the selected customer.']),
                 Forms\Components\Textarea::make('setting_value')->rows(3)->required(),
                 Forms\Components\Select::make('setting_type')
                     ->options([

@@ -9,6 +9,7 @@ use Filament\Forms;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Validation\Rules\Unique;
 
 class DocumentTypeResource extends BaseResource
 {
@@ -34,7 +35,17 @@ class DocumentTypeResource extends BaseResource
     {
         return $schema
             ->components([
-                Forms\Components\TextInput::make('type_code')->required()->maxLength(100),
+                // No customer_id field here: BelongsToCustomer's creating()
+                // hook force-sets it from the acting user (null for a
+                // platform user, creating a shared default type — see
+                // $includeGlobalCustomerDefaults above), so the uniqueness
+                // scope uses the acting user directly rather than $get().
+                Forms\Components\TextInput::make('type_code')->required()->maxLength(100)
+                    ->unique(
+                        ignoreRecord: true,
+                        modifyRuleUsing: fn (Unique $rule): Unique => $rule->where('customer_id', auth()->user()?->customer_id),
+                    )
+                    ->validationMessages(['unique' => 'This document type code is already in use.']),
                 Forms\Components\TextInput::make('type_name')->required()->maxLength(255),
                 Forms\Components\Textarea::make('description')->rows(3),
                 Forms\Components\Select::make('status')

@@ -8,9 +8,11 @@ use App\Http\Middleware\EnsureModuleEnabled;
 use App\Models\Location;
 use Filament\Actions\EditAction;
 use Filament\Forms;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Validation\Rules\Unique;
 
 class LocationResource extends BaseResource
 {
@@ -49,9 +51,19 @@ class LocationResource extends BaseResource
                 Forms\Components\Select::make('location_type_id')
                     ->relationship('locationType', 'type_name')
                     ->searchable(),
-                Forms\Components\TextInput::make('location_code')->required()->maxLength(100),
+                Forms\Components\TextInput::make('location_code')->required()->maxLength(100)
+                    ->unique(
+                        ignoreRecord: true,
+                        modifyRuleUsing: fn (Unique $rule, Get $get): Unique => $rule->where('customer_id', $get('customer_id')),
+                    )
+                    ->validationMessages(['unique' => 'This location code is already in use for the selected customer.']),
                 Forms\Components\TextInput::make('location_name')->required()->maxLength(255),
-                Forms\Components\TextInput::make('barcode')->maxLength(100),
+                Forms\Components\TextInput::make('barcode')->maxLength(100)
+                    ->unique(
+                        ignoreRecord: true,
+                        modifyRuleUsing: fn (Unique $rule, Get $get): Unique => $rule->where('customer_id', $get('customer_id')),
+                    )
+                    ->validationMessages(['unique' => 'This barcode is already in use for the selected customer.']),
                 Forms\Components\Toggle::make('can_store_stock')->default(true),
                 Forms\Components\Toggle::make('can_store_boxes')->default(true),
                 Forms\Components\TextInput::make('box_capacity')->numeric()->helperText('Maximum number of boxes this shelf/rack can hold (optional).'),
