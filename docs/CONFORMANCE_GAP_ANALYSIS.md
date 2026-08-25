@@ -83,7 +83,7 @@ As of 25 August 2026:
 - Existing customer-facing `My Company` is implemented and must not regress.
 - Existing customer-specific platform resources remain separate today.
 
-### WIP Medium — Platform Customer 360 Not Yet Implemented
+### WIP Medium — Platform Customer 360 Read-Only Browsing Implemented; Nav Consolidation Pending
 
 This is primarily a functional/UX conformance gap, not evidence of a new data leak in the existing separate-resource implementation.
 
@@ -91,37 +91,39 @@ Implementation risk is **High** because the change touches authorization, tenant
 
 Required implementation:
 
-1. Add Customer View / Customer 360 page.
-2. Add Overview.
-3. Embed/reuse Users.
-4. Embed/reuse Customer Modules.
-5. Embed/reuse Customer Subscription.
-6. Embed/reuse License administration.
-7. Embed/reuse Billing & Payments.
-8. Embed/reuse customer Audit Logs.
-9. Derive all child `customer_id` values from the selected parent Customer.
-10. Remove/hide duplicate customer-specific platform navigation after parity is verified.
-11. Preserve separate platform master areas.
-12. Preserve customer-facing My Company.
-13. Add browser/security regression tests.
+1. Add Customer View / Customer 360 page. ✅
+2. Add Overview. ✅
+3. Embed/reuse Users. ✅
+4. Embed/reuse Customer Modules. ✅
+5. Embed/reuse Customer Subscription. ✅
+6. Embed/reuse License administration. ✅
+7. Embed/reuse Billing & Payments. ✅
+8. Embed/reuse customer Audit Logs. ✅
+9. Derive all child `customer_id` values from the selected parent Customer. ✅
+10. Remove/hide duplicate customer-specific platform navigation after parity is verified. **Deliberately deferred** — see note below.
+11. Preserve separate platform master areas. ✅
+12. Preserve customer-facing My Company. ✅
+13. Add browser/security regression tests. ✅ (Feature tests; Playwright coverage pending)
+
+Items 1–9, 11 and 12 are implemented as of 25 August 2026. Item 10 is deliberately **not** done in this pass: v1 ships read-only embedded browsing tables per tab (`CustomerResource\Pages\{ViewCustomer,Users,Modules,Subscription,License,BillingAndPayments,AuditLogs}`) that link out to each resource's own existing View/Edit page for actual mutation — no inline create/edit forms were added. Hiding the standalone top-level navigation for Users/Modules/Subscriptions/Licenses/Billing now would remove the only current path to create new child records, so it stays visible until a follow-up pass adds Customer 360 create actions and nav consolidation can happen safely. Audit Logs' own "Platform Audit Logs" top-level nav also stays, per its explicit place in "Platform-wide master/administration remains separate" above — Customer 360's Audit Logs tab is additive, not a replacement.
 
 ### Security Acceptance
 
-Customer A profile must never mutate/read Customer B child data.
+Customer A profile must never mutate/read Customer B child data. **Verified** — `App\Filament\Resources\CustomerResource\Pages\Concerns\HasCustomerScopedEmbeddedTable` constrains every embedded tab's query to `where('customer_id', $customer->getKey())` on top of the wrapped resource's own query; covered by `tests/Feature/CustomerProfileTest.php::test_each_tab_shows_only_the_selected_customers_rows`.
 
-Customer 360 child forms must not accept an arbitrary browser-selected customer ownership.
+Customer 360 child forms must not accept an arbitrary browser-selected customer ownership. **N/A for this pass** — no child-create forms are exposed inside Customer 360 yet (read-only browsing only); this constraint will apply once a future pass adds them.
 
-Datamation Management must remain read-only.
+Datamation Management must remain read-only. Unaffected by this change — Customer 360 adds no new platform-write paths.
 
-Customer roles must not access Platform Customer 360.
+Customer roles must not access Platform Customer 360. **Verified** — `CustomerResource::canAccessCustomer360()` requires `auth()->user()->is_platform_user` in addition to `can('view', $record)`, layered in front of every Customer 360 page precisely because `can('view')` alone legitimately passes for a tenant viewing their own record (required by My Company's `Overview::canAccess()`); covered by `test_non_platform_user_is_denied_even_for_their_own_customer`.
 
 ### Status
 
 **Documentation:** ✅ Approved
-**Implementation:** WIP / Not yet implemented
-**Security regression tests:** WIP
-**Browser QA:** WIP
-**Conformance:** Not yet closed
+**Implementation:** ✅ Implemented (read-only embedded browsing; nav consolidation deferred — see item 10)
+**Security regression tests:** ✅ Added (`tests/Feature/CustomerProfileTest.php`); Playwright coverage still WIP
+**Browser QA:** WIP — pending manual verification pass
+**Conformance:** Not yet closed — item 10 (nav consolidation) and Playwright QA remain open
 
 Close this gap only after implementation, tests, security review, browser QA and documentation synchronization pass the Definition of Done.
 

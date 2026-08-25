@@ -139,6 +139,37 @@ test('CRUD + validation: stock user manages a category', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+test('Platform Customer 360: platform admin can browse every tab for a customer', async ({ page }) => {
+  const errors = collectErrors(page);
+  await login(page, 'qa-superadmin@example.com');
+
+  await page.goto('/admin/customers');
+  await page.getByText('Datamation Inventory Demo').first().click();
+  await page.waitForURL(/\/admin\/customers\/\d+$/, { timeout: 15000 });
+
+  for (const tab of ['users', 'modules', 'subscription', 'license', 'billing', 'audit-logs']) {
+    const url = page.url().replace(/\/admin\/customers\/(\d+)$/, `/admin/customers/$1/${tab}`);
+    const res = await page.goto(url);
+    expect(res.status()).toBe(200);
+  }
+
+  expect(errors).toEqual([]);
+});
+
+test('Platform Customer 360: a non-platform role is denied even for their own customer', async ({ page }) => {
+  await login(page, 'qa-companyadmin@example.com');
+
+  // CustomerResource::can('view') legitimately passes for Company Admin on
+  // their OWN customer record (that's what My Company relies on) — Customer
+  // 360 must still deny via its platform-user-only gate, not resource-level
+  // ownership. QASampleUsersSeeder assigns every QA user to the single
+  // seeded DEMO customer (id 1 in a fresh QA seed run).
+  for (const path of ['', '/users', '/modules', '/subscription', '/license', '/billing', '/audit-logs']) {
+    const res = await page.goto(`/admin/customers/1${path}`);
+    expect([403, 404]).toContain(res.status());
+  }
+});
+
 test('mobile viewport: dashboard renders at 390x844', async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await context.newPage();

@@ -6,6 +6,32 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — Platform Customer 360 (read-only browsing, nav consolidation pending)
+
+- `CustomerResource` gained a `view` page and 6 record-scoped tabs (Overview,
+  Users, Modules, Subscription, License, Billing & Payments, Audit Logs),
+  reached from the Customers list via Filament's record sub-navigation.
+- Each tab embeds its underlying resource's own existing table (columns,
+  filters, tenant scoping) additionally constrained to the one selected
+  customer — the underlying resources, models and services remain separate
+  and authoritative; this is not a database merge.
+- Access is gated to platform users only: `CustomerResource::canAccessCustomer360()`
+  layers an explicit platform-user check in front of `CustomerResource::can()`,
+  since that method legitimately returns true for a tenant viewing their own
+  company (required by the existing My Company cluster) and can't be
+  tightened without breaking it.
+- Row actions on each tab still link through to that resource's own existing
+  View/Edit page for actual mutation — no inline create/edit forms were added
+  in this pass.
+- Standalone top-level navigation for Users/Modules/Subscriptions/Licenses/
+  Billing is deliberately left visible for now (removing it is tracked as a
+  separate follow-up per `docs/CONFORMANCE_GAP_ANALYSIS.md` item 10); Platform
+  Audit Logs' own top-level nav also stays, since the Customer 360 Audit Logs
+  tab is an addition alongside it, not a replacement.
+- Added `tests/Feature/CustomerProfileTest.php` covering tenant isolation
+  across all 6 tabs, denial of non-platform users (even for their own
+  company), and the platform-user positive path.
+
 ### Changed — approved Platform Customer 360 administration model
 
 Documentation updated on 25 August 2026 to define a consolidated Datamation Super Admin customer-management workflow.
