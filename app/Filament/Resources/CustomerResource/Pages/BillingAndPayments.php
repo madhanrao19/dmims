@@ -5,6 +5,8 @@ namespace App\Filament\Resources\CustomerResource\Pages;
 use App\Filament\Resources\BillingRecordResource;
 use App\Filament\Resources\CustomerResource;
 use App\Filament\Resources\CustomerResource\Pages\Concerns\HasCustomerScopedEmbeddedTable;
+use App\Models\BillingRecord;
+use App\Services\BillingService;
 use Filament\Resources\Pages\Concerns\InteractsWithRecord;
 use Filament\Resources\Pages\Page;
 use Filament\Tables\Concerns\InteractsWithTable;
@@ -42,6 +44,16 @@ class BillingAndPayments extends Page implements HasTable
 
     public function table(Table $table): Table
     {
-        return $this->customerScopedResourceTable($table);
+        return $this->customerScopedResourceTable($table)
+            ->headerActions([
+                // BillingRecordResource's own create page (CreateBillingRecord)
+                // routes through BillingService::createInvoice() to generate
+                // invoice_no/total_amount rather than a plain model create —
+                // reuse that same call here instead of bypassing it.
+                $this->customerScopedCreateAction(
+                    'Add Billing Record',
+                    using: fn (array $data): BillingRecord => app(BillingService::class)->createInvoice($data),
+                ),
+            ]);
     }
 }

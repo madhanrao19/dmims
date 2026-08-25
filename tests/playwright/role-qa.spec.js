@@ -156,6 +156,34 @@ test('Platform Customer 360: platform admin can browse every tab for a customer'
   expect(errors).toEqual([]);
 });
 
+test('Platform Customer 360: Add User creates a user scoped to the selected customer', async ({ page }) => {
+  const errors = collectErrors(page);
+  await login(page, 'qa-superadmin@example.com');
+
+  await page.goto('/admin/customers');
+  await page.getByText('Datamation Inventory Demo').first().click();
+  await page.waitForURL(/\/admin\/customers\/\d+$/, { timeout: 15000 });
+  await page.goto(page.url() + '/users');
+
+  const email = `qa-new-${Math.random().toString(36).slice(2, 8)}@example.com`;
+  await page.getByRole('button', { name: /^add user$/i }).click();
+  await expect(page.getByRole('heading', { name: /create user/i })).toBeVisible({ timeout: 15000 });
+  // No customer picker in this modal — it's a Hidden field fixed to the
+  // customer already selected, not a browser-choosable dropdown.
+  await expect(page.getByText('Customer', { exact: true })).toHaveCount(0);
+  await page.getByRole('textbox', { name: /^name/i }).fill('QA New User');
+  await page.getByRole('textbox', { name: /^email/i }).fill(email);
+  await page.getByRole('textbox', { name: /^password/i }).fill('password123');
+  await page.getByRole('combobox', { name: /^status/i }).selectOption('active');
+  await page.getByRole('button', { name: /^create$/i }).click();
+  await page.waitForTimeout(1500);
+
+  await page.getByPlaceholder(/search/i).last().fill(email);
+  await expect(page.getByText(email).first()).toBeVisible();
+
+  expect(errors).toEqual([]);
+});
+
 test('Platform Customer 360: a non-platform role is denied even for their own customer', async ({ page }) => {
   await login(page, 'qa-companyadmin@example.com');
 

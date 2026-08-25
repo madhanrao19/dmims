@@ -5,6 +5,7 @@ namespace App\Filament\Resources\CustomerResource\Pages;
 use App\Filament\Resources\CustomerResource;
 use App\Filament\Resources\CustomerResource\Pages\Concerns\HasCustomerScopedEmbeddedTable;
 use App\Filament\Resources\UserResource;
+use App\Models\User;
 use Filament\Resources\Pages\Concerns\InteractsWithRecord;
 use Filament\Resources\Pages\Page;
 use Filament\Tables\Concerns\InteractsWithTable;
@@ -41,6 +42,19 @@ class Users extends Page implements HasTable
 
     public function table(Table $table): Table
     {
-        return $this->customerScopedResourceTable($table);
+        return $this->customerScopedResourceTable($table)
+            ->headerActions([
+                // Mirrors UserResource\Pages\CreateUser::afterCreate() —
+                // enforcePlatformRoleConsistency() in particular is not
+                // optional: without it a role picked in this modal could
+                // leave is_platform_user out of sync with the user's actual
+                // roles (BaseResource::can()/shouldRegisterNavigation() key
+                // off is_platform_user alone).
+                $this->customerScopedCreateAction('Add User')
+                    ->after(function (User $record): void {
+                        UserResource::stripDisallowedRoles($record);
+                        UserResource::enforcePlatformRoleConsistency($record);
+                    }),
+            ]);
     }
 }

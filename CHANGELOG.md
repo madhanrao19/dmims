@@ -6,6 +6,28 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — Platform Customer 360: "Add X" actions on Users, Modules, Subscription, License, Billing & Payments
+
+- Each Customer 360 tab (except Audit Logs, which is system-generated) now
+  has an "Add User" / "Add Module" / "Add Subscription" / "Add License" /
+  "Add Billing Record" button that opens the wrapped resource's own create
+  form, scoped to the customer already selected.
+- The free `customer_id` picker every one of these resources' own forms
+  normally shows is replaced with a hidden field fixed to that customer —
+  it's never shown or editable in this context — and the submitted data is
+  additionally force-corrected server-side regardless, so even a tampered
+  submission can't create a record under a different customer.
+- Billing records still go through `BillingService::createInvoice()` (for
+  `invoice_no`/`total_amount` generation) rather than a bare model create,
+  matching what `BillingRecordResource`'s own create page already does.
+- Creating a user here still runs the same post-create role/consistency
+  enforcement as `UserResource`'s own create page
+  (`stripDisallowedRoles`/`enforcePlatformRoleConsistency`), so assigning a
+  platform role from this modal can't leave `is_platform_user` out of sync.
+- Extended `tests/Feature/CustomerProfileTest.php` and
+  `tests/playwright/role-qa.spec.js` to cover the new create actions,
+  including a real-browser check that no customer picker is rendered.
+
 ### Added — Platform Customer 360 (read-only browsing, nav consolidation pending)
 
 - `CustomerResource` gained a `view` page and 6 record-scoped tabs (Overview,

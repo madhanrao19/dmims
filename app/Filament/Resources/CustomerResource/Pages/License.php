@@ -45,6 +45,7 @@ class License extends Page implements HasTable
 
     public function table(Table $table): Table
     {
-        return $this->customerScopedResourceTable($table);
+        return $this->customerScopedResourceTable($table)
+            ->headerActions([$this->customerScopedCreateAction('Add License')]);
     }
 }
