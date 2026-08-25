@@ -1,8 +1,8 @@
 # DMIMS Test Strategy, QA Plan & UAT Specification
 
 **Datamation Inventory Management System (DMIMS)**  
-**Version:** 1.1  
-**Updated:** 24 August 2026
+**Version:** 1.2  
+**Updated:** 25 August 2026
 
 ---
 
@@ -10,394 +10,292 @@
 
 Verify:
 
-- Business requirements
-- Customer isolation
-- Platform/customer boundary
+- Functional correctness
 - Authorization
-- Module entitlement
-- Subscription/license behaviour
-- Report filtering
-- Security
-- Stability
+- Customer isolation
+- Customer 360 parent context
+- Existing My Company isolation
+- Role behaviour
+- Module/subscription/license rules
+- Billing integrity
+- Regression safety
 - Production readiness
 
 ---
 
-# 2. Testing Principles
+# 2. Risk Classification
 
-Test business rules and HTTP/browser enforcement, not only code structure.
+Customer 360 implementation is **High Risk change work** because it touches authorization, tenant context, subscription, license and billing presentation/actions.
 
-Every authorization fix requires regression coverage.
-
----
-
-# 3. Test Levels
-
-- Unit
-- Feature
-- Integration
-- System
-- Browser / Playwright
-- UAT
-- Regression
-- Security review
+The feature itself is primarily an administration/UX improvement, but implementation must receive security review.
 
 ---
 
-# 4. Test Environments
+# 3. Test Data
 
-Development, QA/Staging, UAT and Production.
-
-Never use production customer data in non-production without explicit approval.
-
----
-
-# 5. Test Data
-
-Minimum security dataset:
+Create:
 
 - Customer A
 - Customer B
-- Platform user(s)
-- Company Admin
+- Super Admin
+- Datamation Management
+- Company Admin A/B
 - Supervisor
 - Stock User
 - Document User
 - Viewer
-- Active/expired subscription cases
-- Active/suspended license cases
-- Platform `customer_id = NULL` audit rows
-- Customer A/B audit rows
-- Platform and tenant users
-- Inventory/document/billing records
+- Subscriptions A/B
+- Licenses A/B
+- Billing A/B
+- Audit A/B
+- Platform NULL audit rows
 
 ---
 
-# 6. Test Categories
+# 4. Customer List Tests
 
-Functional, security, performance, usability, compatibility and accessibility.
+Super Admin:
+
+- Sees Customer A and B
+- Can search/filter
+- Can open each Customer 360
+
+Management:
+
+- Can view permitted customers
+- Cannot mutate
+
+Customer roles:
+
+- Cannot access Platform Customers list
 
 ---
 
-# 7. Unit Test Requirements
+# 5. Customer 360 Overview Tests
 
-Critical access services and report authorization require focused unit tests.
+Verify selected-customer summary only.
 
----
+Customer A overview must not contain Customer B:
 
-# 8. Feature Test Requirements
-
-Include:
-
-- Login
-- Customer creation
-- User management
-- Product/document workflows
+- Counts
 - Billing
-- Subscription/license
 - Audit
-- Reports
-- Direct authorization paths
+- Subscription
+- License
+- Usage
 
 ---
 
-# 9. Security Test Cases
+# 6. Users Tab Tests
 
-Verify:
+Inside Customer A:
 
-- Invalid login
-- Locked/suspended user
-- Cross-company access
-- Missing permissions
-- Disabled module
-- Expired subscription
-- Suspended/revoked license
-- CSRF
-- XSS
-- IDOR
-- Privilege escalation
-- Platform/customer boundary
+- List contains A users only
+- Platform users absent
+- B users absent
+- Create User automatically assigns A
+- Crafted customer_id=B is rejected/overwritten
+- Edit cannot transfer user to B
 
 ---
 
-# 10. Customer Isolation Tests
+# 7. Modules Tab Tests
 
-Customer A cannot:
+Inside Customer A:
 
-- View Customer B
-- Edit Customer B
-- Export Customer B
-- Search Customer B
-- Select Customer B in relationship fields
-- Reach Customer B by direct URL
-
-Super Admin retains authorized platform visibility.
+- Shows A assignments only
+- Enable/disable affects A only
+- Crafted B customer assignment fails
+- Module Catalogue remains unchanged
 
 ---
 
-# 11. Customer Presentation and Platform Isolation Tests
+# 8. Subscription Tab Tests
 
-Customer roles must not see:
+Inside Customer A:
 
-- Platform Customers list
+- Shows A current/history only
+- Renewal remains A
+- Plan selection allowed from platform plans
+- No arbitrary customer selector
+- B subscription cannot be accessed through A context
+
+---
+
+# 9. License Tab Tests
+
+Inside Customer A:
+
+- Shows A license/history only
+- Renew/suspend/revoke affects A only
+- No cross-customer assignment
+- Management cannot mutate
+
+---
+
+# 10. Billing & Payments Tests
+
+Inside Customer A:
+
+- Only A invoices/payments
+- Record payment affects A invoice
+- Direct B invoice ID denied
+- Outstanding totals use A only
+- Management read-only
+
+---
+
+# 11. Audit Tests
+
+Inside Customer A:
+
+```text
+audit_logs.customer_id = A
+```
+
+Exclude:
+
+- Customer B logs
+- Platform NULL logs
+
+Filters must not leak other-customer module/action data.
+
+---
+
+# 12. Navigation Tests
+
+After implementation, Super Admin primary sidebar should not require separate entries for:
+
+- Customer Users
+- Customer Modules
+- Customer Subscriptions
+- Customer Licenses
+- Customer Billing
+- Customer Payments
+
+Remain separate:
+
 - Platform Users
 - Roles & Permissions
-- Module catalogue
+- Module Catalogue
 - Subscription Plans
-- License Management
+- Reports & Analytics
+- Platform Audit
 - Backup / Restore
-- Platform Settings
-- Platform reports
-- Platform audit logs
-
-Direct URL attempts must fail.
-
-## TENANT_STRICT Verification
-
-For each TENANT_STRICT resource, verify Customer A retrieves only Customer A records.
-
-Specifically:
-
-- Company Admin cannot see Customer B users.
-- Company Admin cannot see `customer_id = NULL` platform users.
-- Company Admin cannot see Customer B audit logs.
-- Company Admin cannot see `customer_id = NULL` platform audit logs.
-- Customer A cannot see Customer B subscription/license/billing.
-- Global search cannot reveal these records.
+- System Settings
 
 ---
 
-# 12. My Company UAT
+# 13. Direct URL / Deep Link Tests
 
-## Company Admin
+Attempt:
 
-Verify:
+- Customer A profile with B child ID
+- Unauthorized child resource routes
+- Customer role access to Customer 360
+- Management mutation routes
 
-- Own Profile
-- Own Users
-- Enabled Modules
-- Subscription Summary
-- License Status
-- Billing when enabled
-- Own Audit
-
-## Supervisor
-
-Verify:
-
-- Own Profile
-- Limited Users
-- Enabled Modules
-- Subscription Summary
-- License Status
-- Billing when enabled
-- No Audit Logs by default
-
-## Operational Users
-
-Verify no unrelated My Company administration.
+Expected denial.
 
 ---
 
-# 13. Inventory Workflow Tests
+# 14. Embedded Filament Action Tests
 
-Receive, Transfer, Out, Adjustment.
+Verify every embedded action maps to correct underlying resource authorization.
 
-Verify quantity, ownership, history and audit.
-
----
-
-# 14. Document Workflow Tests
-
-Receive, Transfer, Move Out, Return.
-
-Verify customer ownership, history and audit.
+Custom actions must fail closed.
 
 ---
 
-# 15. Barcode Tests
+# 15. Global Search Tests
 
-Verify:
+Customer 360 changes must not make customer-owned child records globally searchable outside authorization.
 
-- Generation
-- Uniqueness
-- Unknown barcode
-- Cross-company denial
-- Permission checks
-- Scan history
+Customer roles must not discover Platform Customer 360 records.
 
 ---
 
-# 16. Billing Tests
+# 16. My Company Regression
 
-Verify:
+All existing My Company tests must continue to pass.
 
-- Super Admin mutation only
-- Customer own-view only
-- Billing View gating
-- Direct mutation attempts denied
-- Correct tenant scope
+Customer Admin remains own-company only.
+
+Customer 360 is not visible to customer roles.
 
 ---
 
-# 17. Subscription Tests
+# 17. Operational Regression
 
-Verify:
-
-- Plan assignment
-- Limits
-- Renewal
-- Grace
-- Module sync
-- Customer cannot browse Subscription Plans
-- Customer sees own summary only
+Inventory, Documents, Barcode, Reports, Imports/Exports remain functional.
 
 ---
 
-# 18. License Tests
+# 18. Browser / Playwright QA
 
-Verify:
+Required browser scenarios:
 
-- Active/view-only/blocked
-- Renewal
-- Suspension/revocation
-- Customer cannot open management resource
-- Customer sees simplified own status only
-
----
-
-# 19. Audit Tests
-
-Verify immutable audit creation.
-
-Customer Admin sees only exact own-customer logs.
-
-Test explicit platform NULL row and other-customer row exclusions.
+1. Super Admin opens Customer A.
+2. Navigate every Customer 360 tab.
+3. Create/edit allowed child records.
+4. Confirm customer context never changes.
+5. Management opens same profile read-only.
+6. Customer user receives 403/404 for Customer 360.
+7. Sidebar consolidation correct.
+8. My Company still correct.
+9. Mobile/tablet tab navigation acceptable where supported.
 
 ---
 
-# 20. Report Authorization Tests
+# 19. Performance Tests
 
-Test selector and direct execution independently.
+Check:
 
-## Stock Inventory User
-
-Allowed: authorized Inventory reports.
-
-Denied:
-
-- Document
-- Billing
-- Audit
-- Platform reports
-
-## Document Tracking User
-
-Allowed: authorized Document reports.
-
-Denied:
-
-- Inventory
-- Billing
-- Audit
-- Platform reports
-
-## Company Admin
-
-Verify:
-
-- Inventory only if enabled/permitted
-- Document only if enabled/permitted
-- Billing only if Billing View enabled
-- Audit only when authorized
-- `allowed_reports` enforced
-- All report rows own-customer only
-
-## Direct Request
-
-Manually submit unauthorized report code.
-
-Expected:
-
-403 Forbidden.
-
-UI filtering alone is not a passing test.
+- Customers list with many customers
+- Overview query count
+- Paginated users/billing/audit
+- No N+1 on status/plan/license columns
 
 ---
 
-# 21. Import & Export Tests
+# 20. Security Review Checklist
 
-Verify permission, module, license, tenant ownership, report entitlement and audit.
-
----
-
-# 22. Performance Targets
-
-Keep existing project performance targets and benchmark after authorization changes.
-
----
-
-# 23. Browser Compatibility
-
-Chrome, Edge, Firefox, Safari where supported.
+- Parent route authorization
+- Child scope
+- Mass assignment
+- IDOR
+- Hidden customer_id manipulation
+- Embedded action authorization
+- Cross-customer relation selectors
+- Billing mutation
+- Subscription/license mutation
+- Audit leakage
 
 ---
 
-# 24. Mobile / PWA Testing
+# 21. UAT
 
-Verify mobile navigation does not expose hidden platform functions.
+Business UAT confirms:
 
----
-
-# 25. Accessibility Testing
-
-Target WCAG 2.1 AA.
-
----
-
-# 26. Defect Severity
-
-Critical and High issues block release.
-
-Authorization and tenant leakage are High/Critical depending on exploitability.
+- Customer list is easier to operate
+- Customer profile contains required customer information
+- No need to jump between separate customer-specific menus
+- Customer context is clear
+- Customer management tasks are efficient
+- Platform master areas remain easy to find
 
 ---
 
-# 27. Production Readiness Checklist
+# 22. Release Ready
 
-Before release:
+Customer 360 is release-ready only when:
 
-- Migrations pass
-- Seeders pass
-- Unit/feature/browser tests pass
-- Pint/static analysis pass
-- No Critical/High gaps
-- Tenant isolation verified
-- Report authorization verified
-- Platform/customer navigation verified
-- Audit visibility verified
-- Backup/restore verified
-- Docs synchronized
-
----
-
-# 28. Release Approval
-
-Development, QA, Product Owner and Operations as defined in governance.
-
----
-
-# 29. Definition of Release Ready
-
-No unresolved Critical/High issue.
-
-All access-control acceptance tests must pass.
-
----
-
-# 30. Summary
-
-Testing must prove that customer users see only own-customer, role/module/entitlement-appropriate functions and that hidden functionality remains inaccessible through direct technical paths.
+- All tests pass
+- Browser QA passes
+- Security review passes
+- No Critical/High issue remains
+- Documentation synchronized
+- Conformance gap closed
 
 ---
 
@@ -405,5 +303,6 @@ Testing must prove that customer users see only own-customer, role/module/entitl
 
 | Version | Date | Description |
 |---|---|---|
-| 1.0 | June 2026 | Initial Test Strategy, QA Plan & UAT Specification |
-| 1.1 | 24 August 2026 | Added platform isolation, My Company and report-family authorization regression coverage |
+| 1.0 | June 2026 | Initial QA/UAT Specification |
+| 1.1 | 24 August 2026 | Added strict tenant/My Company/report authorization tests |
+| 1.2 | 25 August 2026 | Added Customer 360 parent-context, navigation and embedded-action test requirements |

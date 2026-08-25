@@ -1,8 +1,8 @@
 # DMIMS Master Functional Specification (MFS)
 
 **Datamation Inventory Management System (DMIMS)**  
-**Version:** 1.1  
-**Updated:** 24 August 2026
+**Version:** 1.2  
+**Updated:** 25 August 2026
 
 ---
 
@@ -19,503 +19,356 @@ No implementation may contradict this specification without an approved change r
 DMIMS Version 1 includes:
 
 1. Dashboard
-2. Customer Management
-3. User Management
+2. Platform Customer Management / Customer 360
+3. Platform User Management
 4. Role & Permission Management
-5. Module Management
-6. Subscription Management
-7. License Management
-8. Billing & Payment Management
-9. Shared Location Management
-10. Stock Inventory
-11. Document Tracking
-12. Barcode Registry
-13. Barcode Scanning
-14. Barcode Printing
-15. Reports & Analytics
-16. Import & Export
-17. Notifications
-18. Audit Logs
-19. System Settings
-20. Progressive Web App
-
-Platform administration and customer presentation are separated.
+5. Module Catalogue
+6. Subscription Plans
+7. Customer Subscription Management
+8. Customer License Management
+9. Billing & Payment Management
+10. Shared Location Management
+11. Stock Inventory
+12. Document Tracking
+13. Barcode Registry/Scanning/Printing
+14. Reports & Analytics
+15. Import & Export
+16. Notifications
+17. Audit Logs
+18. System Settings
+19. Progressive Web App
+20. Customer-facing My Company
 
 ---
 
-# 2. Dashboard Module
-
-## Super Admin Dashboard
+# 2. Platform Dashboard
 
 Displays platform information such as:
 
-- Total Customers
-- Active/Suspended Customers
-- Subscription status
-- License status
+- Customer totals/status
+- Subscription/license status
 - Billing/outstanding balances
-- Revenue summaries
-- Recent audit activity
-- Platform notifications
+- Platform alerts
+- Recent platform activity
 
-## Customer Dashboard
+Quick links may open relevant customer profiles.
 
-Displays only role-relevant own-customer information.
+---
 
-Examples:
+# 3. Platform Customer Management / Customer 360
 
-- Total Products
-- Low Stock
-- Total Boxes
-- Total Document Files
-- Overdue Returns
-- Recent operational activity
-- Subscription Status
+## 3.1 Customers List
+
+Datamation Super Admin can view all customers.
+
+Datamation Management may view permitted read-only customer information.
+
+Recommended list columns:
+
+- Company
+- Company Code
+- Status
+- Current Plan
+- Subscription Status/Expiry
+- License Status/Expiry
+- Users Used / Limit
+- Outstanding Billing
+- Last Activity
+
+Search/filter/sort are supported.
+
+Selecting a customer opens Customer 360.
+
+## 3.2 Customer 360 Route/Workspace
+
+Conceptual workflow:
+
+```text
+Customers
+→ Customer
+→ Customer 360
+```
+
+Required tabs:
+
+### Overview
+
+Shows customer health and summary.
+
+### Users
+
+Lists only users belonging to the selected customer.
+
+Super Admin can create/edit/deactivate permitted customer users.
+
+Customer ownership is automatically the selected Customer.
+
+### Modules
+
+Lists customer module assignments.
+
+Super Admin can enable/disable allowed modules for the selected customer.
+
+### Subscription
+
+Shows current/history subscription details and permits authorized renewal/change actions.
+
+Customer is fixed to the parent context.
+
+### License
+
+Shows current/history license information and permits authorized Super Admin actions.
+
+Customer is fixed to the parent context.
+
+### Billing & Payments
+
+Shows selected-customer billing, invoices, payment history and permitted actions.
+
+### Audit Logs
+
+Shows selected-customer audit events only.
+
+### Activity / Notifications
+
+Optional consolidated timeline of customer-related events/alerts.
+
+## 3.3 Customer 360 Context Rule
+
+No child tab should require an arbitrary Customer selector.
+
+All child queries/actions derive the selected Customer from the parent route/record.
+
+## 3.4 Existing Resources
+
+Customer 360 must reuse existing resources, services, tables and authorization.
+
+It is not a database merge.
+
+---
+
+# 4. Platform Navigation
+
+Recommended platform navigation after Customer 360 implementation:
+
+Dashboard
+
+Customers
+
+Platform Users
+
+Roles & Permissions
+
+Module Catalogue
+
+Subscription Plans
+
+Reports & Analytics
+
+Platform Audit Logs
+
+Backup / Restore
+
+System Settings
+
+Customer-specific Users, Modules, Subscriptions, Licenses, Billing and Payments are managed primarily through Customer 360 rather than separate top-level navigation.
+
+Cross-customer summaries remain available under Reports & Analytics.
+
+---
+
+# 5. Customer-Facing My Company
+
+Customer users do not use Platform Customer 360.
+
+Authorized customer roles use My Company:
+
+- Overview/Profile
+- Users
+- Enabled Modules
+- Subscription Summary
 - License Status
-- Billing status where permitted
+- Billing
+- Audit Logs
 
-Widgets for disabled/unpermitted modules must not appear.
-
----
-
-# 3. Customer Management Module
-
-Platform Customer Management is for Datamation platform roles.
-
-Functions include:
-
-- Create Customer
-- Edit Customer
-- Suspend
-- Reactivate
-- Archive
-- View Customer Details
-- View Customer Users
-- View Modules
-- View Subscription
-- View License
-- View Billing
-- View Audit History
-
-## Customer-Facing My Company
-
-Customer users do not use the multi-customer Customer Management interface.
-
-Authorized Company Admin and Company Supervisor users receive:
-
-**My Company**
-
-Possible tabs:
-
-1. Overview
-2. Users
-3. Enabled Modules
-4. Subscription
-5. License Status
-6. Billing
-7. Audit Logs
-
-Each tab is independently authorized.
-
-### Company Admin
-
-May see:
-
-- Own company profile
-- Own customer users
-- Own enabled modules
-- Own subscription summary
-- Own license status
-- Own billing when Billing View is enabled
-- Own customer audit logs
-
-### Company Supervisor
-
-May see:
-
-- Own company profile
-- Own users according to limited permissions
-- Own enabled modules
-- Own subscription summary
-- Own license status
-- Own billing when Billing View is enabled
-
-Does not receive Audit Logs by default.
-
-### Other Customer Roles
-
-Operational roles should not receive administrative tabs unrelated to their role.
+Each tab remains role/module/entitlement controlled.
 
 ---
 
-# 4. User Management
+# 6. Platform User Management
 
-Functions:
+Platform users remain separate from Customer Users.
 
-- Create
-- Edit
-- Assign role
-- Reset password
-- Lock/unlock
-- Deactivate
-- View login history
+Platform Users include Datamation Super Admin and Datamation Management.
 
-Customer Admin users operate only on their own customer's non-platform users.
-
-Platform users must never appear in customer user management.
+Customer 360 Users tab must not include platform users.
 
 ---
 
-# 5. Module Management
+# 7. Module Management
 
-Available modules include:
+## Module Catalogue
 
-- Stock Inventory
-- Document Tracking
-- Barcode Scanning
-- Barcode Printing
-- Reports
-- Import / Export
-- Advanced Audit
-- Backup / Restore
-- Billing View
+Platform master data.
 
-Disabled modules are hidden and blocked through navigation, routes, actions and services.
+## Customer Modules
 
-Platform Module Management is platform-only.
+Managed through selected Customer 360 → Modules.
 
-Customers may see only a read-only summary of their enabled modules through My Company where permitted.
+Customer users may see enabled module summary only where permitted.
 
 ---
 
-# 6. Subscription Management
+# 8. Subscription Management
 
-Platform functions:
+## Subscription Plans
 
-- Create Plan
-- Edit Plan
-- Assign Plan
-- Renew Subscription
-- Change Modules
-- Update Limits
-- Cancel Subscription
+Platform template catalogue remains separate.
 
-## Customer Subscription Visibility
+## Customer Subscription
 
-Subscription Plans are platform-only master records.
+Managed through selected Customer 360 → Subscription.
 
-Customer users cannot browse or manage Subscription Plans.
-
-Authorized Company Admin/Supervisor users may see only their effective subscription summary:
-
-- Current plan
-- Subscription status
-- Validity dates
-- Effective limits
-- Current usage
-- Enabled modules
-- Allowed report summary
-- Billing cycle
-
-Modification remains a Datamation responsibility.
+Customer users see own summary only.
 
 ---
 
-# 7. License Management
+# 9. License Management
 
-Platform functions:
+Customer-specific full administration is available to Super Admin through selected Customer 360 → License.
 
-- Create
-- Renew
-- Suspend
-- Revoke
-- Reactivate
-- Change access mode
-
-## Customer License Visibility
-
-Customers do not receive License Management.
-
-Authorized Company Admin/Supervisor users may see only a simplified License Status panel.
-
-The panel must not expose unnecessary platform licensing configuration.
+Customer users receive only simplified own status.
 
 ---
 
-# 8. Billing & Payment Module
+# 10. Billing & Payments
 
-Only Datamation Super Admin modifies billing/payment.
+Customer-specific billing administration occurs inside selected Customer 360 → Billing & Payments.
 
-Customer users may view own billing only when Billing View is enabled and permission allows.
+Only authorized platform role may mutate billing/payment.
 
-Customer users cannot:
-
-- Create invoices
-- Issue invoices
-- Cancel billing
-- Record payments
-- Change payment status
+Customer users have permitted own read-only billing.
 
 ---
 
-# 9. Shared Location Module
+# 11. Inventory Module
 
-Single location hierarchy shared by Inventory and Document Tracking.
+Existing inventory pages/workflows remain unchanged.
 
-External destinations are never stored as fake locations.
-
----
-
-# 10. Stock Inventory Module
-
-Pages:
-
-- Categories
-- Products
-- Locations
-- Receive-In
-- Internal Transfer
-- Stock Out
-- Adjustment
-- Movement History
-- Inventory Reports
-
-All records and actions are tenant-scoped.
+Customer 360 may show usage/status summaries but does not replace Inventory operations.
 
 ---
 
-# 11. Document Tracking Module
+# 12. Document Tracking Module
 
-Pages:
+Existing document workflows remain unchanged.
 
-- Boxes
-- Files
-- Receive
-- Transfer
-- Move Out
-- Return
-- Movement History
-- Document Reports
-
-All records and actions are tenant-scoped.
+Customer 360 may show usage/status summaries but does not replace operational pages.
 
 ---
 
-# 12. Barcode Module
+# 13. Barcode Module
 
-Types:
-
-- Product
-- Location
-- Box
-- Document File
-
-Scan flow:
-
-Scan  
-↓  
-Lookup Registry  
-↓  
-Determine Type  
-↓  
-Validate Customer  
-↓  
-Validate Permission  
-↓  
-Validate Module  
-↓  
-Open Allowed Screen  
-↓  
-Log Scan
-
-Cross-customer barcodes must not reveal data.
+Existing barcode workflows remain tenant-scoped and permission controlled.
 
 ---
 
-# 13. Reports & Analytics
+# 14. Reports & Analytics
 
-Reports are role-aware, module-aware and entitlement-aware.
+Platform Reports & Analytics remain separate because they support cross-customer analysis.
 
-## Platform Reports
+Customer-specific reports may be linked/filter-scoped from Customer 360.
 
-Platform-only:
-
-- Customer Summary
-- Subscription Report
-- License Report
-- Platform Billing Analytics
-- Platform Payment Analytics
-- Platform Audit Summary
-- Module Usage
-
-## Inventory Reports
-
-Require:
-
-- Reports module where applicable
-- Stock Inventory enabled
-- Inventory view permission
-- Effective report entitlement
-
-Examples:
-
-- Inventory Summary
-- Low Stock
-- Stock Movement
-- Stock Value
-
-## Document Reports
-
-Require:
-
-- Reports module where applicable
-- Document Tracking enabled
-- Document view permission
-- Effective report entitlement
-
-Examples:
-
-- File Master
-- Box Master
-- Files by Box
-- Boxes by Location
-- Movement History
-- External Movement
-- Overdue Returns
-
-## Billing Reports
-
-Require:
-
-- Billing View enabled
-- View Billing permission
-- Own-customer scope for customer users
-
-## Audit Reports
-
-Company Admin may see only own-customer audit information when audit access is enabled/permitted.
-
-## Report Selector Rule
-
-The report selector must contain only reports the authenticated user is authorized to execute.
-
-Backend generation repeats the same checks.
+Customer users receive only role/module/entitlement-authorized reports.
 
 ---
 
-# 14. Import & Export
+# 15. Audit Logs
 
-Imports supported for authorized operational modules.
+Platform Audit Logs remain separate for platform-level review.
 
-Exports supported in configured formats.
+Customer 360 Audit Logs show only the selected customer.
 
-Every import/export:
-
-- Validates permission
-- Validates module
-- Validates customer ownership
-- Validates license
-- Validates entitlement/limits where applicable
-- Writes audit record
+Customer My Company Audit shows only authenticated user's customer.
 
 ---
 
-# 15. Notifications
+# 16. Import & Export
 
-Generated for relevant customer/platform events.
-
-Customer notifications remain tenant-scoped.
+Existing module/permission/customer rules remain authoritative.
 
 ---
 
-# 16. Audit Logs
+# 17. Notifications
 
-Audit records include user, customer, module, action, timestamp, IP and value changes.
+Platform and customer notifications remain correctly scoped.
 
-Immutable.
-
-Company Admin may view only exact own-customer audit records.
-
-Platform `customer_id = NULL` audit records are not customer-visible.
-
----
-
-# 17. System Settings
-
-Platform settings are platform-only.
-
-Customer settings may be exposed only where explicitly supported and authorized.
+Customer 360 may display customer-related alerts.
 
 ---
 
 # 18. Progressive Web App
 
-Installable, responsive and online-first.
+Customer 360 is primarily a platform administration workflow.
 
-Navigation remains role-aware in desktop, mobile and PWA modes.
+Customer My Company and operational navigation remain responsive/PWA compatible.
 
 ---
 
 # 19. Global Validation Rules
 
-Across all modules:
+Across Customer 360:
 
-- Validate required fields
-- Validate ownership
-- Validate resource scope
-- Check permissions
-- Check subscription
-- Check license
-- Check module
-- Check report entitlement where applicable
-- Audit critical actions
-- Use transactions where required
+- Parent customer authorization required
+- Child customer ownership derived server-side
+- No arbitrary child customer switching
+- Existing resource authorization reused
+- Direct child routes protected
+- Mutations audited
+- Transactions preserved
+- Existing tenant isolation unchanged
 
 ---
 
 # 20. Functional Acceptance Criteria
 
-A feature is accepted only when:
+Customer 360 is accepted only when:
 
-- Behaviour matches specification
-- Validation is enforced
-- Security is enforced
-- Customer isolation is verified
-- Platform/customer boundary is verified
-- Audit logging is complete
-- Error handling is implemented
-- UI follows design system
-- Automated tests pass
-- UAT is approved
+- Customers list works
+- View Customer / Customer 360 works
+- All required tabs work
+- Parent context cannot be tampered with
+- Child lists show selected customer only
+- Child create/update automatically uses selected customer
+- Datamation Management is read-only
+- Customer roles cannot access Customer 360
+- Existing My Company remains correct
+- Reports/operational modules do not regress
+- Automated and browser tests pass
 
 ---
 
-# 21. Future Functional Enhancements
+# 21. Future Enhancements
 
-May include:
+Potential Customer 360 enhancements:
 
-- Native mobile apps
-- Offline synchronization
-- RFID
-- OCR
-- AI classification
-- AI forecasting
-- Public REST API expansion
-- GraphQL
-- Microsoft 365
-- SAP
-- Multi-language
-- Multi-currency
+- Customer health score
+- Renewal alerts
+- Usage trend charts
+- Billing timeline
+- Support tickets
+- Account notes
+- Customer contact history
 
-Future features must inherit the same platform/tenant resource-scope rules.
+Future additions must reuse authoritative services/data.
 
 ---
 
 # 22. Functional Summary
 
-Customer users only receive features belonging to their customer, enabled modules, role permissions, subscription/report entitlement and license access.
+Platform customer administration is centered on one Customers list and one Customer 360 workspace per customer.
 
-Platform administration remains separate.
+Customer users remain centered on My Company and authorized operational modules.
 
 ---
 
@@ -523,5 +376,6 @@ Platform administration remains separate.
 
 | Version | Date | Description |
 |---|---|---|
-| 1.0 | June 2026 | Initial Master Functional Specification |
-| 1.1 | 24 August 2026 | Added My Company, strict tenant scope and module/permission-aware report model |
+| 1.0 | June 2026 | Initial MFS |
+| 1.1 | 24 August 2026 | Added My Company and strict tenant access |
+| 1.2 | 25 August 2026 | Added Platform Customer 360 and consolidated customer-specific management workflow |

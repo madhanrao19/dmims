@@ -33,6 +33,100 @@ Existing fixes remain authoritative and must not regress.
 
 ---
 
+## Platform Customer 360 Design Review — 25 August 2026
+
+The Product Owner approved a customer-centric Platform administration model.
+
+### Approved Target
+
+Datamation Super Admin uses:
+
+```text
+Customers
+→ Select Customer
+→ Customer 360 / Customer Profile
+```
+
+Customer 360 contains:
+
+- Overview
+- Users
+- Modules
+- Subscription
+- License
+- Billing & Payments
+- Audit Logs
+- Activity/Notifications where useful
+
+Customer-specific platform administration should no longer require separate primary sidebar navigation for Customer Users, Customer Modules, Customer Subscriptions, Customer Licenses, Customer Billing or Customer Payments.
+
+Underlying resources/models/services remain separate and authoritative.
+
+Platform-wide master/administration remains separate:
+
+- Platform Users
+- Roles & Permissions
+- Module Catalogue
+- Subscription Plans
+- Reports & Analytics
+- Platform Audit Logs
+- Backup / Restore
+- System Settings
+
+### Current Implementation Review
+
+As of 25 August 2026:
+
+- `CustomerResource` currently exposes list/create/edit pages but no dedicated ViewCustomer/Customer 360 page.
+- `Customer` already exposes relationships for users, departments, customer modules, subscriptions and licenses.
+- Billing records are customer-owned by `customer_id`.
+- Existing customer-facing `My Company` is implemented and must not regress.
+- Existing customer-specific platform resources remain separate today.
+
+### WIP Medium — Platform Customer 360 Not Yet Implemented
+
+This is primarily a functional/UX conformance gap, not evidence of a new data leak in the existing separate-resource implementation.
+
+Implementation risk is **High** because the change touches authorization, tenant context, subscriptions, licensing and billing.
+
+Required implementation:
+
+1. Add Customer View / Customer 360 page.
+2. Add Overview.
+3. Embed/reuse Users.
+4. Embed/reuse Customer Modules.
+5. Embed/reuse Customer Subscription.
+6. Embed/reuse License administration.
+7. Embed/reuse Billing & Payments.
+8. Embed/reuse customer Audit Logs.
+9. Derive all child `customer_id` values from the selected parent Customer.
+10. Remove/hide duplicate customer-specific platform navigation after parity is verified.
+11. Preserve separate platform master areas.
+12. Preserve customer-facing My Company.
+13. Add browser/security regression tests.
+
+### Security Acceptance
+
+Customer A profile must never mutate/read Customer B child data.
+
+Customer 360 child forms must not accept an arbitrary browser-selected customer ownership.
+
+Datamation Management must remain read-only.
+
+Customer roles must not access Platform Customer 360.
+
+### Status
+
+**Documentation:** ✅ Approved
+**Implementation:** WIP / Not yet implemented
+**Security regression tests:** WIP
+**Browser QA:** WIP
+**Conformance:** Not yet closed
+
+Close this gap only after implementation, tests, security review, browser QA and documentation synchronization pass the Definition of Done.
+
+---
+
 # 2. Access-Control Design Review — 24 August 2026
 
 A customer-facing access-control review identified a further class of least-privilege gaps.

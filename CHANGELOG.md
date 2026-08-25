@@ -4,6 +4,23 @@ All notable changes to DMIMS (Datamation Inventory Management System) are
 documented here. The format is based on [Keep a Changelog](https://keepachangelog.com/),
 and the project aims to follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed — approved Platform Customer 360 administration model
+
+Documentation updated on 25 August 2026 to define a consolidated Datamation Super Admin customer-management workflow.
+
+- `Customers` becomes the primary platform entry for customer-specific administration.
+- Selecting a customer opens a planned Customer 360 / Customer Profile workspace.
+- Customer 360 consolidates Overview, Users, Modules, Subscription, License, Billing & Payments and Audit Logs.
+- Customer-specific child ownership is derived from the selected Customer parent; child forms must not use arbitrary customer selection.
+- Existing underlying models/resources/services remain separate and authoritative; this is not a database merge.
+- Platform Users, Roles & Permissions, Module Catalogue, Subscription Plans, Reports & Analytics, Platform Audit, Backup / Restore and System Settings remain separate platform functions.
+- Existing customer-facing My Company remains unchanged in purpose and must not regress.
+- `docs/CONFORMANCE_GAP_ANALYSIS.md` tracks implementation as pending until code, tests, security review and browser QA are complete.
+
+This entry documents the approved target only and does not claim production behaviour has changed.
+
 ## [2.1.40] - 2026-08-24
 
 ### Fixed — Scan Center / Reports action buttons, and broken avatar image

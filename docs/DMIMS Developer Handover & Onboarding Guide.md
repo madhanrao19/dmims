@@ -1,563 +1,176 @@
-# **DMIMS Developer Handover & Onboarding Guide**
+# DMIMS Developer Handover & Onboarding Guide
 
-## **Datamation Inventory Management System (DMIMS)**
-
-**Version:** 1.0
-
----
-
-# **Document Purpose**
-
-This guide enables a new developer to become productive on the DMIMS project as quickly as possible.
-
-It explains:
-
-* How the project is organised  
-* How to set up the development environment  
-* How to understand the codebase  
-* Development workflow  
-* Common pitfalls  
-* Coding expectations  
-* First development tasks
-
-A developer should be able to contribute confidently after completing this guide.
+**Datamation Inventory Management System (DMIMS)**  
+**Version:** 1.1  
+**Updated:** 25 August 2026
 
 ---
 
-# **1\. Project Overview**
+# 1. Project Overview
 
-DMIMS (Datamation Inventory Management System) is a multi-tenant enterprise inventory and document tracking platform.
+DMIMS is a multi-tenant enterprise platform.
 
-The application is designed around these principles:
+Key concepts:
 
-* Multi-company architecture  
-* Customer data isolation  
-* Service-oriented business logic  
-* Immutable audit history  
-* Subscription management  
-* License management  
-* Barcode-driven workflows  
-* Progressive Web App (PWA)
-
----
-
-# **2\. Technology Stack**
-
-| Layer | Technology |
-| ----- | ----- |
-| Backend | Laravel 13 |
-| Admin Panel | Filament 5 |
-| Language | PHP 8.4+ |
-| Database | MariaDB 11 (MySQL 8 compatible) |
-| Frontend | Blade \+ Tailwind \+ Alpine.js |
-| Build Tool | Vite |
-| Queue | Laravel Database Queue |
-| Deployment | Ubuntu 24.04 \+ Apache \+ Cloudflare Tunnel |
+- Strict customer isolation
+- Platform/customer role boundary
+- My Company for customer roles
+- Customer 360 for platform customer administration
+- Subscription/license separation
+- Manual billing
+- Immutable audit/movement history
 
 ---
 
-# **3\. Documents You Must Read**
+# 2. Read Before Coding
 
-Read these documents in order:
+Mandatory order:
 
-1. Developer Getting Started Guide  
-2. Developer Blueprint  
-3. System Architecture Document  
-4. Technical Design Document  
-5. Business Rules Specification  
-6. Security & Access Control Matrix  
-7. Database Dictionary  
-8. API & Integration Specification  
-9. Development Standards & Coding Guidelines
-
-Do not begin feature development until these documents are understood.
-
----
-
-# **4\. Repository Structure**
-
-app/  
-config/  
-database/  
-public/  
-resources/  
-routes/  
-storage/  
-tests/  
-vendor/
-
-Important folders:
-
-app/Models  
-app/Services  
-app/Filament  
-app/Http  
-app/Observers  
-database/migrations  
-database/seeders  
-tests
+1. Engineering Constitution
+2. Governance
+3. Definition of Done
+4. Conformance Gap
+5. Security Matrix
+6. MFS
+7. SAD
+8. TDD
+9. Business Rules
+10. Database Dictionary
+11. Test Strategy
+12. UI/UX
 
 ---
 
-# **5\. Important Services**
+# 3. Two Customer Administration Experiences
 
-Before changing anything, understand these services:
+## Customer Roles — My Company
 
-AccessControlService
+Customer derived from authenticated user.
 
-CustomerSubscriptionObserver (subscription lifecycle)
+Own-company only.
 
-LicenseService
+## Datamation Platform — Customer 360
 
-StockMovementService
+Customer selected from Platform Customers list.
 
-DocumentMovementService
+All child records/actions fixed to selected parent customer.
 
-BarcodeService
-
-AuditService
-
-NotificationService
-
-These services contain the business logic.
+Do not confuse the two contexts.
 
 ---
 
-# **6\. Core Business Concepts**
+# 4. Customer 360 Target
 
-Every developer must understand the following concepts before writing code.
+Customers  
+↓  
+Select Customer  
+↓  
+Overview | Users | Modules | Subscription | License | Billing & Payments | Audit
 
-## **Customer**
-
-A customer is a company using DMIMS.
-
-Every customer owns its own data.
-
----
-
-## **Customer Isolation**
-
-Every customer-owned record includes:
-
-customer\_id
-
-Never trust customer\_id from the browser.
-
-Always derive it from the authenticated user.
+Underlying models/services remain separate.
 
 ---
 
-## **Subscription**
-
-Commercial entitlement.
-
-Controls:
-
-* Plan  
-* Modules  
-* Limits  
-* Billing cycle
-
----
-
-## **License**
-
-Technical access.
-
-Controls:
-
-* Full access  
-* View only  
-* Blocked
-
----
-
-## **AccessControlService**
-
-Combines:
-
-User
-
-↓
-
-Company
-
-↓
-
-Subscription
-
-↓
-
-License
-
-↓
-
-Module
-
-↓
-
-Permission
-
-↓
-
-Limits
-
-Never duplicate this logic elsewhere.
-
----
-
-# **7\. Development Workflow**
-
-Every task should follow this sequence.
-
-Understand requirement
-
-↓
-
-Review related documentation
-
-↓
-
-Review existing implementation
-
-↓
-
-Design solution
-
-↓
-
-Implement
-
-↓
-
-Test
-
-↓
-
-Update documentation
-
-↓
-
-Create Pull Request
-
----
-
-# **8\. Before Writing Code**
-
-Ask yourself:
-
-Does this feature already exist?
-
-Can I reuse an existing service?
-
-Does it affect customer isolation?
-
-Does it require audit logging?
-
-Does it require database transactions?
-
-Does it require permissions?
-
-Does it require tests?
-
----
-
-# **9\. Coding Workflow**
-
-Step 1
-
-Create feature branch.
-
-Step 2
-
-Implement smallest working solution.
-
-Step 3
-
-Reuse existing architecture.
-
-Step 4
-
-Avoid duplication.
-
-Step 5
-
-Write tests.
-
-Step 6
-
-Run formatter.
-
-Step 7
-
-Submit Pull Request.
-
----
-
-# **10\. Development Checklist**
-
-Before committing:
-
-✓ Builds successfully
-
-✓ No PHP warnings
-
-✓ No JavaScript errors
-
-✓ Tests pass
-
-✓ Migrations succeed
-
-✓ Seeder succeeds
-
-✓ Documentation updated
-
-✓ Audit logging implemented
-
-✓ Transactions implemented
-
----
-
-# **11\. Common Pitfalls**
-
-Never:
-
-* Trust customer\_id from requests.  
-* Bypass AccessControlService.  
-* Put business logic in controllers.  
-* Update movement history.  
-* Delete audit logs.  
-* Duplicate business rules.
-
-Always:
-
-* Reuse Services.  
-* Use Form Requests.  
-* Authorize through `BaseResource::can()` / `permissionFor()` (Filament Resource authorization — DMIMS does not use Laravel Policy classes).  
-* Use database transactions.  
-* Write audit records.
-
----
-
-# **12\. First Week Plan**
-
-## **Day 1**
-
-* Clone repository.  
-* Install dependencies.  
-* Configure environment.  
-* Run migrations.  
-* Run seeders.  
-* Log in to the application.
-
----
-
-## **Day 2**
-
-Read:
-
-* Blueprint  
-* Architecture  
-* Database Dictionary
-
-Explore:
-
-* Filament Resources  
-* Models  
-* Services
-
----
-
-## **Day 3**
-
-Debug existing workflows.
+# 5. Important Existing Architecture
 
 Understand:
 
-* Customer isolation  
-* Inventory workflow  
-* Document workflow
+- CustomerResource
+- BaseResource
+- BelongsToCustomer
+- AccessControlService
+- ModuleAccessService
+- LicenseService
+- BillingService
+- PaymentService
+- AuditService
+- CustomerSubscriptionObserver
+- Existing My Company cluster
+- Role-based Playwright tests
 
 ---
 
-## **Day 4**
+# 6. Customer 360 Implementation Expectations
 
-Implement a small bug fix under supervision.
+Use Customer as parent aggregate.
 
-Write tests.
+Reuse existing child resource/table logic.
 
-Submit first Pull Request.
+Do not create parallel authorization.
 
----
+Do not allow customer switching inside child tabs.
 
-## **Day 5**
-
-Review feedback.
-
-Learn coding standards.
-
-Understand deployment process.
+Management role remains read-only.
 
 ---
 
-# **13\. First Month Plan**
+# 7. Common Pitfalls
 
-Week 1
-
-Understand architecture.
-
-Week 2
-
-Complete first feature.
-
-Week 3
-
-Participate in code reviews.
-
-Week 4
-
-Own a small module enhancement independently.
+- Generic Customer select inside Customer 360
+- Child action uses submitted customer_id
+- Embedded action loses resource authorization
+- Customer audit filter queries platform data
+- Overview creates N+1 queries
+- Hiding sidebar item but leaving unauthorized route
+- Breaking customer My Company while changing platform navigation
 
 ---
 
-# **14\. Debugging Tips**
+# 8. Required Tests
 
-Useful Artisan commands:
+Every Customer 360 change should test:
 
-php artisan optimize:clear  
-php artisan migrate:fresh \--seed  
-php artisan test  
-php artisan queue:work  
-php artisan schedule:run
-
-Useful logs:
-
-* Laravel log  
-* Apache log  
-* PHP-FPM log  
-* Queue worker log
+- Parent access
+- Customer A/B isolation
+- Child create/update ownership
+- Embedded actions
+- Management read-only
+- Customer role denied
+- Navigation
+- My Company regression
 
 ---
 
-# **15\. Testing Expectations**
+# 9. Handover Status Rule
 
-Every feature should include:
+If Customer 360 is not yet implemented, it must remain an open item in CONFORMANCE_GAP_ANALYSIS.
 
-* Validation testing  
-* Authorization testing  
-* Customer isolation testing  
-* Business rule testing  
-* Regression testing
-
-Do not rely solely on manual testing.
+Do not describe it as complete based on documentation alone.
 
 ---
 
-# **16\. Pull Request Expectations**
+# 10. Pull Request Expectations
 
-Every Pull Request should include:
+Include:
 
-* Summary  
-* Screenshots (if UI changes)  
-* Database changes  
-* Testing performed  
-* Risks  
-* Documentation updates
-
-Keep Pull Requests focused and reasonably small.
-
----
-
-# **17\. Definition of Done**
-
-A task is complete only when:
-
-* Requirements implemented.  
-* Security verified.  
-* Customer isolation verified.  
-* Tests passing.  
-* Documentation updated.  
-* Code reviewed.  
-* Approved for merge.
+- Scope
+- Screenshots
+- Files changed
+- Security impact
+- Tenant-isolation impact
+- Tests
+- Performance impact
+- Documentation updated
+- Conformance status
 
 ---
 
-# **18\. Frequently Asked Questions**
+# 11. Success Criteria
 
-### **Where does business logic belong?**
+A developer is ready to own Customer 360 work when they can explain:
 
-Services.
-
----
-
-### **Can I use customer\_id from a request?**
-
-No.
-
-Always derive it from the authenticated user.
+- Why customer_id is never trusted from browser
+- Difference between My Company and Customer 360
+- Why Customer is the parent context
+- Why database tables remain separate
+- How embedded Filament authorization is preserved
+- How A/B tenant regression tests prove safety
 
 ---
 
-### **Can I edit audit logs?**
-
-Never.
-
----
-
-### **Can movement history be changed?**
-
-Never.
-
-Use correction records.
-
----
-
-### **Why are subscriptions and licenses separate?**
-
-Subscription \= commercial entitlement.
-
-License \= technical access.
-
----
-
-# **19\. Useful Resources**
-
-Internal documentation:
-
-* Developer Blueprint  
-* Technical Design Document  
-* Database Dictionary  
-* Security Matrix  
-* API Specification  
-* UI/UX Specification  
-* Operations Guide
-
-External documentation:
-
-* Laravel  
-* Filament  
-* PHP  
-* Tailwind CSS  
-* MariaDB
-
----
-
-# **20\. Success Criteria**
-
-A developer is considered fully onboarded when they can:
-
-* Explain the system architecture.  
-* Understand customer isolation.  
-* Navigate the codebase confidently.  
-* Implement a feature following project standards.  
-* Write tests.  
-* Submit production-ready Pull Requests with minimal supervision.
-
----
-
-# **Document History**
+# Document History
 
 | Version | Date | Description |
-| ----- | ----- | ----- |
-| 1.0 | June 2026 | Initial Developer Handover & Onboarding Guide |
-
+|---|---|---|
+| 1.0 | June 2026 | Initial Handover Guide |
+| 1.1 | 25 August 2026 | Added Platform Customer 360 onboarding and implementation requirements |

@@ -1,644 +1,250 @@
-# **DMIMS Developer Getting Started Guide**
+# DMIMS Developer Getting Started Guide
 
-**Datamation Inventory Management System (DMIMS)**
-
-**Version:** 1.0  
-**Project Status:** Production Development  
-**Technology Stack:** Laravel 13 \+ Filament 5 \+ MariaDB (MySQL-compatible) \+ Vite \+ PHP 8.4+
-
----
-
-# **Document Purpose**
-
-This document helps new developers understand, install, configure, and contribute to the Datamation Inventory Management System (DMIMS).
-
-It should be the **first document** every developer reads before starting development.
-
-Related documents:
-
-1. DMIMS Developer Blueprint  
-2. Database Schema & Migration Guide  
-3. Developer Implementation Checklist
+**Datamation Inventory Management System (DMIMS)**  
+**Version:** 1.1  
+**Updated:** 25 August 2026  
+**Technology:** Laravel 13 + Filament 5 + MariaDB + PHP 8.4+
 
 ---
 
-# **1\. Project Overview**
+# 1. Project Overview
 
-## **System Name**
+DMIMS is a multi-tenant platform for:
 
-Datamation Inventory Management System
+- Customer administration
+- Inventory
+- Document tracking
+- Barcode workflows
+- Subscription/license control
+- Billing
+- Reports
+- Audit
+- PWA
 
-**Short Name:** DMIMS
-
-## **Purpose**
-
-DMIMS is a multi-tenant inventory and document tracking platform built for Datamation.
-
-The system enables Datamation to manage multiple customer companies from a single platform while ensuring complete data isolation between customers.
-
-Major modules include:
-
-* Customer Management  
-* User Management  
-* Stock Inventory  
-* Document Tracking  
-* Shared Location Management  
-* Barcode Registry  
-* Barcode Scanning  
-* Barcode Printing  
-* Subscription Management  
-* License Management  
-* Manual Billing  
-* Reports  
-* Audit Logs  
-* Notifications  
-* Progressive Web App (PWA)
+Platform customer administration is customer-centric through the approved Customer 360 architecture.
 
 ---
 
-# **2\. Technology Stack**
+# 2. Mandatory Documents
 
-## **Backend**
+Before development read:
 
-Laravel 13
-
-## **Admin Framework**
-
-Filament 5
-
-## **Programming Language**
-
-PHP 8.4+
-
-## **Database**
-
-MariaDB 11 (MySQL 8 compatible)
-
-## **Authentication**
-
-Laravel Authentication
-
-Filament Authentication
-
-Spatie Laravel Permission
-
-## **Frontend**
-
-Blade
-
-Tailwind CSS
-
-Alpine.js
-
-Vite
-
-## **Queue**
-
-Laravel Database Queue
-
-## **Cache**
-
-File Cache
-
-Redis (future enhancement)
-
-## **Barcode**
-
-Code128
-
-Future:
-
-QR Code
-
-## **Reports**
-
-CSV
-
-Excel
-
-PDF
-
-Print View
-
-## **Server**
-
-Ubuntu 24.04 LTS
-
-Apache
-
-PHP-FPM
-
-Supervisor
-
-Cron
-
-Cloudflare Tunnel
+1. Engineering Constitution
+2. Project Governance
+3. DEFINITION_OF_DONE
+4. CONFORMANCE_GAP_ANALYSIS
+5. Security & Access Control Matrix
+6. MFS
+7. SAD
+8. TDD
+9. Business Rules
+10. Database Dictionary
+11. UI/UX Specification
+12. Test Strategy
 
 ---
 
-# **3\. Development Principles**
+# 3. Core Rules
 
-Every developer must understand these rules before writing code.
-
-## **Rule 1**
-
-Every customer-owned record contains:
-
-customer\_id
-
-## **Rule 2**
-
-Company users only see records belonging to their own customer.
-
-## **Rule 3**
-
-Never trust customer\_id submitted from the browser.
-
-Always use the authenticated user's customer context.
-
-## **Rule 4**
-
-Business logic belongs inside Services.
-
-Controllers should remain thin.
-
-## **Rule 5**
-
-Every important action must be audited.
-
-## **Rule 6**
-
-Movement logs are immutable.
-
-Never edit historical movement records.
+- Never trust request customer_id.
+- TENANT_STRICT is default for customer-owned data.
+- Reuse AccessControlService/BaseResource architecture.
+- Audit critical mutations.
+- Keep movement/audit history immutable.
+- Do not duplicate business logic.
 
 ---
 
-# **4\. Recommended Development Environment**
+# 4. Platform Customer 360 Concept
 
-Operating System
+Developers must understand two distinct customer contexts.
 
-Windows 11
+## Customer User Context
 
-Ubuntu 24.04 LTS
+Customer role:
 
-macOS
+```text
+customer_id = authenticated user's customer_id
+```
 
-Recommended IDE
+Presentation:
 
-Visual Studio Code
+**My Company**
 
-Recommended Extensions
+## Platform Customer 360 Context
 
-PHP Intelephense
+Authorized platform role:
 
-Laravel Extension Pack
+```text
+Customers
+→ selected Customer
+→ child customer-owned data
+```
 
-Laravel Blade Formatter
+Child ownership:
 
-PHP Debug
+```text
+customer_id = selected Customer ID
+```
 
-GitLens
-
-EditorConfig
-
-Prettier
-
-Laravel Pint
-
----
-
-# **5\. Required Software**
-
-Install the following:
-
-Git
-
-PHP 8.4+
-
-Composer
-
-Node.js 22 LTS
-
-npm
-
-MariaDB 11 (MySQL 8 compatible)
-
-Visual Studio Code
+The browser must not choose a different child customer.
 
 ---
 
-# **6\. Clone the Project**
+# 5. Customer 360 Target Components
 
-Clone the repository:
+Platform Customers:
 
-git clone https://github.com/madhanrao19/dmims.git
+- ListCustomers
+- CreateCustomer
+- ViewCustomer / Customer360
+- EditCustomer
 
-Enter the project folder:
+Customer 360:
 
-cd dmims
+- Overview
+- Users
+- Modules
+- Subscription
+- License
+- Billing & Payments
+- Audit
+
+Reuse existing resources/services.
 
 ---
 
-# **7\. Install Dependencies**
+# 6. Navigation Rule
 
-Install PHP packages
+After Customer 360 implementation, customer-specific platform administration is contextual under Customers.
 
+Platform-wide master areas remain separate.
+
+---
+
+# 7. Local Setup
+
+Use current repository README/deployment setup.
+
+Typical:
+
+```bash
 composer install
-
-Install frontend packages
-
 npm install
-
-Publish Filament's admin-panel assets (CSS/JS/fonts). Required after every
-fresh `composer install` — without it the admin panel loads with no
-JavaScript errors visible on the page, but interactive elements (buttons,
-selects, modals) silently do nothing because Alpine.js components never
-register.
-
-php artisan filament:assets
-
----
-
-# **8\. Environment Configuration**
-
-Copy the example environment file.
-
-cp .env.example .env
-
-Generate the application key.
-
 php artisan key:generate
-
-Configure database settings.
-
-Example:
-
-DB\_CONNECTION=mysql  
-DB\_HOST=127.0.0.1  
-DB\_PORT=3306  
-DB\_DATABASE=dmims  
-DB\_USERNAME=root  
-DB\_PASSWORD=password
-
----
-
-# **9\. Database Setup**
-
-Run migrations.
-
 php artisan migrate
-
-Seed default data.
-
-php artisan db:seed
-
-If rebuilding from scratch:
-
-php artisan migrate:fresh \--seed
-
----
-
-# **10\. Build Frontend Assets**
-
-Development
-
-npm run dev
-
-Production
-
-npm run build
-
----
-
-# **11\. Run the Application**
-
-php artisan serve
-
-Open
-
-http://127.0.0.1:8000
-
-Filament Admin
-
-http://127.0.0.1:8000/admin
-
----
-
-# **12\. Project Folder Structure**
-
-app/  
-    Console/  
-    Exceptions/  
-    Filament/  
-    Http/  
-    Jobs/  
-    Mail/  
-    Models/  
-    Observers/  
-    Providers/  
-    Services/
-
-bootstrap/
-
-config/
-
-database/  
-    factories/  
-    migrations/  
-    seeders/
-
-public/
-
-resources/  
-    css/  
-    js/  
-    views/
-
-routes/
-
-storage/
-
-tests/
-
----
-
-# **13\. Important Folders**
-
-## **app/Models**
-
-Database models.
-
----
-
-## **app/Services**
-
-Contains business logic.
-
-Business rules should not be implemented inside controllers.
-
----
-
-## **app/Filament**
-
-Filament Resources
-
-Pages
-
-Widgets
-
-Forms
-
-Tables
-
----
-
-## **database/migrations**
-
-Database schema.
-
----
-
-## **database/seeders**
-
-Default roles
-
-Permissions
-
-Modules
-
-Subscription plans
-
-Demo users
-
----
-
-## **resources/views**
-
-Blade templates.
-
----
-
-## **routes**
-
-Application routes.
-
----
-
-## **tests**
-
-Unit Tests
-
-Feature Tests
-
----
-
-# **14\. Development Workflow**
-
-Recommended order:
-
-1. Pull latest code  
-2. Create feature branch  
-3. Implement feature  
-4. Test locally  
-5. Run code formatter  
-6. Commit  
-7. Push branch  
-8. Create Pull Request  
-9. Code Review  
-10. Merge
-
----
-
-# **15\. Git Branch Naming**
-
-Feature
-
-feature/customer-management
-
-Bug Fix
-
-bugfix/barcode-print
-
-Hotfix
-
-hotfix/login-error
-
----
-
-# **16\. Coding Standards**
-
-Follow PSR-12.
-
-Use Laravel Pint.
-
-Use strict typing where practical.
-
-Keep controllers thin.
-
-Use dependency injection.
-
-Avoid duplicated logic.
-
-Prefer Services for business logic.
-
-Use transactions for inventory and document movements.
-
----
-
-# **17\. Common Artisan Commands**
-
-Generate model
-
-php artisan make:model Product
-
-Generate migration
-
-php artisan make:migration
-
-Generate Filament Resource
-
-php artisan make:filament-resource Product
-
-Generate Service
-
-php artisan make:class Services/ProductService
-
-Clear cache
-
-php artisan optimize:clear
-
----
-
-# **18\. Running Tests**
-
-Run all tests
-
-php artisan test
-
-Run a specific test
-
-php artisan test \--filter ProductTest
-
----
-
-# **19\. Before Every Commit**
-
-Confirm:
-
-* Application runs  
-* No PHP errors  
-* No JavaScript errors  
-* Migrations succeed  
-* Seeder succeeds  
-* Feature tested  
-* No debug code left behind  
-* No credentials committed
-
----
-
-# **20\. Common Problems**
-
-## **Composer Error**
-
-composer install  
-composer dump-autoload
-
----
-
-## **Missing APP\_KEY**
-
-php artisan key:generate
-
----
-
-## **Permission Errors**
-
-php artisan storage:link
-
-Ensure storage permissions are correct.
-
----
-
-## **Migration Error**
-
-php artisan migrate:fresh \--seed
-
----
-
-## **Frontend Assets Missing**
-
-npm install
-
-npm run dev
-
----
-
-## **Admin Panel Loads but Buttons/Selects/Modals Don't Work**
-
-No console errors on the page itself, but the browser console shows errors
-like `filamentFormButton is not defined` or `selectFormComponent is not
-defined`. Filament's own vendor JS/CSS was never published to `public/` —
-run:
-
 php artisan filament:assets
+npm run build
+php artisan test
+```
 
 ---
 
-# **21\. Development Best Practices**
+# 8. Important Code Areas
 
-Always:
+- `app/Filament/Resources`
+- `app/Filament/Clusters`
+- `app/Models`
+- `app/Services`
+- `app/Models/Concerns`
+- `tests/Feature`
+- `tests/playwright`
+- `docs`
 
-* Use database transactions for inventory updates.  
-* Write audit logs for important actions.  
-* Validate user input.  
-* Check permissions before modifying data.  
-* Respect customer isolation.  
-* Reuse existing services whenever possible.  
-* Keep methods focused and easy to understand.
+---
+
+# 9. Customer Model
+
+Customer is the natural platform administration parent.
+
+Review existing relationships before adding new ones.
+
+Add Eloquent relationships only when schema supports them.
+
+---
+
+# 10. Development Workflow
+
+Understand  
+↓  
+Inspect docs/code  
+↓  
+Classify risk  
+↓  
+Plan root cause  
+↓  
+Implement  
+↓  
+Test  
+↓  
+Security review  
+↓  
+Update docs  
+↓  
+PR
+
+---
+
+# 11. Customer 360 Development Safety
 
 Never:
 
-* Hardcode customer IDs.  
-* Trust browser-submitted customer IDs.  
-* Bypass access control.  
-* Delete movement history.  
-* Store business logic in Blade templates.  
-* Expose secrets or credentials.
+- Copy customer_id from form request
+- Add generic customer selector to child tabs
+- Duplicate resource permissions
+- Bypass embedded-action authorization
+- Load all child history into Overview
+- Merge domain tables merely for UI convenience
+
+Always:
+
+- Resolve parent Customer server-side
+- Reuse child relationships/resources/services
+- Paginate heavy tables
+- Audit mutations
+- Test A/B customer isolation
 
 ---
 
-# **22\. First Development Milestone**
+# 12. Testing
 
-The first successful milestone is achieved when:
+For Customer 360 run:
 
-* Datamation Super Admin can create Customer A.  
-* Datamation Super Admin can create Customer B.  
-* Customer A users only see Customer A data.  
-* Customer B users only see Customer B data.  
-* Company isolation is fully enforced.  
-* Filament Resources load correctly.  
-* Migrations and seeders complete without errors.
-
----
-
-# **23\. Where to Go Next**
-
-After completing this guide, developers should read the documents in the following order:
-
-1. Developer Blueprint  
-2. Database Schema & Migration Guide  
-3. Developer Implementation Checklist  
-4. Technical Design Document (TDD)  
-5. System Architecture Document (SAD)  
-6. Business Rules Document  
-7. Database Dictionary
+- Feature tests
+- Permission tests
+- Tenant tests
+- Browser/Playwright tests
+- Static analysis
+- Frontend build
 
 ---
 
-# **Document History**
+# 13. First Milestone
+
+A successful Customer 360 implementation proves:
+
+- Super Admin sees all Customers
+- Opens Customer A profile
+- Manages A users/modules/subscription/license/billing without re-selecting customer
+- Audit shows A only
+- Customer B cannot be affected from A context
+- Management is read-only
+- Customer roles cannot access Customer 360
+- My Company remains correct
+
+---
+
+# 14. Definition of Done
+
+Follow repository DEFINITION_OF_DONE.
+
+No Customer 360 task is complete while its Conformance Gap remains open.
+
+---
+
+# Document History
 
 | Version | Date | Description |
-| ----- | ----- | ----- |
-| 1.0 | June 2026 | Initial Developer Getting Started Guide |
-
+|---|---|---|
+| 1.0 | June 2026 | Initial Getting Started Guide |
+| 1.1 | 25 August 2026 | Added Customer 360 architecture and implementation safety guidance |

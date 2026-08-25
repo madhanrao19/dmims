@@ -1,430 +1,380 @@
 # DMIMS Technical Design Document (TDD)
 
 **Datamation Inventory Management System**  
-**Version:** 1.1  
-**Updated:** 24 August 2026
-
----
-
-# Document Purpose
-
-Defines the technical implementation standards for DMIMS.
+**Version:** 1.2  
+**Updated:** 25 August 2026
 
 ---
 
 # 1. Technical Stack
 
-| Layer | Technology |
-|---|---|
-| Backend | Laravel 13 |
-| Admin Panel | Filament 5 |
-| Language | PHP 8.4+ |
-| Database | MariaDB / MySQL compatible |
-| Authentication | Laravel + Filament |
-| Permissions | Spatie Laravel Permission |
-| Frontend | Blade + Tailwind CSS + Alpine.js |
-| Build Tool | Vite |
-| Queue | Database Queue |
-| Cache | File Cache, Redis-ready |
-| Server | Ubuntu 24.04 + Apache + PHP-FPM |
+Use current DMIMS stack:
+
+- Laravel 13
+- Filament 5
+- PHP 8.4+
+- MariaDB/MySQL compatible
+- Spatie Permission
+- Blade/Tailwind/Alpine
+- Vite
 
 ---
 
-# 2. Directory Structure
+# 2. Core Design Rules
 
-Use existing DMIMS Laravel structure under:
-
-- app/Filament
-- app/Http
-- app/Models
-- app/Services
-- app/Traits
-- app/Observers
-- app/Jobs
-- resources
-- routes
-- tests
-- docs
-
-Reuse existing architecture.
+- Reuse existing architecture.
+- Business logic stays in services.
+- Resource authorization stays server-side.
+- Never trust request customer_id.
+- Keep tenant isolation.
+- No duplicate Customer 360 business logic.
 
 ---
 
-# 3. Laravel Design Rules
+# 3. Resource Scope
 
-Controllers remain thin.
-
-Business logic belongs in services.
-
-Models hold relationships/scopes/casts.
-
-Middleware handles cross-cutting validation.
-
-Filament resources must enforce authorization server-side.
-
-Never rely only on UI visibility.
-
-## 3.1 Resource Scope Classification
-
-Each resource/page must explicitly identify one logical access scope:
+Use:
 
 - PLATFORM_ONLY
 - TENANT_STRICT
 - TENANT_WITH_GLOBAL_DEFAULTS
 
-### TENANT_STRICT
-
-For non-platform users:
-
-```php
-$query->where('customer_id', auth()->user()->customer_id);
-```
-
-Do not append `orWhereNull('customer_id')`.
-
-### TENANT_WITH_GLOBAL_DEFAULTS
-
-Only explicitly approved resources may use:
-
-```php
-$query->where(function ($query) use ($user) {
-    $query
-        ->where('customer_id', $user->customer_id)
-        ->orWhereNull('customer_id');
-});
-```
-
-### PLATFORM_ONLY
-
-Customer users fail authorization even if they possess a similarly named generic permission.
-
-Platform-only status must be enforced server-side.
+For Customer 360 child resources, TENANT_STRICT is scoped to the selected authorized parent Customer.
 
 ---
 
-# 4. Required Models
+# 4. Customer 360 Technical Design
 
-Core:
+## 4.1 CustomerResource
 
-- Customer
-- User
-- Module
-- CustomerModule
-- SubscriptionPlan
-- CustomerSubscription
-- SubscriptionLog
+Add a platform View page:
+
+```php
+'view' => Pages\ViewCustomer::route('/{record}')
+```
+
+or equivalent approved Customer 360 route.
+
+The customer table row should link to ViewCustomer.
+
+## 4.2 ViewCustomer
+
+ViewCustomer is the main platform customer workspace.
+
+Recommended sections/tabs:
+
+- Overview
+- Users
+- Modules
+- Subscription
 - License
-- LicenseLog
-- BillingRecord
-- BillingPayment
-- BillingLog
-- Setting
-- AuditLog
-- Notification
+- Billing & Payments
+- Audit Logs
+- Activity/Notifications
 
-Inventory:
+## 4.3 Embedded Resource Reuse
 
-- Category
-- Product
-- ProductLocationStock
-- StockMovement
-- StockAlert
-- Location
-- LocationType
+Where possible, reuse underlying resources:
 
-Document:
-
-- Box
-- DocumentType
-- DocumentFile
-- DocumentMovementLog
-
-Barcode:
-
-- BarcodeRegistry
-- BarcodeScanLog
-
----
-
-# 5. Required Services
-
-Use existing:
-
-- AccessControlService
-- ModuleAccessService
-- LicenseService
-- BillingService
-- PaymentService
-- BarcodeService
-- ScannerService
-- StockMovementService
-- DocumentMovementService
-- AuditService
-- NotificationService
-- ImportService
-- ReportExportService
-- BackupService
-
-Subscription lifecycle may remain split across AccessControlService and subscription observer architecture.
-
----
-
-# 6. Required Middleware
-
-Applicable middleware includes:
-
-- Auth
-- User active
-- Company assigned/active
-- Business access
-- Subscription validation
-- License validation
-- Module validation
-- Activity logging
-
-Middleware order must ensure authentication/session exists before business-access checks.
-
----
-
-# 7. Filament Resources
-
-Resources must not infer customer visibility from permission names alone.
-
-## 7.1 Platform-Only Resources
-
-Examples:
-
-- SubscriptionPlanResource
-- ModuleResource
-- Platform settings
-- BackupResource
-- Other platform administration
-
-Customer users must not register navigation or pass direct authorization.
-
-## 7.2 Strict Tenant Resources
-
-Examples:
-
-- UserResource customer user view
+- UserResource
 - CustomerModuleResource
 - CustomerSubscriptionResource
-- License customer record
+- LicenseResource
 - BillingRecordResource
 - AuditLogResource
-- Operational resources
 
-Query ownership must be exact.
+Use reusable relation managers/embedded tables/components.
 
-## 7.3 Customer-Facing Presentation
+Do not fork their permission logic.
 
-Customer users should not receive separate platform-style navigation entries for customer modules/subscriptions/licenses.
+## 4.4 Parent Context Contract
 
-Where permitted, relevant information should be composed into:
+Customer 360 components receive a trusted `Customer $record`.
 
-**My Company**
+Child queries must use:
 
-Panels:
-
-- Profile
-- Users
-- Enabled Modules
-- Subscription Summary
-- License Status
-- Billing
-- Audit
-
-Every panel independently authorizes access.
-
-Do not duplicate business logic.
-
----
-
-# 8. Naming Standards
-
-Use Laravel conventions:
-
-- plural snake_case tables
-- PascalCase models
-- `Service` suffix
-- explicit permission names
-- explicit scope semantics
-
----
-
-# 9. Database Transactions
-
-Use transactions for critical multi-table operations including inventory/document movement, billing updates, renewals and barcode registration.
-
----
-
-# 10. Error Handling
-
-Throw typed exceptions where appropriate.
-
-Log unexpected errors.
-
-Return user-safe messages.
-
-Do not leak existence of another tenant's records.
-
----
-
-# 11. Logging
-
-Log system errors, failed login, queue failures, import/export failures and unexpected exceptions.
-
-Audit critical business actions separately.
-
----
-
-# 12. Validation Standards
-
-Validate server-side:
-
-- Required fields
-- Length
-- Uniqueness
-- Foreign keys
-- Dates
-- Numbers
-- Files
-- Barcode format
-- Customer ownership
-- Role and platform boundary
-
----
-
-# 13. Database Relationships
-
-All customer-owned relationships must maintain same-customer integrity.
-
-Relationship/select queries must not enumerate records from another customer or platform-only resources.
-
----
-
-# 14. Queue Jobs
-
-Jobs carrying customer work must derive/use trusted customer ownership created server-side.
-
-Do not trust user-supplied `customer_id` embedded in job payloads.
-
----
-
-# 15. Performance Guidelines
-
-Use eager loading, pagination, indexes, caching and streaming/queues for large workloads.
-
-Authorization queries should be efficient and indexed.
-
----
-
-# 16. Security Guidelines
-
-Use:
-
-- CSRF
-- Session security
-- Rate limiting
-- Resource authorization
-- Middleware
-- Validation
-- Parameterized queries
-- Secure uploads
-- HTTPS
-
-Never expose secrets.
-
-Never use navigation visibility as sole security.
-
----
-
-# 17. Testing Requirements
-
-Each module requires feature, unit, permission, validation, transaction and regression tests.
-
-## Mandatory Access-Control Regression Tests
-
-- TENANT_STRICT excludes `customer_id = NULL`.
-- Customer Admin cannot enumerate platform users.
-- Company Admin audit query excludes platform logs.
-- Platform-only resources are inaccessible to customer roles.
-- Stock role cannot run Document reports.
-- Document role cannot run Inventory reports.
-- Billing reports fail when Billing View is disabled.
-- Direct report generation fails for unauthorized report code.
-- Global search cannot leak platform/other-tenant records.
-
----
-
-# 18. ReportExportService Design
-
-Each report definition must declare sufficient authorization metadata.
-
-Recommended fields:
-
-```text
-group
-platform_only
-required_permission
-required_module
-required_report_entitlement
+```php
+->where('customer_id', $record->getKey())
 ```
 
-`view reports` controls entry to Reports, not all report content.
+or a relationship from the parent Customer.
 
-`availableTo()` and generation must enforce the same effective authorization.
+Child create/update mutation must set:
 
-Never rely only on filtering the dropdown.
+```php
+$data['customer_id'] = $record->getKey();
+```
 
----
+server-side.
 
-# 19. Development Workflow
+A browser-supplied alternative must be ignored/rejected.
 
-Follow:
+## 4.5 Customer Selector
 
-Understand  
-↓  
-Discover  
-↓  
-Prioritize  
-↓  
-Implement root cause  
-↓  
-Test  
-↓  
-Security review  
-↓  
-Documentation update  
-↓  
-Release
+Do not display a generic Customer selector inside Customer 360 child forms.
+
+The selected Customer is already known.
+
+This reduces both UX friction and cross-customer assignment risk.
 
 ---
 
-# 20. Definition of Done
+# 5. Customer Model Relationships
 
-A change is complete only when:
+Current model relationships should be extended where useful for Customer 360.
 
-- Business requirement implemented
-- Customer isolation enforced
-- Resource authorization implemented
+Recommended:
+
+```php
+public function billingRecords(): HasMany
+{
+    return $this->hasMany(BillingRecord::class);
+}
+
+public function billingPayments(): HasMany
+{
+    return $this->hasMany(BillingPayment::class);
+}
+
+public function auditLogs(): HasMany
+{
+    return $this->hasMany(AuditLog::class);
+}
+
+public function notifications(): HasMany
+{
+    return $this->hasMany(Notification::class);
+}
+```
+
+Only add relationships that match the actual schema.
+
+No migration is needed solely to add an Eloquent relationship when the foreign key already exists.
+
+---
+
+# 6. Platform Navigation
+
+Target platform navigation:
+
+- Dashboard
+- Customers
+- Platform Users
+- Roles & Permissions
+- Module Catalogue
+- Subscription Plans
+- Reports & Analytics
+- Platform Audit Logs
+- Backup / Restore
+- System Settings
+
+Hide customer-specific top-level navigation after Customer 360 is complete:
+
+- Customer Users
+- Customer Modules
+- Customer Subscriptions
+- Customer Licenses
+- Customer Billing
+- Customer Payments
+
+Do not delete underlying routes/resources unless there is a separate approved refactor.
+
+They may remain available as internal/deep-link destinations used by Customer 360.
+
+---
+
+# 7. Customer List Design
+
+Customer list should support:
+
+- Search
+- Status filter
+- Plan/subscription status where efficient
+- License status where efficient
+- User usage
+- Outstanding billing
+- Last activity where efficient
+
+Avoid expensive per-row N+1 queries.
+
+Use aggregates/subqueries/eager loading.
+
+---
+
+# 8. Customer 360 Overview Design
+
+Use summary cards rather than full child datasets.
+
+Suggested cards:
+
+- Customer Status
+- Subscription
+- License
+- Enabled Modules
+- Users / Limit
+- Products / Limit
+- Files / Limit
+- Boxes / Limit
+- Outstanding Billing
+
+Recent Activity should be limited/paginated or capped.
+
+---
+
+# 9. Authorization
+
+## Super Admin
+
+Full Customer 360 access.
+
+## Datamation Management
+
+Read-only Customer 360.
+
+All mutation actions hidden and server-denied.
+
+## Customer Roles
+
+Customer 360 `canAccess()` returns false.
+
+They use My Company.
+
+---
+
+# 10. Embedded Action Authorization
+
+Any embedded Filament action must explicitly preserve the underlying resource's authorization semantics.
+
+Do not assume embedding automatically maps actions to resource `can()`.
+
+Fail closed for unmapped custom actions.
+
+This is especially important for:
+
+- Edit
+- Delete
+- Record Payment
+- Subscription renewal
+- License suspend/revoke
+- Module enable/disable
+
+---
+
+# 11. Billing/Payment Integration
+
+Customer 360 Billing uses BillingService/PaymentService.
+
+Do not duplicate invoice/payment calculations.
+
+All child records must match selected Customer.
+
+---
+
+# 12. Subscription Integration
+
+Use existing subscription lifecycle/observer/services.
+
+Customer 360 supplies selected Customer context.
+
+Subscription Plan selection remains a platform template choice, but customer ownership is fixed.
+
+---
+
+# 13. License Integration
+
+Use LicenseService.
+
+License management is available only to authorized platform role.
+
+Selected Customer context is fixed.
+
+---
+
+# 14. Module Integration
+
+Use ModuleAccessService/customer_modules.
+
+Module catalogue remains platform-wide.
+
+Assignment is customer-specific.
+
+---
+
+# 15. Audit Integration
+
+Use AuditLogResource/AuditService.
+
+Customer 360 query must be selected-customer only.
+
+---
+
+# 16. Testing Requirements
+
+Add feature/browser tests for:
+
+- Customer list → ViewCustomer navigation
+- Every Customer 360 tab
+- Parent scope tampering
+- Customer A/B child isolation
+- User create parent assignment
+- Module assignment parent lock
+- Subscription parent lock
+- License parent lock
+- Billing/payment parent lock
+- Audit parent scope
+- Management read-only
+- Tenant users forbidden
+- Standalone platform nav consolidation
+- My Company regression
+- Custom embedded action authorization
+- Global search/deep links
+
+---
+
+# 17. Performance Requirements
+
+Customer 360 must remain responsive with large customers.
+
+Use pagination for users, billing and audit.
+
+Do not load every child relation at once.
+
+---
+
+# 18. Security Review
+
+This implementation is High Risk because it touches:
+
+- Authorization
+- Tenant isolation
+- Customer assignment
+- Billing
+- Subscription
+- Licensing
+
+Require security review before merge.
+
+---
+
+# 19. Definition of Done
+
+Complete only when:
+
+- Code implemented
 - Tests pass
+- Browser QA passes
+- Tenant isolation verified
+- No customer-switch bypass
 - Static analysis passes
-- UI correct
-- Docs updated
-- No Critical/High gaps remain in scope
+- UI navigation updated
+- Docs synchronized
+- Conformance gap closed
 
 ---
 
-# 21. Future Enhancements
+# 20. Summary
 
-Future APIs, mobile, SSO, AI, GraphQL and integration layers must reuse the same access-control model.
-
----
-
-# 22. Technical Design Summary
-
-DMIMS uses explicit resource scope, defense in depth, service-oriented business logic and strict platform/customer separation.
+Customer 360 is a composition layer over existing DMIMS resources/services, with the Customer record acting as trusted parent context.
 
 ---
 
@@ -432,5 +382,6 @@ DMIMS uses explicit resource scope, defense in depth, service-oriented business 
 
 | Version | Date | Description |
 |---|---|---|
-| 1.0 | June 2026 | Initial Technical Design Document |
-| 1.1 | 24 August 2026 | Added explicit resource scopes, customer My Company composition and report authorization metadata |
+| 1.0 | June 2026 | Initial TDD |
+| 1.1 | 24 August 2026 | Added resource scopes/My Company |
+| 1.2 | 25 August 2026 | Added technical design for Platform Customer 360 |

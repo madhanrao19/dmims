@@ -1,8 +1,8 @@
 # DMIMS Security & Access Control Matrix
 
 **Datamation Inventory Management System (DMIMS)**  
-**Version:** 1.2  
-**Updated:** 24 August 2026 (§3 clarified same day — see Document History)
+**Version:** 1.3  
+**Updated:** 25 August 2026
 
 ---
 
@@ -15,6 +15,8 @@ It is the authoritative reference for:
 - Filament Resource authorization
 - Spatie permissions
 - Filament navigation
+- Customer 360 / Customer Profile access
+- Customer-facing My Company access
 - Middleware
 - UI visibility
 - Report authorization
@@ -36,23 +38,11 @@ DMIMS follows:
 - Audit Everything
 - No Direct Object Access
 - Explicit Permission Checks
-
-## 1.1 Customer-Facing Access Principle
-
-A customer user must only see or access:
-
-1. Records belonging to the authenticated user's own customer.
-2. Modules enabled for that customer.
-3. Functions permitted by the user's assigned role and permissions.
-4. Reports permitted by the user's operational modules and report entitlement.
-5. Functions allowed by the customer's subscription.
-6. Functions allowed by the customer's current license/access mode.
-
-Platform administration functions must not be visible or accessible to customer users.
+- Trusted Parent Context for Customer Administration
 
 Hiding a menu item is not authorization.
 
-The same access decision must be enforced for:
+Authorization must be enforced for:
 
 - Navigation
 - Dashboard widgets
@@ -61,6 +51,7 @@ The same access decision must be enforced for:
 - Direct URLs
 - Filament Resources
 - Relation Managers
+- Embedded tables
 - Select/dropdown queries
 - Table actions
 - Bulk actions
@@ -78,8 +69,6 @@ The same access decision must be enforced for:
 ---
 
 # 2. Role Hierarchy
-
-Highest privilege:
 
 Datamation Super Admin  
 ↓  
@@ -108,7 +97,7 @@ are platform-tier roles.
 
 Every other role is tenant-scoped.
 
-`users.is_platform_user` must always match whether the user holds a platform-tier role.
+`users.is_platform_user` must match actual platform-tier role membership.
 
 ---
 
@@ -120,7 +109,7 @@ Every DMIMS resource must use one explicit access-scope class.
 
 Platform-owned resources.
 
-Customer users must never receive direct navigation or resource access.
+Customer users must never receive direct navigation or administrative resource access.
 
 Examples:
 
@@ -130,21 +119,13 @@ Examples:
 - Module catalogue
 - Location type catalogue
 - Subscription Plans
-- License administration (create, renew, suspend, revoke, reactivate,
-  technical access mode, limits, module/report overrides — the standalone
-  License Management resource, including internal technical fields such as
-  server fingerprint, installation id and deployment configuration)
+- Full License administration
 - Platform settings
 - Backup / Restore
 - Platform reports
 - Platform audit logs
 
 Only authorized Datamation platform roles may access these resources.
-
-License administration is intentionally listed both here and, in a
-narrower read-only form, under §3.2 — see the note there. This is the only
-resource with a split classification; every other example belongs to
-exactly one scope class.
 
 ## 3.2 TENANT_STRICT
 
@@ -156,9 +137,13 @@ For a customer user:
 customer_id = authenticated user's customer_id
 ```
 
-Only exact tenant ownership is permitted.
+For a Customer 360 child context opened by an authorized platform user:
 
-`customer_id IS NULL` must NOT be included.
+```text
+customer_id = selected Customer record ID
+```
+
+No child screen may accept a different customer ID from the browser.
 
 Examples:
 
@@ -166,30 +151,23 @@ Examples:
 - Customer modules
 - Customer subscriptions
 - Subscription logs
-- License status/history (read-only: status, access mode, valid from/to,
-  expiry warning, and the license log/audit trail — via Dashboard/My
-  Company, not the administrative License Management resource, which is
-  §3.1 PLATFORM_ONLY)
+- License status/history
 - Billing records
 - Billing payments
 - Billing logs
 - Categories
 - Products
 - Locations
-- Product location stocks
 - Stock movements
-- Stock alerts
 - Boxes
 - Document files
-- Document movement logs
-- Barcode registry
-- Barcode scan logs
-- Audit logs
+- Barcode records
+- Customer audit logs
 - Customer notifications
 
 ## 3.3 TENANT_WITH_GLOBAL_DEFAULTS
 
-Used only where the business model explicitly supports shared global reference records.
+Used only for explicitly approved shared reference records.
 
 For a customer user:
 
@@ -199,14 +177,9 @@ OR
 customer_id IS NULL
 ```
 
-Examples may include:
+Examples may include approved global/default Document Types or Settings.
 
-- Global/default Document Types
-- Explicitly approved global Settings/reference values
-
-This scope is opt-in and must never be used as the default tenant scope.
-
-A nullable `customer_id` alone does not authorize customer visibility.
+This scope is opt-in.
 
 ---
 
@@ -216,82 +189,138 @@ A nullable `customer_id` alone does not authorize customer visibility.
 
 Full platform control.
 
-Can manage:
+Can:
 
-- Whole system
-- All customers
-- All users
-- Roles and permissions
-- Modules
-- Subscriptions
-- Licenses
-- Billing
-- Payments
-- Reports
-- Audit logs
-- Backup / restore
-- Settings
-
-Scope: all customers and platform resources.
+- View all customers
+- Open any Customer 360 profile
+- Manage the selected customer's users
+- Manage the selected customer's enabled modules
+- Manage the selected customer's subscription
+- Manage the selected customer's license
+- Manage the selected customer's billing/payments
+- View the selected customer's audit logs
+- Manage platform Subscription Plans
+- Manage platform Module Catalogue
+- Manage platform users
+- Manage roles/permissions
+- Access platform reports, audit, backup and settings
 
 ## Datamation Management
 
-Read-only platform analytics.
+Read-only platform role.
 
-Can view permitted platform summaries and reports.
+May open Customer 360 in read-only mode where permitted.
 
-Cannot modify operational or administrative data.
+Cannot perform customer mutations.
 
-## Company Admin
+## Customer Roles
 
-Customer administrator.
+Customer roles do not access Platform Customer 360.
 
-Can:
-
-- Manage own company users
-- Manage operational modules allowed by role and entitlement
-- View own reports
-- View own billing when Billing View is enabled
-- View own subscription summary
-- View own license status
-- View own customer audit logs
-
-Cannot access platform configuration.
-
-## Company Supervisor
-
-Operational oversight.
-
-Can:
-
-- Perform operational work where permitted
-- View own company profile
-- View limited user information / limited user updates
-- View own subscription summary
-- View own license status
-- View own billing when enabled
-
-Cannot access platform administration or customer audit logs unless explicitly approved later.
-
-## Stock Inventory User
-
-Inventory operations only.
-
-## Document Tracking User
-
-Document operations only.
-
-## Viewer
-
-Read-only access to permitted operational areas.
+They use the tenant-facing **My Company** area and operational modules.
 
 ---
 
-# 5. Customer / My Company Permissions
+# 5. Platform Customer 360 / Customer Profile
 
-Customer users must not see a multi-customer Customer Management area.
+## 5.1 Purpose
 
-Authorized customer administration is consolidated under:
+Customer 360 is the primary Datamation platform workspace for managing one selected customer.
+
+Platform navigation should expose one primary:
+
+**Customers**
+
+entry for customer administration.
+
+The Customers list displays all customers permitted to the platform role.
+
+Selecting a customer opens a consolidated Customer Profile / Customer 360 workspace.
+
+## 5.2 Required Customer 360 Tabs
+
+Recommended tabs:
+
+1. Overview
+2. Users
+3. Modules
+4. Subscription
+5. License
+6. Billing & Payments
+7. Audit Logs
+8. Activity / Notifications where useful
+
+## 5.3 Trusted Parent Customer Rule
+
+Once a platform user opens:
+
+```text
+Customers → Customer A
+```
+
+every customer-owned child query and mutation must derive `customer_id` from Customer A's parent record.
+
+Do not show a second customer selector inside a Customer 360 child tab unless there is a documented exceptional workflow.
+
+A crafted request attempting to assign Customer B data while inside Customer A must be rejected or server-side overwritten with Customer A's ID.
+
+## 5.4 Customer 360 Overview
+
+Overview should provide customer health/status including where available:
+
+- Company name/code
+- Company status
+- Contact information
+- Current subscription plan/status
+- Subscription expiry
+- Current license/access mode
+- License expiry
+- Enabled modules
+- Users used / effective user limit
+- Products used / effective limit
+- Files used / effective limit
+- Boxes used / effective limit
+- Outstanding billing
+- Recent customer audit/activity
+- Alerts or near-expiry conditions
+
+## 5.5 Platform Navigation Consolidation
+
+The following customer-specific management areas should not be separate primary sidebar destinations once Customer 360 is implemented:
+
+- Customer Users
+- Customer Modules
+- Customer Subscriptions
+- Customer Licenses
+- Customer Billing
+- Customer Payments
+
+The underlying resources/models/services remain separate internally.
+
+They are presented through the selected customer's Customer 360 workspace.
+
+## 5.6 Platform Items That Remain Separate
+
+These remain top-level platform administration because they are not specific to one selected customer:
+
+- Platform Users
+- Roles & Permissions
+- Module Catalogue
+- Subscription Plans
+- Reports & Analytics
+- Platform Audit Logs
+- Backup / Restore
+- System Settings
+
+Cross-customer subscription/license/billing summaries may remain under Reports & Analytics.
+
+---
+
+# 6. Customer-Facing My Company
+
+Customer users must not see the Platform Customers list or Customer 360.
+
+Authorized customer roles use:
 
 **My Company**
 
@@ -300,284 +329,173 @@ Possible tabs:
 - Company Profile
 - Company Users
 - Enabled Modules
-- Subscription
+- Subscription Summary
 - License Status
 - Billing
-- Audit Logs
+- Customer Audit Logs
 
-Each tab is independently authorized.
+Each tab remains independently authorized.
 
-| Function | SA | Mgmt | Company Admin | Supervisor | Stock | Document | Viewer |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| Platform Customer List | ✓ | View | ✗ | ✗ | ✗ | ✗ | ✗ |
-| Own Company Profile | ✓ | ✓ | View | View | ✗ | ✗ | ✗ |
-| Own Company Users | ✓ | ✓ | Manage | View / Limited Edit | ✗ | ✗ | ✗ |
-| Own Enabled Modules | ✓ | ✓ | View | View | ✗ | ✗ | ✗ |
-| Own Subscription Summary | ✓ | ✓ | View | View | ✗ | ✗ | ✗ |
-| Own License Status | ✓ | ✓ | View | View | ✗ | ✗ | ✗ |
-| Own Billing | ✓ | ✓ | View* | View* | ✗ | ✗ | ✗ |
-| Own Audit Logs | ✓ | Limited | View | ✗ | ✗ | ✗ | ✗ |
+Customer My Company uses authenticated-user customer context.
 
-\* Only when Billing View is enabled.
+Platform Customer 360 uses selected-parent customer context.
+
+These are different presentation contexts over the same authoritative business data.
 
 ---
 
-# 6. User Management Permissions
+# 7. User Management Permissions
 
-| Permission | SA | Mgmt | Admin | Sup | Stock | Doc | Viewer |
+| Permission | SA | Mgmt | Company Admin | Supervisor | Stock | Doc | Viewer |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| View Users | ✓ | ✓ | Own | Own | ✗ | ✗ | ✗ |
-| Create User | ✓ | ✗ | Own | ✗ | ✗ | ✗ | ✗ |
-| Update User | ✓ | ✗ | Own | Limited | ✗ | ✗ | ✗ |
-| Reset Password | ✓ | ✗ | Own | ✗ | ✗ | ✗ | ✗ |
+| View Platform Users | ✓ | View | ✗ | ✗ | ✗ | ✗ | ✗ |
+| View Customer Users in Customer 360 | ✓ | View | N/A | N/A | N/A | N/A | N/A |
+| Create Customer User | ✓ | ✗ | Own Company | ✗ | ✗ | ✗ | ✗ |
+| Update Customer User | ✓ | ✗ | Own Company | Limited Own | ✗ | ✗ | ✗ |
+| Reset Password | ✓ | ✗ | Own Company | ✗ | ✗ | ✗ | ✗ |
 | Delete User | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 
-Customer user queries must use exact customer ownership.
-
-Platform users with `customer_id = NULL` must never appear in customer user management.
+Customer 360 user operations must be locked to the selected customer.
 
 ---
 
-# 7. Subscription Permissions
+# 8. Module Permissions
+
+## Platform Module Catalogue
+
+Platform-only.
+
+Defines modules available in DMIMS.
+
+## Customer Modules
+
+Customer-specific assignments are managed by Super Admin from:
+
+```text
+Customers → Selected Customer → Modules
+```
+
+Customer Admin/Supervisor may view their enabled modules through My Company where permitted.
+
+Customer roles cannot change module assignments.
+
+---
+
+# 9. Subscription Permissions
 
 ## Subscription Plans
 
-Subscription Plans are platform master data.
+Platform-only template catalogue.
 
-Only Datamation Super Admin may directly create, edit, activate, deactivate or browse Subscription Plans.
-
-Customer users must not:
-
-- See Subscription Plans in navigation
-- Browse the platform plan catalogue
-- Access Subscription Plan routes directly
-- Enumerate plans through global search
-- View platform plan configuration
+Remain a separate top-level Platform administration item.
 
 ## Customer Subscription
 
-Company Admin and Company Supervisor may view only their own current subscription summary.
-
-Customer-facing information may include:
-
-- Current plan name
-- Subscription status
-- Valid from
-- Valid to
-- Usage limits
-- Current usage
-- Enabled modules
-- Allowed report summary
-- Billing cycle
-
-Customer users cannot modify subscription configuration.
-
----
-
-# 8. License Permissions
-
-Only Datamation Super Admin may:
-
-- Create licenses
-- Renew licenses
-- Suspend licenses
-- Revoke licenses
-- Reactivate licenses
-- Change technical access mode
-- Change license limits
-- Change license module/report overrides
-
-Customer users must not receive a standalone License Management resource or menu.
-
-Company Admin and Company Supervisor may see only a simplified own-customer License Status through Dashboard or My Company.
-
-Customer-facing license information should be limited to:
-
-- Status
-- Access mode
-- Valid from
-- Valid to
-- Expiry warning
-
-Internal technical fields such as server fingerprint, installation identifier, deployment configuration and administrative remarks must not be exposed unless explicitly required.
-
----
-
-# 9. Billing Permissions
-
-| Action | SA | Mgmt | Admin | Supervisor | Stock | Document | Viewer |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| View Billing | ✓ | ✓ | Own* | Own* | ✗ | ✗ | ✗ |
-| Create Invoice | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| Update Payment | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| Cancel Billing | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| Export Billing | ✓ | ✓ | Own* | Own* | ✗ | ✗ | ✗ |
-
-\* Billing View module required.
-
-Customer billing data is TENANT_STRICT.
-
----
-
-# 10. Inventory Permissions
-
-| Action | SA | Mgmt | Admin | Supervisor | Stock | Document | Viewer |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| View Products | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ |
-| Create Product | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ |
-| Update Product | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ |
-| Delete Product | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ |
-| Receive Stock | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ |
-| Stock Out | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ |
-| Transfer Stock | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ |
-| Adjust Stock | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ |
-
----
-
-# 11. Document Tracking Permissions
-
-| Action | SA | Mgmt | Admin | Supervisor | Stock | Document | Viewer |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| View Files | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ |
-| Receive File | ✓ | ✗ | ✓ | ✓ | ✗ | ✓ | ✗ |
-| Transfer File | ✓ | ✗ | ✓ | ✓ | ✗ | ✓ | ✗ |
-| Move Out File | ✓ | ✗ | ✓ | ✓ | ✗ | ✓ | ✗ |
-| Return File | ✓ | ✗ | ✓ | ✓ | ✗ | ✓ | ✗ |
-| Receive Box | ✓ | ✗ | ✓ | ✓ | ✗ | ✓ | ✗ |
-| Transfer Box | ✓ | ✗ | ✓ | ✓ | ✗ | ✓ | ✗ |
-| Move Out Box | ✓ | ✗ | ✓ | ✓ | ✗ | ✓ | ✗ |
-| Return Box | ✓ | ✗ | ✓ | ✓ | ✗ | ✓ | ✗ |
-
----
-
-# 12. Barcode Permissions
-
-| Action | SA | Mgmt | Admin | Supervisor | Stock | Document | Viewer |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| Scan Barcode | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
-| Print Barcode | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✗ |
-| View Registry | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-
-Barcode results remain customer-scoped.
-
----
-
-# 13. Reports & Analytics Permissions
-
-A generic `view reports` permission alone is insufficient.
-
-For a customer user, a report is available only when all applicable checks pass:
-
-1. User belongs to the customer.
-2. Reports module is enabled.
-3. Required operational module is enabled.
-4. User has the required operational permission.
-5. Report is permitted by effective `allowed_reports`.
-6. License permits viewing/export.
-7. Report query is tenant-scoped.
-8. Export permission is satisfied.
-
-| Report Family | Required Module | Required Capability |
-|---|---|---|
-| Inventory Reports | Stock Inventory | View Inventory |
-| Document Reports | Document Tracking | View Documents |
-| Billing Reports | Billing View | View Billing |
-| Audit Reports | Audit entitlement | View Audit Logs |
-| Platform Reports | Platform only | Datamation role |
-
-| Report | SA | Mgmt | Admin | Supervisor | Stock | Document | Viewer |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| Platform Customer Reports | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| Subscription Platform Reports | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| License Platform Reports | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| Inventory Reports | ✓ | ✓ | ✓* | ✓* | ✓* | ✗ | ✓* |
-| Document Reports | ✓ | ✓ | ✓* | ✓* | ✗ | ✓* | ✓* |
-| Billing Reports | ✓ | ✓ | Own** | Own** | ✗ | ✗ | ✗ |
-| Audit Reports | ✓ | Limited | Own*** | ✗ | ✗ | ✗ | ✗ |
-
-\* Required module and report entitlement must also be enabled.  
-\** Billing View must be enabled.  
-\*** Own-customer audit records only.
-
-A report must not appear in the report selector when the user cannot execute it.
-
-Backend generation must repeat the same authorization checks.
-
----
-
-# 14. Audit Permissions
-
-Audit logs are immutable.
-
-Only AuditService may write audit records.
-
-No user may edit or delete audit records.
-
-## Datamation Super Admin
-
-May view all platform and customer audit records.
-
-## Datamation Management
-
-May view summarized audit information where permitted.
-
-## Company Admin
-
-May view only:
+Super Admin manages the selected customer's subscription through:
 
 ```text
-audit_logs.customer_id = authenticated_user.customer_id
+Customers → Selected Customer → Subscription
 ```
 
-Company Admin must NOT see:
+The child workflow must not require re-selecting the customer.
 
-- `customer_id = NULL` platform logs
-- Another customer's logs
-- Datamation administrative logs unrelated to their customer
-- Platform backup / restore activity
-- Platform settings activity
-- Platform subscription-plan administration
+Datamation Management may view read-only where permitted.
 
-## Other Customer Roles
-
-Company Supervisor, Stock Inventory User, Document Tracking User and Viewer do not receive direct Audit Logs access unless explicitly approved later.
+Customer users see only their own effective summary.
 
 ---
 
-# 15. Import & Export Permissions
+# 10. License Permissions
 
-Imports require:
+Full License administration is platform-only.
 
-- Active subscription
-- Active license
-- Required module enabled
-- Required operational permission
-- Customer ownership
-- Limit availability
+Super Admin manages the selected customer's license through:
 
-Exports require:
+```text
+Customers → Selected Customer → License
+```
 
-- Required operational permission
-- Required module
-- License allowing export
-- Report entitlement where applicable
-- Exact tenant scope
+Customer users see simplified own License Status only.
 
-Every import and export creates an audit record.
+Internal technical fields remain platform-only.
 
 ---
 
-# 16. Customer Isolation Matrix
+# 11. Billing & Payment Permissions
 
-| User | Own Company | Other Company | Platform NULL Records |
-|---|---:|---:|---:|
-| Super Admin | ✓ | ✓ | ✓ |
-| Management | ✓ | ✓ Read-only | ✓ Read-only |
-| Company Admin | ✓ | ✗ | ✗ except approved global defaults |
-| Supervisor | ✓ | ✗ | ✗ except approved global defaults |
-| Stock User | ✓ | ✗ | ✗ except approved global defaults |
-| Document User | ✓ | ✗ | ✗ except approved global defaults |
-| Viewer | ✓ | ✗ | ✗ except approved global defaults |
+Super Admin manages the selected customer's billing/payment through:
+
+```text
+Customers → Selected Customer → Billing & Payments
+```
+
+Customer users may view own billing only when Billing View and role permission allow.
+
+Customer users cannot mutate billing/payment.
+
+---
+
+# 12. Inventory Permissions
+
+Existing inventory role matrix remains authoritative.
+
+Customer 360 does not replace operational Inventory screens.
+
+---
+
+# 13. Document Tracking Permissions
+
+Existing document role matrix remains authoritative.
+
+Customer 360 does not replace operational Document Tracking screens.
+
+---
+
+# 14. Barcode Permissions
+
+Existing barcode permissions remain authoritative.
+
+Cross-customer barcode information must never be exposed.
+
+---
+
+# 15. Reports & Analytics
+
+A generic `view reports` permission is insufficient.
+
+Reports require the relevant module, permission, entitlement, tenant context and license mode.
+
+Platform Reports & Analytics may provide cross-customer summaries.
+
+Customer-specific management should route back to the selected Customer 360 profile when practical.
+
+---
+
+# 16. Audit Permissions
+
+## Platform
+
+Super Admin may view platform-wide audit information.
+
+Datamation Management may view permitted summaries.
+
+## Customer 360
+
+When a customer is selected:
+
+```text
+audit_logs.customer_id = selected Customer ID
+```
+
+The Customer 360 Audit tab must not mix unrelated platform NULL logs or another customer's logs.
+
+## Customer My Company
+
+Company Admin may view only:
+
+```text
+audit_logs.customer_id = authenticated user's customer_id
+```
 
 ---
 
@@ -585,29 +503,25 @@ Every import and export creates an audit record.
 
 Authenticated?  
 ↓  
-User Active?  
+Platform or Customer Role?  
 ↓  
-Platform or Customer Context?  
+Requested Presentation Context?  
 ↓  
 Resource Scope Allowed?  
 ↓  
-Company Active?  
+Trusted Customer Context Resolved?  
 ↓  
-Subscription Valid?  
+Role Permission?  
 ↓  
-License Allows?  
-↓  
-Module Enabled?  
-↓  
-Permission Granted?  
-↓  
-Report Entitlement / Usage Limit?  
+Company / Subscription / License / Module rules?  
 ↓  
 Perform Action  
 ↓  
-Write Audit Log
+Audit
 
-Any failed mandatory check immediately denies access.
+For Customer 360, trusted customer context is the authorized parent Customer record.
+
+For My Company, trusted customer context is the authenticated user's customer.
 
 ---
 
@@ -615,44 +529,47 @@ Any failed mandatory check immediately denies access.
 
 Developers must:
 
-- Never trust client-submitted `customer_id`.
-- Derive tenant context from authenticated user.
-- Use authorization in addition to navigation hiding.
-- Block direct URL access.
-- Apply resource-specific query scopes.
-- Protect relation managers, selects, global search and exports.
-- Audit critical mutations.
+- Never trust client-submitted customer ID.
+- Never allow a Customer 360 child form to silently switch customer.
+- Reuse existing resources/services rather than duplicating logic.
+- Authorize embedded tables/actions.
+- Protect direct child routes.
+- Protect global search.
+- Audit critical changes.
 - Fail closed.
-- Prefer exact tenant matching for customer-owned data.
 
 ---
 
 # 19. QA Verification Checklist
 
-QA must verify:
+Verify:
 
-- Each role sees only permitted menus.
-- Customer users cannot see Subscription Plans.
-- Customer users cannot access standalone License Management.
-- Customer users cannot see platform users.
-- Company Admin sees only own-customer audit logs.
-- `customer_id = NULL` is excluded from TENANT_STRICT resources.
-- Stock users cannot run Document reports.
-- Document users cannot run Inventory reports.
-- Billing reports require Billing View.
-- Report selector contains only executable reports.
-- Direct unauthorized report requests fail.
-- Hidden platform URLs remain inaccessible.
-- Global search does not reveal unauthorized platform records.
-- Cross-customer direct IDs are blocked.
-- Exports use the same authorization rules as on-screen reports.
+- Super Admin sees all Customers.
+- Clicking a Customer opens Customer 360.
+- Customer 360 child tabs show only selected-customer data.
+- Creating a user inside Customer A automatically assigns Customer A.
+- Crafted Customer B IDs are rejected/overwritten inside Customer A context.
+- Customer Modules tab cannot modify another customer.
+- Subscription tab is locked to selected customer.
+- License tab is locked to selected customer.
+- Billing/Payments are locked to selected customer.
+- Audit tab contains only selected-customer audit events.
+- Customer-specific standalone sidebar entries are removed/hidden for platform users as approved.
+- Platform Users remains separate.
+- Subscription Plans remains separate.
+- Module Catalogue remains separate.
+- Cross-customer Reports & Analytics remain available.
+- Datamation Management Customer 360 is read-only.
+- Customer roles cannot access Platform Customer 360.
+- Existing My Company behaviour does not regress.
 
 ---
 
-# 20. Document History
+# Document History
 
 | Version | Date | Description |
 |---|---|---|
 | 1.0 | June 2026 | Initial Security & Access Control Matrix |
-| 1.1 | 24 August 2026 | Added explicit resource-scope classifications, My Company boundary, strict audit/user isolation, platform-only Subscription Plans/License management and report-family authorization |
-| 1.2 | 24 August 2026 | Resolved a self-contradiction where "Licenses" appeared under both §3.1 PLATFORM_ONLY and §3.2 TENANT_STRICT: split into License *administration* (§3.1, the standalone resource) and License *status/history* (§3.2, read-only). Added the Location type catalogue to §3.1 (implemented as `LocationTypeResource::$platformOnly`; see CONFORMANCE_GAP_ANALYSIS.md §10a H3) |
+| 1.1 | 24 August 2026 | Added strict tenant scope and My Company model |
+| 1.2 | 24 August 2026 | Clarified split License administration/status scope and global defaults |
+| 1.3 | 25 August 2026 | Added Platform Customer 360, trusted parent customer context and consolidated customer-specific platform management |

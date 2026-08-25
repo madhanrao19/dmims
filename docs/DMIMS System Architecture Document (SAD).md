@@ -1,20 +1,18 @@
 # DMIMS System Architecture Document (SAD)
 
 **Datamation Inventory Management System**  
-**Version:** 1.1  
-**Updated:** 24 August 2026
+**Version:** 1.2  
+**Updated:** 25 August 2026
 
 ---
 
 # 1. Purpose
 
-This document describes the architecture of DMIMS and the rules developers must follow.
+Defines the architecture of DMIMS.
 
 ---
 
 # 2. Architecture Overview
-
-DMIMS is a multi-tenant Laravel application.
 
 Browser / PWA  
 ↓  
@@ -24,150 +22,156 @@ Authentication
 ↓  
 Authorization  
 ↓  
-Customer / Platform Context  
+Platform / Customer Presentation Context  
+↓  
+Trusted Customer Context  
 ↓  
 Resource Scope  
 ↓  
-Subscription / License / Module / Permission  
+Services  
 ↓  
-Service Layer  
-↓  
-Eloquent Models  
+Models  
 ↓  
 MariaDB  
 ↓  
 Audit
 
-Business actions must not bypass this flow.
-
 ---
 
-# 3. High-Level System Architecture
-
-DMIMS contains two presentation boundaries:
+# 3. Presentation Boundaries
 
 ## Platform Boundary
 
-For authorized Datamation roles.
+For Datamation platform roles.
 
 Includes:
 
-- Platform customer administration
-- Platform users
-- Roles/permissions
-- Module catalogue
+- Dashboard
+- Customers / Customer 360
+- Platform Users
+- Roles & Permissions
+- Module Catalogue
 - Subscription Plans
-- License management
-- Billing administration
-- Platform reports
-- Platform audit
-- Backup/restore
+- Reports & Analytics
+- Platform Audit
+- Backup/Restore
 - Settings
 
 ## Customer Boundary
 
 For customer roles.
 
-Includes only:
+Includes:
 
-- Own company presentation
-- Enabled operational modules
-- Role-permitted reports
-- Role-permitted billing/audit summaries
+- My Company
+- Authorized operational modules
+- Authorized reports
 - Own customer data
 
 ---
 
-# 4. Technology Architecture
+# 4. Customer 360 Architecture
 
-- Laravel 13
-- Filament 5
-- PHP 8.4+
-- MariaDB
-- Blade / Tailwind / Alpine
-- Vite
-- Spatie Permission
-- Ubuntu 24.04
-- Apache / PHP-FPM
-- Supervisor
-- Cloudflare Tunnel
+## 4.1 Parent Resource
+
+`CustomerResource` is the platform parent for customer-specific administration.
+
+Target page structure:
+
+```text
+CustomerResource
+├── ListCustomers
+├── CreateCustomer
+├── ViewCustomer / Customer360
+└── EditCustomer
+```
+
+## 4.2 Child Domains
+
+ViewCustomer composes existing customer-owned domains:
+
+- Users
+- Customer Modules
+- Customer Subscriptions
+- Licenses
+- Billing Records
+- Billing Payments
+- Audit Logs
+- Notifications/Activity
+
+## 4.3 No Data-Layer Merge
+
+Customer 360 is presentation orchestration.
+
+Do not combine these tables into one table.
+
+Do not create duplicate Customer360 business tables merely for display.
+
+## 4.4 Trusted Parent Context
+
+Every child operation uses the selected `Customer` record as trusted context.
+
+Example:
+
+```text
+/customers/{customer}/users
+```
+
+or embedded tab state must resolve Customer through authorized server-side route/model binding.
+
+Child `customer_id` is derived from parent Customer.
 
 ---
 
 # 5. Multi-Tenant Architecture
 
-Every customer-owned table includes `customer_id`.
-
-The authenticated user's customer context determines customer-owned records.
-
-Never trust request-provided `customer_id`.
-
-## 5.1 Tenant Scope Architecture
-
-DMIMS uses three explicit scope classifications.
-
 ### PLATFORM_ONLY
 
-Accessible only to authorized platform roles.
+Platform master/admin resources.
 
 ### TENANT_STRICT
 
-For customer users:
+Customer-owned data.
+
+For customer user:
 
 ```text
 customer_id = authenticated user's customer_id
 ```
 
-No implicit `OR customer_id IS NULL`.
+For Customer 360:
 
-This is the default for customer-owned data.
+```text
+customer_id = selected authorized Customer ID
+```
 
 ### TENANT_WITH_GLOBAL_DEFAULTS
 
-Only for explicitly approved shared reference data:
-
-```text
-customer_id = authenticated user's customer_id
-OR customer_id IS NULL
-```
-
-This is opt-in.
-
-## Architectural Rule
-
-A generic reusable tenant scope must never automatically append `OR customer_id IS NULL` for every customer resource.
-
-Global/default records must be deliberately declared.
+Explicit opt-in only.
 
 ---
 
-# 6. Request Lifecycle
+# 6. Request Lifecycle — Customer 360
 
-Browser  
+Platform User  
 ↓  
-Route  
+Authenticate  
 ↓  
-Authentication  
+Authorize Platform Role  
 ↓  
-Role / Permission Validation  
+Resolve Customer record  
 ↓  
-Platform / Customer Context  
+Authorize selected Customer  
 ↓  
-Resource Scope Validation  
+Resolve child tab/action  
 ↓  
-Company Status  
+Apply selected Customer scope  
 ↓  
-Subscription  
-↓  
-License  
-↓  
-Module  
-↓  
-Business Permission  
+Apply action permission/business rules  
 ↓  
 Service  
 ↓  
-Database  
+Database transaction if required  
 ↓  
 Audit  
 ↓  
@@ -177,253 +181,177 @@ Response
 
 # 7. Layered Architecture
 
-## Presentation Layer
+Customer 360 remains in Presentation Layer.
 
-Filament Resources, Pages, Widgets, Forms and Tables.
+It must reuse:
 
-Presentation components do not define security on their own.
-
-## Service Layer
-
-Business rules and cross-module operations.
-
-## Model Layer
-
-Relationships, casts and scopes.
-
-## Database Layer
-
-Constraints, indexes, transactions, soft deletes and immutable history.
+- BaseResource authorization
+- Existing Eloquent relationships
+- Existing Services
+- Existing Observers
+- Existing report/audit logic
+- Existing tenant-scope protections
 
 ---
 
-# 8. Core Services
+# 8. Customer Model Relationships
 
-Core security/business services include:
+Customer is the natural aggregate navigation root for Customer 360.
 
-- AccessControlService
-- ModuleAccessService
-- LicenseService
-- BillingService
-- PaymentService
-- BarcodeService
-- ScannerService
-- StockMovementService
-- DocumentMovementService
-- NotificationService
-- AuditService
-- ReportExportService
-- ImportService
-- BackupService
+Required/desired relationships include:
 
-No module should duplicate the access-control decision independently.
+- users()
+- departments()
+- customerModules()
+- subscriptions()
+- licenses()
+- billingRecords()
+- billingPayments() where useful
+- auditLogs()
+- notifications()
+- locations()
+
+Relationships may be added to the model without changing database schema where foreign keys already exist.
 
 ---
 
-# 9. Security Architecture
+# 9. Customer 360 UI Composition
 
-Every request must pass appropriate layers.
+Preferred implementation options:
 
-Authorization applies before data reaches presentation.
+1. Filament ViewRecord with Tabs/Sections and embedded tables
+2. Relation Managers
+3. Reusable embedded resource tables/pages
 
-## Customer Presentation Boundary
+Choose the option that best reuses existing resources and authorization.
 
-The same access model controls:
-
-Navigation  
-↓  
-Dashboard  
-↓  
-Global Search  
-↓  
-Resource Queries  
-↓  
-Relations  
-↓  
-Actions  
-↓  
-Reports / Exports  
-↓  
-API  
-↓  
-Jobs
-
-The absence of a menu item is not sufficient protection.
+Do not copy large table/form definitions into new parallel implementations.
 
 ---
 
-# 10. Customer Isolation
+# 10. Platform Navigation Architecture
 
-Isolation is enforced at:
+Primary customer management navigation becomes:
 
-- Query/model layer
-- Filament resource authorization
-- Middleware
-- Service layer
-- Relationship/select queries
-- Report/export layer
-- API
-- UI
+```text
+Customers
+```
 
-TENANT_STRICT is the default for customer-owned data.
+Customer-specific resources become contextual to selected Customer.
 
----
+Remain top-level:
 
-# 11. Module Architecture
-
-Disabled modules are:
-
-- Hidden
-- Route blocked
-- Direct URL blocked
-- Service blocked
-- Report blocked
-
-## 11.1 Customer Administration Architecture
-
-Customer-facing company administration uses a consolidated:
-
-**My Company**
-
-interface.
-
-Possible panels:
-
-- Profile
-- Users
-- Enabled Modules
-- Subscription
-- License Status
-- Billing
-- Audit
-
-This is a presentation composition over existing authoritative resources/services.
-
-Do not duplicate business data or business logic.
-
-Platform resources remain separate for authorized Datamation users.
+- Platform Users
+- Roles & Permissions
+- Module Catalogue
+- Subscription Plans
+- Reports & Analytics
+- Platform Audit
+- Backup / Restore
+- System Settings
 
 ---
 
-# 12. Movement Architecture
+# 11. My Company Architecture
 
-Three models:
+Customer My Company remains a separate tenant-facing presentation composition.
 
-- Internal Transfer
-- External Receive-In
-- External Move-Out
+Do not merge My Company and Platform Customer 360 into one authorization path.
 
-External locations are not fake DMIMS locations.
+They may share reusable components/services but resolve customer context differently.
 
 ---
 
-# 13. Barcode Architecture
+# 12. Security Architecture
 
-Barcode  
-↓  
-Registry  
-↓  
-Type  
-↓  
-Customer Validation  
-↓  
-Module/Permission Validation  
-↓  
-Allowed Action  
-↓  
-Scan Log
+Protect:
+
+- Parent Customer route
+- Every embedded child table
+- Every row action
+- Every create/update action
+- Global search
+- Deep links
+- Exports
+- Cross-customer relation options
+
+A child action cannot override parent customer context.
+
+---
+
+# 13. Reports Architecture
+
+Reports & Analytics remain separate.
+
+Customer 360 can pass an authorized selected-customer filter to reusable report services where supported.
+
+Never implement separate report SQL inside Customer 360.
 
 ---
 
 # 14. Audit Architecture
 
-Audit records are immutable.
+Customer 360 Audit is a customer-filtered view of authoritative audit logs.
 
-Platform audit events and customer audit events are distinct by customer ownership.
-
-For customer audit access:
-
-```text
-audit_logs.customer_id = authenticated user's customer_id
-```
-
-Platform `NULL` audit rows are excluded.
+Platform Audit remains separate.
 
 ---
 
 # 15. Database Transactions
 
-Mandatory for multi-table operations and all critical movements, billing, renewal and barcode registration operations.
+Existing transaction requirements remain unchanged.
+
+Customer 360 must call existing services for mutations.
 
 ---
 
-# 16. Background Processing
+# 16. Performance
 
-Future/background jobs must preserve authenticated/derived tenant context and must never accept arbitrary customer ownership from untrusted payloads.
+Customer 360 Overview should avoid N+1 queries.
+
+Use aggregate queries/eager loading/caching where appropriate.
+
+Do not load full users/audit/billing history into Overview.
+
+Use paginated child tabs.
 
 ---
 
-# 17. PWA Architecture
+# 17. PWA / Responsive
 
-Online-first.
+Customer 360 should remain usable on desktop/tablet.
 
-Role/module navigation remains identical in security semantics across browser and installed PWA.
+Customer operational PWA functionality remains unchanged.
 
 ---
 
 # 18. Production Architecture
 
-Internet  
-↓  
-Cloudflare  
-↓  
-Cloudflare Tunnel  
-↓  
-Ubuntu  
-↓  
-Apache / PHP-FPM  
-↓  
-Laravel  
-↓  
-MariaDB  
-↓  
-Storage / Backup
+No infrastructure change is required solely for Customer 360.
 
 ---
 
 # 19. Design Principles
 
-- Single Responsibility
-- Separation of Concerns
-- Multi-Tenant by Design
-- Security by Default
-- Least Privilege
-- Fail Closed
-- Audit Everything
-- Immutable History
+- Customer-centric administration
+- Trusted parent context
 - Reuse existing architecture
+- No duplicated business logic
+- Defense in depth
+- Least privilege
+- Clear platform/customer separation
 
 ---
 
-# 20. Future Architecture
+# 20. Architecture Decision
 
-Future APIs, mobile apps, reporting integrations, Power BI, AI, webhooks and external services must inherit the same `PLATFORM_ONLY`, `TENANT_STRICT` and `TENANT_WITH_GLOBAL_DEFAULTS` model.
+See ADR-011 for the accepted Platform Customer 360 decision.
 
 ---
 
-# 21. Architecture Principles Summary
+# 21. Summary
 
-Never trust browser customer_id.
-
-Use exact tenant scope for customer-owned records.
-
-Do not expose platform resources to customers.
-
-Never rely only on hidden navigation.
-
-Authorize reports by underlying module and permission.
-
-Keep documentation synchronized.
+DMIMS uses Customer as the platform administration aggregate root while retaining separate underlying domain models/services.
 
 ---
 
@@ -431,5 +359,6 @@ Keep documentation synchronized.
 
 | Version | Date | Description |
 |---|---|---|
-| 1.0 | June 2026 | Initial System Architecture Document |
-| 1.1 | 24 August 2026 | Added explicit resource scope architecture and My Company presentation boundary |
+| 1.0 | June 2026 | Initial SAD |
+| 1.1 | 24 August 2026 | Added explicit resource scope/My Company |
+| 1.2 | 25 August 2026 | Added Platform Customer 360 aggregate/presentation architecture |

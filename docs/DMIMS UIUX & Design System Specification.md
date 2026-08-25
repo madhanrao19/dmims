@@ -1,404 +1,363 @@
 # DMIMS UI/UX & Design System Specification
 
 **Datamation Inventory Management System (DMIMS)**  
-**Version:** 1.1  
-**Updated:** 24 August 2026
+**Version:** 1.2  
+**Updated:** 25 August 2026
 
 ---
 
 # 1. Design Principles
 
-DMIMS should be:
+DMIMS UI is:
 
 - Clean
 - Professional
 - Fast
 - Consistent
 - Accessible
-- Mobile-friendly
-- Easy to learn
-- Optimized for operational work
+- Customer-centric
 - Least-privilege by presentation
 
-Users should not be shown irrelevant platform functions.
-
 ---
 
-# 2. Design Philosophy
+# 2. Platform Navigation
 
-Every screen should answer:
-
-1. Where am I?
-2. What can I do?
-3. What should I do next?
-
-Navigation must reflect actual authorization.
-
----
-
-# 3. Theme
-
-Modern enterprise dashboard.
-
-Use the documented DMIMS theme and avoid unnecessary visual clutter.
-
----
-
-# 4. Colour Palette
-
-Use existing DMIMS palette and status conventions.
-
----
-
-# 5. Typography
-
-Use Inter/system UI with readable enterprise sizing.
-
----
-
-# 6. Spacing
-
-Use consistent 8-point spacing.
-
----
-
-# 7. Icons
-
-Use Heroicons consistently.
-
----
-
-# 8. Navigation Structure
-
-## Platform Navigation
-
-Authorized Datamation users may see platform items such as:
-
-- Dashboard
-- Customers
-- Users
-- Roles & Permissions
-- Modules
-- Subscription Plans
-- Customer Subscriptions
-- Licenses
-- Billing
-- Reports & Analytics
-- Audit Logs
-- Backup / Restore
-- System Settings
-
-Actual visibility remains role-aware.
-
-## Customer Navigation
-
-Recommended:
+Recommended Platform navigation:
 
 Dashboard
 
-My Company  
-├── Overview  
-├── Users  
-├── Enabled Modules  
-├── Subscription  
-├── License Status  
-├── Billing  
-└── Audit Logs  
+Customers
 
-Stock Inventory  
-├── Categories  
-├── Products  
-├── Locations  
-├── Receive In  
-├── Transfer  
-├── Stock Out  
-├── Adjustment  
-└── Stock Reports  
+Platform Users
 
-Document Tracking  
-├── Locations  
-├── Boxes  
-├── Document Files  
-├── File / Box Movements  
-└── Document Reports  
+Roles & Permissions
 
-Barcode  
-├── Scanner  
-├── Registry  
-└── Printing  
+Module Catalogue
 
-Reports
+Subscription Plans
 
-Profile / Account
+Reports & Analytics
 
-Not every role sees every item.
+Platform Audit Logs
 
-### Customer Navigation Rules
+Backup / Restore
 
-- Hide My Company tabs the role cannot access.
-- Hide Stock Inventory when disabled/unpermitted.
-- Hide Document Tracking when disabled/unpermitted.
-- Hide Barcode functions according to module/permission.
-- Hide Billing unless Billing View is enabled.
-- Hide Reports when unavailable.
-- Never show platform administration to customer roles.
+System Settings
 
-## Platform-Only Navigation
-
-Customer users must never see:
-
-- Multi-customer Customers
-- Platform Users
-- Roles & Permissions management
-- Module catalogue management
-- Subscription Plans
-- Customer Subscription administration
-- License Management
-- Platform Billing administration
-- Backup / Restore
-- Platform Settings
-- Platform reports
-- Platform audit logs
+Customer-specific administration is accessed through Customers → selected Customer.
 
 ---
 
-# 9. Dashboard Design
+# 3. Customers List
 
-Widgets are role/module aware.
+Customers is the primary platform customer-management landing page.
 
-Do not show empty or unauthorized module cards merely because the widget exists.
+Recommended columns:
 
----
+| Column | Purpose |
+|---|---|
+| Company | Name |
+| Code | Customer code |
+| Status | Active/Suspended/etc. |
+| Plan | Current plan |
+| Subscription | Status/expiry |
+| License | Status/expiry |
+| Users | Used / limit |
+| Outstanding | Billing balance |
+| Last Activity | Recent activity |
 
-# 10. Summary Cards
-
-Use icon, label, value and status.
-
-Customer cards use own-customer data only.
-
----
-
-# 11. Tables
-
-Support:
-
-- Search
-- Sort
-- Pagination
-- Filters
-- Responsive layout
-
-Export is shown only when authorized.
+Rows should be clickable or include a clear **View Customer** action.
 
 ---
 
-# 12. Filters
+# 4. Customer 360 / Customer Profile
 
-Customer users must not receive multi-customer selectors.
+Opening a customer displays a single customer-focused workspace.
 
-Platform-only customer filters are restricted to Datamation platform roles.
+Header should show:
 
----
+- Company name
+- Company code
+- Status badge
+- Key contact
+- Quick actions allowed to role
 
-# 13. Forms
+Recommended tabs:
 
-Forms are logically grouped.
+**Overview | Users | Modules | Subscription | License | Billing & Payments | Audit Logs**
 
-Customer ownership fields are hidden/locked where derived server-side.
+Optional:
 
-Do not expose platform fields to customer users.
-
----
-
-# 14. Required Fields
-
-Use clear validation.
-
-Server-side authorization and validation remain authoritative.
+**Activity / Notifications**
 
 ---
 
-# 15. Buttons
+# 5. Customer 360 Overview
 
-Only render actions the user can execute.
+Use summary cards.
 
-Backend must still authorize each action.
+Recommended:
 
----
-
-# 16. Status Badges
-
-Use consistent documented status colours.
-
----
-
-# 17. Confirmation Dialogues
-
-Require confirmation for destructive/high-impact actions.
-
----
-
-# 18. Notifications
-
-Messages should be concise and should not disclose unauthorized entity existence.
-
----
-
-# 19. Empty States
-
-Empty states should offer only actions the user may perform.
-
----
-
-# 20. Loading States
-
-Use component-level loading where practical.
-
----
-
-# 21. Inventory Screens
-
-Shown only when Inventory is enabled and role permits.
-
----
-
-# 22. Document Tracking Screens
-
-Shown only when Document Tracking is enabled and role permits.
-
----
-
-# 23. Barcode Scanner
-
-Mobile-friendly.
-
-Do not reveal barcode details belonging to another customer.
-
----
-
-# 24. Dashboard Widgets
-
-Examples:
-
+- Customer Status
+- Subscription
+- License
+- Enabled Modules
+- Users
 - Products
-- Low Stock
+- Document Files
 - Boxes
-- Documents
-- Returns
-- Subscription Status
+- Outstanding Billing
+- Recent Activity
+
+Use clear warning badges for:
+
+- Near expiry
+- Expired
+- Suspended
+- Overdue billing
+- Usage limit reached
+
+---
+
+# 6. Users Tab
+
+Shows selected-customer users only.
+
+Do not display customer selector.
+
+Create User action automatically applies selected customer.
+
+---
+
+# 7. Modules Tab
+
+Shows selected-customer module assignments.
+
+Module catalogue details may be referenced but assignment is fixed to selected customer.
+
+---
+
+# 8. Subscription Tab
+
+Shows:
+
+- Current plan
+- Status
+- Valid dates
+- Limits
+- Usage
+- Enabled modules
+- Billing cycle
+- History
+
+Super Admin may perform permitted renewal/change actions.
+
+Do not ask user to select customer again.
+
+---
+
+# 9. License Tab
+
+Shows:
+
+- License number where appropriate
+- Status
+- Access mode
+- Validity
+- Technical details for Super Admin where authorized
+- History
+
+Customer is fixed to selected parent.
+
+---
+
+# 10. Billing & Payments Tab
+
+Shows:
+
+- Invoices
+- Billing status
+- Payment status
+- Total
+- Paid
+- Outstanding
+- Due date
+- Payment history
+
+Super Admin actions may include record payment, issue/cancel invoice as currently permitted.
+
+Customer is fixed to parent.
+
+---
+
+# 11. Audit Logs Tab
+
+Shows selected-customer audit logs only.
+
+Use filters for:
+
+- Date
+- Module
+- Action
+- User
+
+Do not include unrelated platform NULL logs.
+
+---
+
+# 12. Platform Navigation Consolidation
+
+Once Customer 360 is complete, do not show duplicate primary navigation for:
+
+- Customer Users
+- Customer Modules
+- Customer Subscriptions
+- Customer Licenses
+- Customer Billing
+- Customer Payments
+
+These functions remain reachable contextually inside Customer 360.
+
+---
+
+# 13. Top-Level Items That Remain
+
+Keep:
+
+- Platform Users
+- Roles & Permissions
+- Module Catalogue
+- Subscription Plans
+- Reports & Analytics
+- Platform Audit
+- Backup / Restore
+- System Settings
+
+These have platform-wide meaning.
+
+---
+
+# 14. Customer My Company
+
+Customer-facing My Company remains:
+
+- Overview/Profile
+- Users
+- Enabled Modules
+- Subscription
 - License Status
-- Own Billing
+- Billing
+- Audit Logs where permitted
 
-Show only relevant authorized widgets.
-
----
-
-# 25. Responsive Behaviour
-
-Authorization does not change between desktop, tablet and mobile.
-
-Hidden desktop navigation must remain hidden in mobile drawer/PWA.
+Do not expose Platform Customer 360 navigation to customer roles.
 
 ---
 
-# 26. PWA
+# 15. Breadcrumbs
 
-Installable and online-first.
+Example:
 
-PWA navigation follows exactly the same role/module rules.
+```text
+Customers > ABC Manufacturing > Billing & Payments
+```
+
+The selected customer should remain obvious throughout the workspace.
 
 ---
 
-# 27. Accessibility
+# 16. Quick Actions
+
+Customer 360 may offer:
+
+- Edit Customer
+- Add User
+- Renew Subscription
+- Renew/Suspend License
+- Create Invoice
+
+Only display allowed actions.
+
+---
+
+# 17. Forms
+
+Within Customer 360:
+
+- Customer field is not user-selectable.
+- Customer context is displayed as read-only label if needed.
+- Server-side context remains authoritative.
+
+---
+
+# 18. Responsive Behaviour
+
+Customer 360 tabs may collapse into mobile/tablet tab menu.
+
+Security/navigation semantics must remain identical.
+
+---
+
+# 19. Accessibility
 
 Target WCAG 2.1 AA.
 
----
-
-# 28. Error Pages
-
-401/403/404/419/429/500/503 must not disclose sensitive resource details.
+Tabs, badges and actions must be keyboard/screen-reader accessible.
 
 ---
 
-# 29. Reusable Components
+# 20. Empty States
 
-Recommended reusable components include:
+Each tab provides a useful customer-context action where permitted.
 
-- Status badge
-- Customer-scoped selector
-- Location selector
-- Barcode display
-- Movement history
-- Audit timeline
-- Notification panel
-- Summary cards
-- My Company tabs
+Example:
+
+"No users have been created for ABC Manufacturing."
+
+Button:
+
+"Add User"
 
 ---
 
-# 30. Page Layout Standard
+# 21. Error States
 
-Use:
+403/404 must not disclose unauthorized customer data.
 
-Page Title  
-↓  
-Breadcrumb  
-↓  
-Allowed Quick Actions  
-↓  
-Summary Cards  
-↓  
-Filters  
-↓  
-Main Content
+Parent Customer not found/unauthorized returns a safe error.
 
 ---
 
-# 31. Report Selector UX
+# 22. Performance UX
 
-The selector must contain only reports the user may execute.
+Load Overview quickly.
 
-### Stock Inventory User
+Lazy-load/paginate heavy child lists.
 
-Inventory reports only.
-
-### Document Tracking User
-
-Document reports only.
-
-### Company Admin
-
-Only enabled/authorized operational report families.
-
-Billing reports only with Billing View.
-
-Audit reports only when authorized and always own-customer.
-
-Prefer complete omission of unauthorized report types.
+Do not render thousands of audit/billing rows at once.
 
 ---
 
-# 32. UI Quality Checklist
+# 23. UI Quality Checklist
 
-Before release:
-
-- Correct role navigation
-- Correct module navigation
-- No platform items visible to customer roles
-- My Company tabs filtered
-- No customer selector for tenant users
-- Report selector filtered
-- Direct access protection separately tested
+- One Customers entry for customer administration
+- Customer row opens Customer 360
+- Customer name always visible
+- Correct tabs
+- No duplicate customer selectors
+- No duplicate customer-specific sidebar items
+- Platform master items remain separate
+- Management role read-only
+- Customer roles cannot access Customer 360
+- My Company still works
+- Embedded actions authorized
 - Responsive
 - Accessible
-- Consistent
 
 ---
 
-# 33. Summary
+# 24. Summary
 
-DMIMS UI presents only functions the authenticated user is entitled to use while backend authorization independently enforces the same boundary.
+Customer 360 reduces navigation clutter and makes customer administration faster while preserving the same underlying authorization and business architecture.
 
 ---
 
@@ -406,5 +365,6 @@ DMIMS UI presents only functions the authenticated user is entitled to use while
 
 | Version | Date | Description |
 |---|---|---|
-| 1.0 | June 2026 | Initial UI/UX & Design System Specification |
-| 1.1 | 24 August 2026 | Added role-aware My Company, platform-only customer boundary and filtered reports/navigation |
+| 1.0 | June 2026 | Initial UI/UX Specification |
+| 1.1 | 24 August 2026 | Added My Company/access-aware navigation |
+| 1.2 | 25 August 2026 | Added Platform Customer 360 and consolidated platform customer navigation |

@@ -1,341 +1,227 @@
 # DMIMS Database Dictionary
 
 **Datamation Inventory Management System (DMIMS)**  
-**Version:** 1.1  
-**Updated:** 24 August 2026
+**Version:** 1.2  
+**Updated:** 25 August 2026
 
 ---
 
-# Document Purpose
+# 1. Purpose
 
-This document describes DMIMS database ownership and application access semantics.
+Documents database ownership and relationships relevant to the DMIMS application.
 
-Schema field-level definitions remain governed by actual Laravel migrations.
-
----
-
-# Database Design Principles
-
-DMIMS follows:
-
-- Multi-tenant architecture
-- Customer isolation
-- Immutable movement history
-- Soft deletes for master data
-- Foreign key integrity
-- Audit-first design
-- Subscription/license separation
-- Explicit access-scope classification
+The actual Laravel migrations remain authoritative for physical schema.
 
 ---
 
-# Data Access Scope Classification
+# 2. Access Scope Classification
 
-## PLATFORM_ONLY
+Use:
 
-Platform-owned/master data.
+- PLATFORM_ONLY
+- TENANT_STRICT
+- TENANT_WITH_GLOBAL_DEFAULTS
 
-Examples:
+Customer 360 does not change table ownership.
 
-- roles
-- permissions
-- modules
-- subscription_plans
-- platform settings
+It changes how platform administration navigates customer-owned tables.
 
-Customer users cannot directly browse these tables as platform administration resources.
+---
 
-## TENANT_STRICT
+# 3. Customers Table
 
-Customer-owned records.
+`customers` remains the customer master.
 
-Customer query rule:
+Customer is the platform administration aggregate/navigation root for Customer 360.
+
+## Logical Relationships
+
+Customer has many:
+
+- Users
+- Departments
+- Customer Modules
+- Customer Subscriptions
+- Subscription Logs where related
+- Licenses
+- License Logs where related
+- Billing Records
+- Billing Payments
+- Billing Logs
+- Locations
+- Categories
+- Products
+- Boxes
+- Document Files
+- Movement Logs
+- Barcode Records
+- Audit Logs
+- Notifications
+
+Implement Eloquent relationships only where actual foreign keys/schema support them.
+
+---
+
+# 4. Users
+
+Customer users contain `customer_id`.
+
+Platform users are distinguished by platform role/flag.
+
+Customer 360 Users query:
 
 ```text
-customer_id = authenticated user's customer_id
+users.customer_id = selected Customer ID
 ```
 
-Examples:
-
-- customer users
-- customer_modules
-- customer_subscriptions
-- subscription_logs
-- licenses
-- license_logs
-- billing_records
-- billing_payments
-- billing_logs
-- locations
-- categories
-- products
-- product_location_stocks
-- stock_movements
-- stock_alerts
-- boxes
-- document_files
-- document_movement_logs
-- barcode_registry
-- barcode_scan_logs
-- audit_logs
-- customer notifications
-
-`customer_id IS NULL` is not part of a customer query for these resources.
-
-## TENANT_WITH_GLOBAL_DEFAULTS
-
-Tables explicitly designed to contain global and customer-specific reference records.
-
-Examples:
-
-- document_types where `customer_id` may be NULL
-- settings where approved global values are customer-readable
-
-NULL does not automatically mean customer-visible.
-
----
-
-# CUSTOMERS
-
-Purpose: stores customer companies.
-
-Platform Customer Management is PLATFORM_ONLY.
-
-Customer users may view own company through My Company where authorized.
-
----
-
-# USERS
-
-Purpose: stores platform and customer users.
-
-Platform users:
+Customer My Company query:
 
 ```text
-customer_id = NULL
-is_platform_user = true
+users.customer_id = authenticated user's customer_id
 ```
 
-Customer users:
+---
+
+# 5. Modules
+
+`modules` is platform master data.
+
+`customer_modules` is customer-owned assignment data.
+
+Customer 360 Modules uses:
 
 ```text
-customer_id = owning customer
-is_platform_user = false
+customer_modules.customer_id = selected Customer ID
 ```
 
-## Access Rules
+---
 
-When a customer administrator lists users:
+# 6. Subscription Plans
+
+Platform master templates.
+
+Not merged into customers.
+
+---
+
+# 7. Customer Subscriptions
+
+Customer-owned.
+
+Customer 360 Subscription filters by selected customer.
+
+Plan relationship remains separate.
+
+---
+
+# 8. Licenses
+
+Customer-owned license records.
+
+Customer 360 full License administration uses selected customer.
+
+Customer-facing License Status remains limited presentation.
+
+---
+
+# 9. Billing Records
+
+Customer-owned.
+
+Customer 360 Billing:
 
 ```text
-users.customer_id = authenticated_user.customer_id
+billing_records.customer_id = selected Customer ID
 ```
 
-Platform users must never be included.
+---
+
+# 10. Billing Payments
+
+Customer-owned.
+
+Where the table contains `customer_id`, selected customer scope must match.
+
+Payments should also belong to billing records owned by the same customer.
 
 ---
 
-# MODULES
+# 11. Audit Logs
 
-Platform module catalogue.
-
-Scope: PLATFORM_ONLY.
-
-Customers may see only their own enabled module assignments, not the module management resource.
-
----
-
-# CUSTOMER_MODULES
-
-Purpose: customer module assignments.
-
-Scope: TENANT_STRICT.
-
----
-
-# SUBSCRIPTION_PLANS
-
-Purpose: reusable platform plan templates.
-
-Scope: PLATFORM_ONLY.
-
-Customer users do not browse this table/resource.
-
----
-
-# CUSTOMER_SUBSCRIPTIONS
-
-Purpose: actual subscription assigned to customer.
-
-Scope: TENANT_STRICT.
-
-Customers may see own summary where permitted.
-
----
-
-# SUBSCRIPTION_LOGS
-
-Scope: TENANT_STRICT.
-
-Immutable history.
-
----
-
-# LICENSES
-
-Scope: TENANT_STRICT as data ownership.
-
-Full management is platform-only.
-
-Customer-facing presentation is simplified License Status.
-
----
-
-# LICENSE_LOGS
-
-Scope: TENANT_STRICT.
-
-Not directly customer-editable.
-
----
-
-# BILLING_RECORDS
-
-Scope: TENANT_STRICT.
-
-Customer users may only view own records when Billing View is enabled.
-
-Only Datamation Super Admin modifies billing.
-
----
-
-# BILLING_PAYMENTS / BILLING_LOGS
-
-Scope: TENANT_STRICT.
-
-Manual platform-controlled payment administration.
-
----
-
-# LOCATIONS
-
-Scope: TENANT_STRICT.
-
-Shared by Inventory and Documents.
-
----
-
-# CATEGORIES / PRODUCTS / PRODUCT_LOCATION_STOCKS
-
-Scope: TENANT_STRICT.
-
-Unique keys and quantities remain scoped by customer.
-
----
-
-# STOCK_MOVEMENTS / STOCK_ALERTS
-
-Scope: TENANT_STRICT.
-
-Movement history immutable.
-
----
-
-# BOXES / DOCUMENT_FILES / DOCUMENT_MOVEMENT_LOGS
-
-Scope: TENANT_STRICT.
-
-Movement history immutable.
-
----
-
-# DOCUMENT_TYPES
-
-May support global defaults and customer-specific records.
-
-Scope: TENANT_WITH_GLOBAL_DEFAULTS only if actual implementation/business rule supports `customer_id = NULL` global records.
-
----
-
-# BARCODE_REGISTRY / BARCODE_SCAN_LOGS
-
-Scope: TENANT_STRICT.
-
-Cross-customer barcode lookup must not reveal information.
-
----
-
-# AUDIT_LOGS
-
-Purpose: immutable audit trail.
-
-## Ownership Meaning
-
-`customer_id` populated:
-
-Customer-related audit event.
-
-`customer_id = NULL`:
-
-Platform-level audit event.
-
-## Customer Access Rule
-
-Company Admin may query only:
+Customer-specific audit rows:
 
 ```text
-customer_id = authenticated user's customer_id
+audit_logs.customer_id = Customer ID
 ```
 
-Platform NULL logs must never be included in customer audit queries.
+Platform-level audit rows may use NULL.
 
-Other-customer logs must never be included.
-
----
-
-# NOTIFICATIONS
-
-Customer notifications:
-
-TENANT_STRICT.
-
-Platform notifications:
-
-Platform-only.
+Customer 360 customer audit view must include exact selected customer only.
 
 ---
 
-# SETTINGS
+# 12. Notifications
 
-May contain platform and customer-specific settings.
+Customer-specific notifications remain customer-owned.
 
-Customer visibility of NULL/global settings must be explicitly approved per setting group.
-
-Do not expose all global settings by default.
+Customer 360 may display selected-customer alerts without changing storage.
 
 ---
 
-# Foreign Key Standards
+# 13. Inventory / Document / Barcode
 
-Maintain referential integrity.
+No schema change from Customer 360.
 
-History tables should not cascade delete.
+These remain tenant-owned operational tables.
 
-Tenant-owned relationships must preserve same-customer integrity.
-
----
-
-# Index Standards
-
-Index customer ownership and frequently queried authorization/filter columns.
+Customer 360 Overview may compute counts/usage from them.
 
 ---
 
-# Database Design Summary
+# 14. Customer 360 Schema Rule
 
-Database nullability is not an authorization rule.
+Do not create a `customer_360` table merely to support the UI.
 
-Application access is determined by explicit resource-scope classification plus role/module/subscription/license authorization.
+Customer 360 is composed from existing normalized tables.
+
+If performance requires caching/materialized summary data in future, that requires a separate reviewed architecture/database change.
+
+---
+
+# 15. Same-Customer Integrity
+
+Relationships created/updated from Customer 360 must maintain:
+
+```text
+child.customer_id = parent_customer.id
+```
+
+Cross-customer child assignment is invalid.
+
+---
+
+# 16. Indexing
+
+Existing customer_id indexes are essential for Customer 360 child queries.
+
+Review indexes for:
+
+- users.customer_id
+- customer_modules.customer_id
+- customer_subscriptions.customer_id
+- licenses.customer_id
+- billing_records.customer_id
+- billing_payments.customer_id
+- audit_logs.customer_id
+- notifications.customer_id
+
+---
+
+# 17. Summary
+
+Customer 360 relies on existing normalized customer-owned tables and customer_id indexes.
+
+No database-table merge is required.
 
 ---
 
@@ -344,4 +230,5 @@ Application access is determined by explicit resource-scope classification plus 
 | Version | Date | Description |
 |---|---|---|
 | 1.0 | June 2026 | Initial Database Dictionary |
-| 1.1 | 24 August 2026 | Added explicit platform/tenant scope semantics and strict audit/user access rules |
+| 1.1 | 24 August 2026 | Added explicit scope semantics |
+| 1.2 | 25 August 2026 | Added Customer aggregate/Customer 360 relationship and integrity guidance |

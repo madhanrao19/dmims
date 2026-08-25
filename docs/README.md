@@ -1,10 +1,10 @@
-# DMIMS Customer Access-Control Documentation Update Pack
+# DMIMS Platform Customer 360 Documentation Update Pack
 
-**Prepared:** 24 August 2026
+**Prepared:** 25 August 2026
 
-This package contains full standalone updated Markdown documents for the approved customer-facing access-control model.
+This package updates the DMIMS documentation for the approved Platform Customer 360 / Customer Profile workflow.
 
-## Files
+## Full Replacement Markdown Files
 
 - `docs/DMIMS Security & Access Control Matrix.md`
 - `docs/DMIMS Business Rules & Functional Specification.md`
@@ -15,70 +15,62 @@ This package contains full standalone updated Markdown documents for the approve
 - `docs/DMIMS Administrator Manual.md`
 - `docs/DMIMS Database Dictionary.md`
 - `docs/DMIMS Test Strategy, QA Plan & UAT Specification.md`
-- `docs/DMIMS API & Service Integration Specification.md`
 - `docs/DMIMS Architecture Decision Records (ADR).md`
-- `docs/CONFORMANCE_GAP_ANALYSIS.md`
-- `CHANGELOG_UNRELEASED_ENTRY.md`
+- `docs/DMIMS Developer Getting Started Guide.md`
+- `docs/DMIMS Developer Handover & Onboarding Guide.md`
 
-## Approved Access Model
+## Merge-Safe Entries
 
-Customer access is determined by:
+The Customer 360 entries were merged in place, preserving all existing historical records:
 
-```text
-OWN CUSTOMER
-AND
-ROLE PERMISSION
-AND
-ENABLED MODULE
-AND
-SUBSCRIPTION ENTITLEMENT
-AND
-LICENSE ACCESS
-AND
-RESOURCE-SPECIFIC AUTHORIZATION
-```
+- `docs/CONFORMANCE_GAP_ANALYSIS.md` — new "Platform Customer 360 Design Review — 25 August 2026" section added near the top.
+- `CHANGELOG.md` — new `## [Unreleased]` entry added above the released version history.
 
-Resource scope classes:
+These were merges rather than destructive replacements because the current Conformance Gap Analysis and Changelog contain detailed historical security/release records that must be preserved.
 
-- `PLATFORM_ONLY`
-- `TENANT_STRICT`
-- `TENANT_WITH_GLOBAL_DEFAULTS`
-
-For customer-owned data:
+## Approved Platform Navigation
 
 ```text
-TENANT_STRICT
-= customer_id = authenticated_user.customer_id
+Dashboard
+Customers
+Platform Users
+Roles & Permissions
+Module Catalogue
+Subscription Plans
+Reports & Analytics
+Platform Audit Logs
+Backup / Restore
+System Settings
 ```
 
-`customer_id IS NULL` is never automatically customer-visible.
+## Approved Customer 360
 
-## Customer-Facing Administration
+```text
+Customers
+→ Selected Customer
+   ├── Overview
+   ├── Users
+   ├── Modules
+   ├── Subscription
+   ├── License
+   ├── Billing & Payments
+   └── Audit Logs
+```
 
-Use:
+## Core Security Rule
 
-**My Company**
+```text
+Customer 360 child customer_id
+=
+selected authorized parent Customer ID
+```
 
-with role-controlled panels:
-
-- Profile
-- Users
-- Enabled Modules
-- Subscription
-- License Status
-- Billing
-- Audit Logs
+Never trust a child customer ID submitted by the browser.
 
 ## Important
 
-These documents define the approved target state.
+The current GitHub implementation does not yet have a full Platform Customer 360 ViewCustomer workspace.
 
-`CONFORMANCE_GAP_ANALYSIS.md` correctly marks the corresponding implementation work as pending.
+Documentation is the approved target state.
 
-`CHANGELOG_UNRELEASED_ENTRY.md` is intentionally merge-ready rather than a replacement file, so existing release history is preserved.
-
-Do not claim production conformance until code, tests and browser-level role QA pass.
-
-## Governance
-
-Existing Engineering Constitution, Project Governance and Definition of Done remain authoritative and do not need replacement for this change.
+Do not mark conformance complete until implementation, automated tests, security review and browser QA pass.
