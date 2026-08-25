@@ -68,7 +68,10 @@ class FilamentPanelProvider extends PanelProvider
                 'danger' => Color::Rose,
                 'info' => Color::Sky,
             ])
-            ->font('Inter')
+            // No ->font() override: Filament's default (no custom family) uses the
+            // bundled, self-hosted "Inter Variable" font via LocalFontProvider. Calling
+            // ->font('Inter') switches to BunnyFontProvider (external CDN), which the
+            // same-origin CSP in SecurityHeaders blocks, breaking font loading.
             ->darkMode(true)
             ->sidebarCollapsibleOnDesktop()
             ->maxContentWidth(Width::Full)
