@@ -6,6 +6,25 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed — Scan Center / Reports pages lost Tailwind utility classes (layout, spacing, badges)
+
+- Root cause: no custom Filament theme was registered, so the panel used
+  Filament's stock precompiled CSS, which only contains the utility classes
+  used by Filament's own package views. Custom page views under
+  `resources/views/filament/pages/*.blade.php` used additional classes
+  (`justify-center`, `pt-2`, `space-y-4`, badge/chip styling, etc.) that were
+  never compiled in, so they silently no-op'd — the Download button on
+  Reports wasn't centered, and the Recent scans list on Scan Center rendered
+  as unstyled inline text.
+- Fix: scaffolded a proper Filament theme (`resources/css/filament/admin/theme.css`,
+  registered via `->viteTheme(...)` in `FilamentPanelProvider`) that scans
+  `app/Filament/**` and `resources/views/filament/**`, so custom page styling
+  compiles correctly. Also restyled the Scan Center "Recent scans" rows
+  (barcode chip, badge, clock icon + timestamp, bordered rows) to match the
+  intended design.
+- Any future custom Filament page view can now safely use Tailwind utility
+  classes — verify by rebuilding assets (`npm run build`) after changes.
+
 ### Fixed — toast notifications overlapped the topbar (Search box / user menu)
 
 - Reported live on Scan Center: the "Unknown barcode" notification (with its

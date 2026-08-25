@@ -59,6 +59,12 @@ class FilamentPanelProvider extends PanelProvider
                 AppAuthentication::make()->recoverable(),
             ])
             // --- Branding & visual language ---
+            // Custom theme so utility classes used in our own page views
+            // (resources/views/filament/**, app/Filament/**) are compiled
+            // into the CSS bundle — Filament's stock CSS only carries the
+            // classes its own package views use, so unscanned pages like
+            // Scan Center/Reports silently lost layout/spacing utilities.
+            ->viteTheme('resources/css/filament/admin/theme.css')
             ->brandName('DMIMS')
             ->favicon(asset('icons/icon-192.png'))
             ->colors([
