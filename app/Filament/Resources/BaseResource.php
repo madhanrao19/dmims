@@ -47,6 +47,22 @@ abstract class BaseResource extends Resource
      */
     protected static bool $customerFacingViaMyCompany = false;
 
+    /**
+     * docs/CONFORMANCE_GAP_ANALYSIS.md, Platform Customer 360 Design Review,
+     * item 10: when true, a PLATFORM user also reaches this resource's data
+     * through Customer 360 (App\Filament\Resources\CustomerResource's
+     * record sub-navigation) instead of a standalone top-level navigation
+     * entry, mirroring how $customerFacingViaMyCompany hides the entry for
+     * non-platform users. The resource's own routes, pages and
+     * can()/getEloquentQuery() are unchanged and still fully functional —
+     * Customer 360's embedded tables link straight to them, and its "Add X"
+     * actions create through the same resource — only the duplicate
+     * top-level sidebar entry is hidden, for both platform and non-platform
+     * users. Deliberately NOT set on AuditLogResource: the approved target
+     * keeps "Platform Audit Logs" as its own separate, cross-customer view.
+     */
+    protected static bool $consolidatedViaCustomer360 = false;
+
     protected static ?string $permission = null;
 
     /**
@@ -328,6 +344,14 @@ abstract class BaseResource extends Resource
 
         if (! $user) {
             return true; // allow navigation to register for unauthenticated contexts
+        }
+
+        // Customer 360 consolidation applies to platform AND non-platform
+        // users alike (unlike every check below, which only hides nav from
+        // non-platform users) — checked first, ahead of the platform-user
+        // early return.
+        if (static::$consolidatedViaCustomer360) {
+            return false;
         }
 
         if ($user->is_platform_user) {

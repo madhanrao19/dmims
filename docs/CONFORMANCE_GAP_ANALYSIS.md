@@ -83,7 +83,7 @@ As of 25 August 2026:
 - Existing customer-facing `My Company` is implemented and must not regress.
 - Existing customer-specific platform resources remain separate today.
 
-### WIP Medium — Platform Customer 360 Browsing + Scoped Create Implemented; Nav Consolidation Pending
+### Implemented — Platform Customer 360 (browsing, scoped create, nav consolidation)
 
 This is primarily a functional/UX conformance gap, not evidence of a new data leak in the existing separate-resource implementation.
 
@@ -100,12 +100,14 @@ Required implementation:
 7. Embed/reuse Billing & Payments. ✅ (browse + Add Billing Record)
 8. Embed/reuse customer Audit Logs. ✅ (browse only — system-generated, no manual create)
 9. Derive all child `customer_id` values from the selected parent Customer. ✅
-10. Remove/hide duplicate customer-specific platform navigation after parity is verified. **Deliberately deferred** — see note below.
+10. Remove/hide duplicate customer-specific platform navigation after parity is verified. ✅
 11. Preserve separate platform master areas. ✅
 12. Preserve customer-facing My Company. ✅
 13. Add browser/security regression tests. ✅ (Feature tests + Playwright)
 
-Items 1–9, 11 and 12 are implemented as of 25 August 2026. Each tab (except Audit Logs) now has an "Add X" header action that creates a new child record with `customer_id` fixed to the selected Customer 360 parent — see Security Acceptance below for how. Row actions still link out to each resource's own existing View/Edit page for further edits. Item 10 remains deliberately **not** done: hiding the standalone top-level navigation for Users/Modules/Subscriptions/Licenses/Billing is still held back pending a browser QA sign-off pass on this newly-added create capability, even though a create path now exists inside Customer 360 too. Audit Logs' own "Platform Audit Logs" top-level nav also stays, per its explicit place in "Platform-wide master/administration remains separate" above — Customer 360's Audit Logs tab is additive, not a replacement.
+All 13 items are implemented as of 25 August 2026. Each tab (except Audit Logs) has an "Add X" header action that creates a new child record with `customer_id` fixed to the selected Customer 360 parent — see Security Acceptance below for how. Row actions still link out to each resource's own existing View/Edit page for further edits.
+
+Item 10: `UserResource`, `CustomerModuleResource`, `CustomerSubscriptionResource`, `LicenseResource` and `BillingRecordResource` now set a new `BaseResource::$consolidatedViaCustomer360 = true` flag (mirroring the existing `$customerFacingViaMyCompany` mechanism, but hiding the standalone top-level nav entry for platform users too, not just tenant users). The resources' own routes/pages/`can()`/`getEloquentQuery()` are unchanged and fully functional — only the duplicate sidebar entry is hidden; Customer 360's embedded tables and "Add X" actions link straight to them. `AuditLogResource` deliberately does **not** set this flag — its top-level "Platform Audit Logs" nav stays, per "Platform-wide master/administration remains separate" above; Customer 360's Audit Logs tab is additive, not a replacement.
 
 ### Security Acceptance
 
@@ -120,14 +122,12 @@ Customer roles must not access Platform Customer 360. **Verified** — `Customer
 ### Status
 
 **Documentation:** ✅ Approved
-**Implementation:** ✅ Implemented (embedded browsing + scoped create actions; nav consolidation deferred — see item 10)
-**Security regression tests:** ✅ Added (`tests/Feature/CustomerProfileTest.php`, `tests/playwright/role-qa.spec.js`)
-**Browser QA:** ✅ Passing (Playwright: browse all tabs, Add User end-to-end, non-platform denial)
-**Conformance:** Not yet closed — item 10 (nav consolidation) remains an explicit, separate follow-up
+**Implementation:** ✅ Implemented (embedded browsing, scoped create actions, standalone nav consolidated)
+**Security regression tests:** ✅ Added (`tests/Feature/CustomerProfileTest.php`, `tests/Feature/MyCompanyClusterTest.php`, `tests/playwright/role-qa.spec.js`)
+**Browser QA:** ✅ Passing (Playwright: browse all tabs, Add User end-to-end, non-platform denial, standalone nav gone + routes still functional)
+**Conformance:** ✅ Closed
 
-**Known pre-existing gap, not introduced by this change (flagged, not fixed):** `BaseResource::usageLimitReached()` keys its "Limit Rule" check off the *acting* user's own `customer_id`, which is always null for a platform user — so a platform-initiated create (via Customer 360's new Add actions, or via any of these resources' own standalone create pages, which already had this gap) never enforces a customer's subscription usage limit (e.g. `max_users`). Pre-existing in `BaseResource`, orthogonal to this feature; left for a separate fix.
-
-Close this gap only after implementation, tests, security review, browser QA and documentation synchronization pass the Definition of Done.
+**Known pre-existing gap, not introduced by this change (flagged, not fixed):** `BaseResource::usageLimitReached()` keys its "Limit Rule" check off the *acting* user's own `customer_id`, which is always null for a platform user — so a platform-initiated create (via Customer 360's Add actions, or via any of these resources' own standalone create pages, which already had this gap) never enforces a customer's subscription usage limit (e.g. `max_users`). Pre-existing in `BaseResource`, orthogonal to this feature; left for a separate fix.
 
 ---
 

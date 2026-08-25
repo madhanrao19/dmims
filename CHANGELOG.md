@@ -6,6 +6,29 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed — Platform Customer 360: standalone navigation consolidated (item 10 closed)
+
+- `UserResource`, `CustomerModuleResource`, `CustomerSubscriptionResource`,
+  `LicenseResource` and `BillingRecordResource` no longer show their own
+  top-level sidebar entry for platform users — Customer 360's record
+  sub-navigation (browsing + the "Add X" actions above) is now the single
+  entry point for administering a specific customer's users, modules,
+  subscriptions, licenses and billing.
+- New `BaseResource::$consolidatedViaCustomer360` flag drives this, mirroring
+  the existing `$customerFacingViaMyCompany` mechanism but for platform users
+  instead of tenant users. The resources' own routes/pages/authorization are
+  completely unchanged and still fully functional — only the duplicate
+  sidebar entry is hidden.
+- `AuditLogResource` is deliberately unaffected: "Platform Audit Logs" stays
+  as its own top-level, cross-customer entry; Customer 360's Audit Logs tab
+  is additive, not a replacement.
+- `docs/CONFORMANCE_GAP_ANALYSIS.md`'s Platform Customer 360 gap is now
+  closed — all 13 required-implementation items are done.
+- Extended `tests/Feature/MyCompanyClusterTest.php` (nav hidden for platform
+  users too; standalone routes still resolve) and
+  `tests/playwright/role-qa.spec.js` (sidebar no longer shows the old
+  entries; the routes still return 200 directly).
+
 ### Added — Platform Customer 360: "Add X" actions on Users, Modules, Subscription, License, Billing & Payments
 
 - Each Customer 360 tab (except Audit Logs, which is system-generated) now

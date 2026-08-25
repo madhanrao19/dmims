@@ -21,6 +21,10 @@ class UserResource extends BaseResource
     // the My Company > Users tab instead of a standalone nav entry.
     protected static bool $customerFacingViaMyCompany = true;
 
+    // Platform Customer 360 Design Review, item 10: platform users reach
+    // this via Customer 360's Users tab instead of a standalone nav entry.
+    protected static bool $consolidatedViaCustomer360 = true;
+
     protected static ?string $permission = 'manage users';
 
     // Security & Access Control Matrix §6: only Super Admin may delete a

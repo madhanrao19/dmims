@@ -156,6 +156,26 @@ test('Platform Customer 360: platform admin can browse every tab for a customer'
   expect(errors).toEqual([]);
 });
 
+test('Platform Customer 360: old standalone nav items are gone, routes still work', async ({ page }) => {
+  await login(page, 'qa-superadmin@example.com');
+  await page.goto('/admin');
+
+  const sidebar = page.locator('.fi-sidebar');
+  for (const label of ['Customer Subscriptions', 'Customer Modules', 'Licenses', 'Invoices']) {
+    await expect(sidebar.getByRole('link', { name: label, exact: true })).toHaveCount(0);
+  }
+  // "Users" is ambiguous with Customer 360's own tab label elsewhere, but
+  // the standalone top-level sidebar entry itself must be gone too.
+  await expect(sidebar.getByRole('link', { name: 'Users', exact: true })).toHaveCount(0);
+  // Platform Audit Logs is explicitly NOT consolidated — stays visible.
+  await expect(sidebar.getByRole('link', { name: 'Audit Logs', exact: true })).toBeVisible();
+
+  // Routes remain fully functional even with the nav entry hidden.
+  await expect((await page.goto('/admin/users')).status()).toBe(200);
+  await expect((await page.goto('/admin/billing-records')).status()).toBe(200);
+  await expect((await page.goto('/admin/licenses')).status()).toBe(200);
+});
+
 test('Platform Customer 360: Add User creates a user scoped to the selected customer', async ({ page }) => {
   const errors = collectErrors(page);
   await login(page, 'qa-superadmin@example.com');

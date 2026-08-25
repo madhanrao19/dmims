@@ -15,6 +15,7 @@ use App\Filament\Resources\BillingRecordResource;
 use App\Filament\Resources\CustomerModuleResource;
 use App\Filament\Resources\CustomerResource;
 use App\Filament\Resources\CustomerSubscriptionResource;
+use App\Filament\Resources\LicenseResource;
 use App\Filament\Resources\UserResource;
 use App\Models\BillingRecord;
 use App\Models\Customer;
@@ -198,7 +199,7 @@ class MyCompanyClusterTest extends TestCase
         $this->assertSame(AuditLogResource::can('viewAny'), AuditLogs::canAccess());
     }
 
-    public function test_standalone_resource_navigation_is_hidden_for_tenant_users_but_kept_for_platform_users(): void
+    public function test_standalone_resource_navigation_is_hidden_for_tenant_users_and_for_platform_users_via_customer_360(): void
     {
         $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACM', 'status' => 'active']);
         $admin = $this->companyAdmin($customer);
@@ -211,10 +212,17 @@ class MyCompanyClusterTest extends TestCase
         $this->assertFalse(AuditLogResource::shouldRegisterNavigation());
         $this->assertFalse(CustomerResource::shouldRegisterNavigation());
 
+        // Platform Customer 360 Design Review, item 10 (25 Aug 2026): these
+        // five now consolidate into Customer 360's record sub-navigation for
+        // platform users too, same as they already do for tenant users via
+        // My Company — see CustomerProfileTest for the Customer-360-side
+        // assertions. Audit Logs and Customers themselves are unaffected.
         $this->actingAs(User::factory()->create(['is_platform_user' => true, 'status' => 'active']));
-        $this->assertTrue(UserResource::shouldRegisterNavigation());
-        $this->assertTrue(CustomerModuleResource::shouldRegisterNavigation());
-        $this->assertTrue(CustomerSubscriptionResource::shouldRegisterNavigation());
+        $this->assertFalse(UserResource::shouldRegisterNavigation());
+        $this->assertFalse(CustomerModuleResource::shouldRegisterNavigation());
+        $this->assertFalse(CustomerSubscriptionResource::shouldRegisterNavigation());
+        $this->assertFalse(BillingRecordResource::shouldRegisterNavigation());
+        $this->assertFalse(LicenseResource::shouldRegisterNavigation());
         $this->assertTrue(AuditLogResource::shouldRegisterNavigation());
         $this->assertTrue(CustomerResource::shouldRegisterNavigation());
     }
@@ -239,6 +247,31 @@ class MyCompanyClusterTest extends TestCase
         $this->actingAs($admin);
 
         $this->get(UserResource::getUrl('edit', ['record' => $admin]))->assertOk();
+    }
+
+    /**
+     * Platform Customer 360 Design Review, item 10: hiding these five
+     * resources' standalone top-level nav for platform users must not break
+     * the routes themselves — Customer 360's embedded tables and "Add X"
+     * actions still link straight to them.
+     */
+    public function test_standalone_resource_routes_remain_functional_for_platform_users_despite_hidden_nav(): void
+    {
+        $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACM', 'status' => 'active']);
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $platformUser = User::factory()->create(['is_platform_user' => true, 'status' => 'active']);
+        $platformUser->assignRole('Datamation Super Admin');
+        $this->actingAs($platformUser);
+
+        $this->assertFalse(UserResource::shouldRegisterNavigation());
+        $this->get(UserResource::getUrl('index'))->assertOk();
+        $this->get(UserResource::getUrl('create'))->assertOk();
+
+        $this->assertFalse(BillingRecordResource::shouldRegisterNavigation());
+        $this->get(BillingRecordResource::getUrl('index'))->assertOk();
+
+        $this->assertFalse(LicenseResource::shouldRegisterNavigation());
+        $this->get(LicenseResource::getUrl('index'))->assertOk();
     }
 
     public function test_overview_shows_only_own_company_data(): void

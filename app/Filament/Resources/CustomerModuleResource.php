@@ -21,6 +21,10 @@ class CustomerModuleResource extends BaseResource
     // the My Company > Enabled Modules tab instead of a standalone nav entry.
     protected static bool $customerFacingViaMyCompany = true;
 
+    // Platform Customer 360 Design Review, item 10: platform users reach
+    // this via Customer 360's Modules tab instead of a standalone nav entry.
+    protected static bool $consolidatedViaCustomer360 = true;
+
     protected static ?string $permission = 'manage subscriptions';
 
     protected static string|\BackedEnum|null $navigationIcon = null;

@@ -22,6 +22,10 @@ class LicenseResource extends BaseResource
     // elsewhere (Dashboard), not this administrative resource.
     protected static bool $platformOnly = true;
 
+    // Platform Customer 360 Design Review, item 10: administered via
+    // Customer 360's License tab instead of a standalone top-level entry.
+    protected static bool $consolidatedViaCustomer360 = true;
+
     protected static ?string $permission = 'manage licensing';
 
     protected static string|\BackedEnum|null $navigationIcon = null;

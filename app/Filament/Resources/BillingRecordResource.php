@@ -30,6 +30,11 @@ class BillingRecordResource extends BaseResource
     // the My Company > Billing tab instead of a standalone nav entry.
     protected static bool $customerFacingViaMyCompany = true;
 
+    // Platform Customer 360 Design Review, item 10: platform users reach
+    // this via Customer 360's Billing & Payments tab instead of a
+    // standalone nav entry.
+    protected static bool $consolidatedViaCustomer360 = true;
+
     protected static ?string $permission = 'manage billing';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Billing';
