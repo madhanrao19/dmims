@@ -406,4 +406,34 @@ abstract class BaseResource extends Resource
             }
         };
     }
+
+    /**
+     * A Textarea bound to a model attribute cast as 'array' (e.g.
+     * enabled_modules/allowed_reports on CustomerSubscription/License) must
+     * never receive the admin's raw JSON string as-is: Eloquent's array cast
+     * setter assumes a string value is already meant literally and
+     * json_encodes it again, so a valid ["a","b"] typed into the field was
+     * silently stored double-encoded — read back later as the original
+     * string instead of an array. Anything that then iterates the "array"
+     * (e.g. CustomerSubscriptionObserver::syncEnabledModules()'s whereIn())
+     * hit a hard TypeError instead of a validation error. Decode the typed
+     * JSON into a real array before it ever reaches the model, and
+     * re-encode the stored array back to text when an existing record is
+     * loaded for editing.
+     */
+    protected static function jsonTextareaDehydrate(): \Closure
+    {
+        return function (?string $state) {
+            return blank($state) ? null : json_decode($state, true);
+        };
+    }
+
+    protected static function jsonTextareaHydrate(): \Closure
+    {
+        return function ($component, mixed $state): void {
+            if (is_array($state)) {
+                $component->state(json_encode($state));
+            }
+        };
+    }
 }

@@ -6,6 +6,29 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed — creating/editing a Subscription or License with a non-blank JSON field crashed
+
+- `CustomerSubscriptionResource`/`LicenseResource`'s `enabled_modules` and
+  `allowed_reports` Textareas are bound to model attributes cast as `'array'`.
+  Submitting valid JSON (e.g. `["stock_inventory"]`) passed the raw string
+  straight to the model; Eloquent's array-cast setter `json_encode()`s a
+  string value again instead of decoding it first, so it was stored
+  double-encoded and read back as the original string, not an array.
+  `CustomerSubscriptionObserver::syncEnabledModules()`'s `whereIn()` then hit
+  a hard `TypeError` — a live 500 on every create/edit with a non-blank
+  Enabled Modules field (License stored the same corrupted value silently,
+  with no observer to crash on it).
+- Found during a second full QA pass on Herd, live in the browser via
+  Customer 360's "Add Subscription" action.
+- Fixed at the shared root: two new helpers on `BaseResource`
+  (`jsonTextareaDehydrate()`/`jsonTextareaHydrate()`) decode the typed JSON
+  into a real array before it reaches the model, and re-encode the stored
+  array back to text when an existing record is loaded for editing. Applied
+  to all 4 affected fields across both resources.
+- Added a regression test reproducing the actual bug via a real form
+  submission (a JSON string, not a PHP array passed directly to the model)
+  to `tests/Feature/CustomerSubscriptionModuleSyncTest.php`.
+
 ### Fixed — blank Enabled Modules no longer disables every module for a customer
 
 - `CustomerSubscriptionObserver::syncEnabledModules()` used to treat a

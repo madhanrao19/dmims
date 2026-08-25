@@ -52,10 +52,14 @@ class CustomerSubscriptionResource extends BaseResource
                 Forms\Components\TextInput::make('max_boxes')->numeric(),
                 Forms\Components\Textarea::make('allowed_reports')
                     ->helperText('Enter JSON array of allowed report codes.')
-                    ->rule(static::jsonRule()),
+                    ->rule(static::jsonRule())
+                    ->afterStateHydrated(static::jsonTextareaHydrate())
+                    ->dehydrateStateUsing(static::jsonTextareaDehydrate()),
                 Forms\Components\Textarea::make('enabled_modules')
                     ->helperText('Enter JSON array of enabled module codes. Leave blank to leave this customer\'s existing module access unchanged; a non-blank list is synced exactly (listed modules enabled, all others disabled).')
-                    ->rule(static::jsonRule()),
+                    ->rule(static::jsonRule())
+                    ->afterStateHydrated(static::jsonTextareaHydrate())
+                    ->dehydrateStateUsing(static::jsonTextareaDehydrate()),
                 Forms\Components\TextInput::make('support_level')->maxLength(100),
                 Forms\Components\Select::make('status')
                     ->options([

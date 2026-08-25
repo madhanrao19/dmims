@@ -56,10 +56,14 @@ class LicenseResource extends BaseResource
                 Forms\Components\TextInput::make('max_boxes')->numeric(),
                 Forms\Components\Textarea::make('enabled_modules')
                     ->helperText('Enter JSON array of enabled module codes.')
-                    ->rule(static::jsonRule()),
+                    ->rule(static::jsonRule())
+                    ->afterStateHydrated(static::jsonTextareaHydrate())
+                    ->dehydrateStateUsing(static::jsonTextareaDehydrate()),
                 Forms\Components\Textarea::make('allowed_reports')
                     ->helperText('Enter JSON array of allowed reports.')
-                    ->rule(static::jsonRule()),
+                    ->rule(static::jsonRule())
+                    ->afterStateHydrated(static::jsonTextareaHydrate())
+                    ->dehydrateStateUsing(static::jsonTextareaDehydrate()),
                 Forms\Components\Select::make('status')
                     ->options([
                         'trial' => 'Trial',
