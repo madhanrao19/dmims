@@ -54,7 +54,7 @@ class CustomerSubscriptionResource extends BaseResource
                     ->helperText('Enter JSON array of allowed report codes.')
                     ->rule(static::jsonRule()),
                 Forms\Components\Textarea::make('enabled_modules')
-                    ->helperText('Enter JSON array of enabled module codes. Leave blank to disable ALL modules for this customer — CustomerSubscriptionObserver syncs every CustomerModule row to exactly this list on save.')
+                    ->helperText('Enter JSON array of enabled module codes. Leave blank to leave this customer\'s existing module access unchanged; a non-blank list is synced exactly (listed modules enabled, all others disabled).')
                     ->rule(static::jsonRule()),
                 Forms\Components\TextInput::make('support_level')->maxLength(100),
                 Forms\Components\Select::make('status')

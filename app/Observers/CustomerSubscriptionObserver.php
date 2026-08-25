@@ -61,7 +61,20 @@ class CustomerSubscriptionObserver
 
     protected function syncEnabledModules(CustomerSubscription $subscription): void
     {
-        $enabled = $subscription->enabled_modules ?: [];
+        $enabled = $subscription->enabled_modules;
+
+        // A blank/omitted list is never a deliberate "disable every module
+        // for this customer" — there's no UI that asks an admin to declare
+        // a full module list just to leave it empty on purpose; disabling a
+        // specific module already has its own explicit path (the Modules
+        // tab / CustomerModuleResource). Treat blank as "leave existing
+        // CustomerModule state untouched" instead of wiping it — this was
+        // previously the default for every blank submission (including the
+        // field simply never being filled in), which silently disabled all
+        // of a customer's modules.
+        if (blank($enabled)) {
+            return;
+        }
 
         // Ensure enabled modules exist as CustomerModule rows
         $moduleIds = Module::whereIn('module_code', $enabled)->pluck('id')->all();

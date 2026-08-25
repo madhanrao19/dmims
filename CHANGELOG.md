@@ -6,6 +6,23 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed — blank Enabled Modules no longer disables every module for a customer
+
+- `CustomerSubscriptionObserver::syncEnabledModules()` used to treat a
+  blank/omitted `enabled_modules` field as "disable every `CustomerModule`
+  row for this customer" — there was no legitimate reason to rely on that
+  (disabling a specific module already has its own explicit path via the
+  Modules tab / `CustomerModuleResource`), and no warning that it would
+  happen. A blank field now leaves existing module access untouched instead.
+  A non-blank list still syncs exactly as before (listed modules enabled,
+  everything else disabled) — unchanged, still covered by the existing
+  `tests/Feature/AccessControlTest.php` case.
+- Superseded the warning-text-only fix from the previous entry below (the
+  helper text is updated to describe the new, safe behaviour instead of
+  warning about the old dangerous one).
+- Added `tests/Feature/CustomerSubscriptionModuleSyncTest.php` covering
+  blank-on-create, blank-on-update, and the unchanged non-blank-sync case.
+
 ### Added — Platform Customer 360: Locations tab, tenant Locations stay separate
 
 - Customer 360 gained a "Locations" tab (browse + "Add Location"), identical
