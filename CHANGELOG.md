@@ -6,6 +6,29 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed — Excel/PDF report downloads crashed ("Malformed UTF-8 characters")
+
+- The Reports page form uses `wire:submit="download"` (a Livewire AJAX
+  call). Livewire only knows how to turn a `StreamedResponse` into a browser
+  file download; a component method returning anything else has its return
+  value JSON-encoded as part of the AJAX reply. `ReportExportService::xlsx()`
+  returned `response()->download()` (a `BinaryFileResponse`) and `pdf()`
+  returned dompdf's `->download()` (a plain `Response` with a binary body) —
+  so selecting Excel or PDF crashed with "Malformed UTF-8 characters,
+  possibly incorrectly encoded" while Livewire tried to JSON-encode the raw
+  binary content. Only CSV (already a `StreamedResponse` via
+  `response()->streamDownload()`) worked.
+- Fix: `xlsx()` and `pdf()` now build their output and stream it via
+  `response()->streamDownload()`, matching the working `csv()` pattern.
+  `ReportExportService::generate()` and `Reports::download()` return types
+  tightened from `Response|StreamedResponse` to `StreamedResponse`. Verified
+  live — both formats now download correctly (`%PDF-1.7` header / `PK\x03\x04`
+  zip header) instead of erroring.
+- Updated the page's helper text, which incorrectly implied Excel/PDF were
+  conditional on a "converter library" being installed — both packages
+  (`openspout/openspout`, `barryvdh/laravel-dompdf`) are already required
+  dependencies and always available.
+
 ### Fixed — Scan Center / Reports pages lost Tailwind utility classes (layout, spacing, badges)
 
 - Root cause: no custom Filament theme was registered, so the panel used

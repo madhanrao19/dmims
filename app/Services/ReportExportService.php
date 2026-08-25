@@ -20,7 +20,6 @@ use Illuminate\Database\Eloquent\Builder;
 use InvalidArgumentException;
 use OpenSpout\Common\Entity\Row;
 use OpenSpout\Writer\XLSX\Writer as XlsxWriter;
-use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -119,7 +118,7 @@ class ReportExportService
     /**
      * @param  'csv'|'xlsx'|'pdf'  $format
      */
-    public function generate(string $key, string $format = 'csv'): Response|StreamedResponse
+    public function generate(string $key, string $format = 'csv'): StreamedResponse
     {
         if (! isset(static::definitions()[$key])) {
             throw new InvalidArgumentException("Unknown report: {$key}");
@@ -148,7 +147,7 @@ class ReportExportService
         }, $fileName, ['Content-Type' => 'text/csv']);
     }
 
-    private function xlsx(string $fileName, array $headers, iterable $rows): Response
+    private function xlsx(string $fileName, array $headers, iterable $rows): StreamedResponse
     {
         $temp = tempnam(sys_get_temp_dir(), 'rpt').'.xlsx';
 
@@ -160,12 +159,17 @@ class ReportExportService
         }
         $writer->close();
 
-        return response()->download($temp, $fileName, [
-            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        ])->deleteFileAfterSend(true);
+        // Livewire's wire:submit only recognises a StreamedResponse as a file
+        // download (it JSON-encodes anything else, which corrupts binary
+        // content) — stream the temp file's bytes rather than returning
+        // response()->download(), which is a plain BinaryFileResponse.
+        return response()->streamDownload(function () use ($temp) {
+            readfile($temp);
+            unlink($temp);
+        }, $fileName, ['Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
     }
 
-    private function pdf(string $title, string $fileName, array $headers, iterable $rows): Response
+    private function pdf(string $title, string $fileName, array $headers, iterable $rows): StreamedResponse
     {
         $html = view('reports.pdf', [
             'title' => $title,
@@ -174,7 +178,12 @@ class ReportExportService
             'generatedAt' => now(),
         ])->render();
 
-        return Pdf::loadHTML($html)->setPaper('a4', 'landscape')->download($fileName);
+        $pdf = Pdf::loadHTML($html)->setPaper('a4', 'landscape')->output();
+
+        // Same Livewire streaming requirement as xlsx() above.
+        return response()->streamDownload(function () use ($pdf) {
+            echo $pdf;
+        }, $fileName, ['Content-Type' => 'application/pdf']);
     }
 
     /**

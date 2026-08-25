@@ -9,7 +9,6 @@ use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Pages\Page;
 use Filament\Schemas\Schema;
-use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -73,7 +72,7 @@ class Reports extends Page implements HasForms
             ->statePath('data');
     }
 
-    public function download(): Response|StreamedResponse
+    public function download(): StreamedResponse
     {
         $state = $this->form->getState();
         $key = $state['report'];

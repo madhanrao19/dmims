@@ -14,7 +14,7 @@
     </form>
 
     <p class="mt-4 text-sm text-gray-500 dark:text-gray-400">
-        Reports are scoped to your organisation. CSV is available now; Excel and
-        PDF are produced when the converter library is installed on the server.
+        Reports are scoped to your organisation. CSV, Excel (XLSX) and PDF are
+        all available.
     </p>
 </x-filament-panels::page>
