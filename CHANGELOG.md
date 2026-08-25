@@ -6,6 +6,54 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed — toast notifications overlapped the topbar (Search box / user menu)
+
+- Reported live on Scan Center: the "Unknown barcode" notification (with its
+  "New Document"/"New Box" action buttons) rendered starting only 16px from
+  the top of the viewport — Filament's default toast position — which sits
+  underneath/across the panel's own 64px sticky topbar, visually colliding
+  with the Search box and user menu. Same root cause affects any page that
+  fires a top-aligned toast while scrolled to the top (e.g. Reports'
+  validation-error notification), not just Scan Center.
+- Root cause: Filament's built-in notification container has no awareness of
+  this panel's custom sticky topbar height, so its default `top: 1rem`
+  offset is too small.
+- Fixed centrally, not per-page: `FilamentPanelProvider` now adds a
+  `PanelsRenderHook::HEAD_END` hook injecting one scoped CSS rule
+  (`.fi-no.fi-vertical-align-start{top:5rem}`) so every top-aligned toast
+  clears the topbar, panel-wide. Verified live (scan → notification renders
+  fully below the topbar, no overlap) and against the full backend suite
+  (210/210 passing, unaffected — a CSS-only change).
+
+### Added — branded error pages for 401/403/404/419/429/500/503
+
+- All HTTP error pages previously fell through to Laravel's bare, unstyled
+  default view (white background, no branding, no way back into the app).
+  Added `resources/views/errors/{401,403,404,419,429,500,503}.blade.php`
+  (a shared `errors/layout.blade.php`), matching the Filament panel's dark
+  theme, with an auth-aware "Sign in" / "Go to Dashboard" action and a "Go
+  Back" link. Self-contained (inline CSS, no Vite/Tailwind build
+  dependency), consistent with the login page's dark palette. The 403/404
+  copy stays generic per the UI/UX spec's "must not disclose unauthorized
+  customer data" rule — no resource/record names are echoed back.
+- Full backend suite (210 tests), Pint, Larastan, and the full Playwright
+  role-QA suite (18 tests) re-run clean after the change — pure view
+  addition, no route/controller/middleware touched.
+
+### Documentation — reconciled UI/UX spec with the actual, tested navigation
+
+- `docs/DMIMS UIUX & Design System Specification.md` §2/§13 (v1.2) listed
+  "Platform Users" and "Roles & Permissions" as top-level nav items. Neither
+  matches the current, product-owner-approved, test-locked implementation:
+  `UserResource` deliberately hides its standalone nav for platform users
+  too (`docs/CONFORMANCE_GAP_ANALYSIS.md` §1 item 10, asserted by
+  `tests/playwright/role-qa.spec.js`), and no Roles & Permissions Filament
+  resource exists at all (Spatie roles/permissions are seeder-only). Updated
+  to v1.3 to match reality and flagged the platform-staff-user navigation
+  gap (no menu path to `customer_id IS NULL` accounts, only a direct
+  `/admin/users` URL) as a known, unresolved item rather than silently
+  regressing the tested consolidation to "fix" it.
+
 ### Fixed — creating/editing a Subscription or License with a non-blank JSON field crashed
 
 - `CustomerSubscriptionResource`/`LicenseResource`'s `enabled_modules` and

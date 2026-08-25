@@ -11,6 +11,7 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Filament\Support\Enums\Width;
+use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
@@ -73,6 +74,17 @@ class FilamentPanelProvider extends PanelProvider
             // ->font('Inter') switches to BunnyFontProvider (external CDN), which the
             // same-origin CSP in SecurityHeaders blocks, breaking font loading.
             ->darkMode(true)
+            // Filament's default toast position (fixed, top-4/right-4 = 16px
+            // from the viewport edge) doesn't account for the panel's own
+            // sticky 64px topbar, so a toast overlaps/obscures the search box
+            // and user menu on any page that fires one while scrolled to the
+            // top (most visibly Scan Center's "Unknown barcode" notification
+            // and Reports' validation errors). Push top-aligned toasts below
+            // the topbar instead of forking Filament's notification view.
+            ->renderHook(
+                PanelsRenderHook::HEAD_END,
+                fn (): string => '<style>.fi-no.fi-vertical-align-start{top:5rem}</style>',
+            )
             ->sidebarCollapsibleOnDesktop()
             ->maxContentWidth(Width::Full)
             ->discoverResources(app_path('Filament/Resources'), 'App\\Filament\\Resources')

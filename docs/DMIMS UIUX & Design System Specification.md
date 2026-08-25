@@ -1,7 +1,7 @@
 # DMIMS UI/UX & Design System Specification
 
 **Datamation Inventory Management System (DMIMS)**  
-**Version:** 1.2  
+**Version:** 1.3  
 **Updated:** 25 August 2026
 
 ---
@@ -28,10 +28,6 @@ Dashboard
 
 Customers
 
-Platform Users
-
-Roles & Permissions
-
 Module Catalogue
 
 Subscription Plans
@@ -45,6 +41,27 @@ Backup / Restore
 System Settings
 
 Customer-specific administration is accessed through Customers → selected Customer.
+
+**"Platform Users" is not a separate top-level nav item.** `UserResource` (the
+only user-management resource — it serves both platform staff and tenant
+users, distinguished by `customer_id`) sets `$consolidatedViaCustomer360 =
+true`, which per the 25 August 2026 Customer 360 design review
+(`docs/CONFORMANCE_GAP_ANALYSIS.md` §1, item 10) hides its standalone
+top-level nav for platform users too, not only tenant users — a deliberate,
+test-locked decision (`tests/playwright/role-qa.spec.js`: "old standalone
+nav items are gone, routes still work"). The route (`/admin/users`) still
+works and is reachable from Customer 360's Users tab for a given customer's
+tenant users. **Known gap:** there is currently no navigation path to list
+or manage platform staff accounts (`customer_id IS NULL`) — a Super Admin
+must know the direct `/admin/users` URL. Not fixed here to avoid regressing
+the tested consolidation; flagged for a future dedicated "Platform Users"
+view scoped to `customer_id IS NULL` if this becomes a real workflow need.
+
+**"Roles & Permissions" is not implemented** as a Filament resource (no
+`RoleResource`/`PermissionResource` exists). Roles and permissions
+(Spatie Laravel Permission) are currently managed only via
+`RolesAndPermissionsSeeder`, not an admin UI. Removed from the list above;
+tracked as an unimplemented feature, not a navigation defect.
 
 ---
 
@@ -224,8 +241,6 @@ These functions remain reachable contextually inside Customer 360.
 
 Keep:
 
-- Platform Users
-- Roles & Permissions
 - Module Catalogue
 - Subscription Plans
 - Reports & Analytics
@@ -233,7 +248,10 @@ Keep:
 - Backup / Restore
 - System Settings
 
-These have platform-wide meaning.
+These have platform-wide meaning. **Platform Users and Roles & Permissions
+are deliberately not top-level items — see §2** (Platform Users is
+consolidated/reachable only via direct URL or Customer 360; Roles &
+Permissions has no admin UI at all).
 
 ---
 
@@ -368,3 +386,4 @@ Customer 360 reduces navigation clutter and makes customer administration faster
 | 1.0 | June 2026 | Initial UI/UX Specification |
 | 1.1 | 24 August 2026 | Added My Company/access-aware navigation |
 | 1.2 | 25 August 2026 | Added Platform Customer 360 and consolidated platform customer navigation |
+| 1.3 | 25 August 2026 | Production UI/UX audit: reconciled §2/§13 with the actual tested nav (Platform Users has no standalone entry; Roles & Permissions was never implemented); added custom-branded 401/403/404/419/429/500/503 error pages |
