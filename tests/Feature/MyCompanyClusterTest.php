@@ -16,6 +16,7 @@ use App\Filament\Resources\CustomerModuleResource;
 use App\Filament\Resources\CustomerResource;
 use App\Filament\Resources\CustomerSubscriptionResource;
 use App\Filament\Resources\LicenseResource;
+use App\Filament\Resources\LocationResource;
 use App\Filament\Resources\UserResource;
 use App\Models\BillingRecord;
 use App\Models\Customer;
@@ -225,6 +226,28 @@ class MyCompanyClusterTest extends TestCase
         $this->assertFalse(LicenseResource::shouldRegisterNavigation());
         $this->assertTrue(AuditLogResource::shouldRegisterNavigation());
         $this->assertTrue(CustomerResource::shouldRegisterNavigation());
+    }
+
+    /**
+     * LocationResource is the one deliberate exception: it consolidates into
+     * Customer 360 for PLATFORM users only (same $consolidatedViaCustomer360
+     * flag as the five resources above), while tenant users keep their own
+     * existing standalone "Locations" nav unchanged — the opposite direction
+     * from every other resource in this test class, worth locking in
+     * explicitly so it can't regress silently either way.
+     */
+    public function test_location_navigation_stays_for_tenant_users_but_hides_for_platform_users(): void
+    {
+        $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACM', 'status' => 'active']);
+        $admin = $this->companyAdmin($customer);
+        $module = Module::firstOrCreate(['module_code' => 'stock_inventory'], ['module_name' => 'Stock Inventory', 'status' => 'active']);
+        CustomerModule::create(['customer_id' => $customer->id, 'module_id' => $module->id, 'is_enabled' => true, 'enabled_at' => now()]);
+
+        $this->actingAs($admin);
+        $this->assertTrue(LocationResource::shouldRegisterNavigation());
+
+        $this->actingAs(User::factory()->create(['is_platform_user' => true, 'status' => 'active']));
+        $this->assertFalse(LocationResource::shouldRegisterNavigation());
     }
 
     public function test_standalone_resource_routes_remain_functional_for_edit_actions(): void

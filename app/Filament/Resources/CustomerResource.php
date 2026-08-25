@@ -184,6 +184,7 @@ class CustomerResource extends BaseResource
             Pages\Subscription::class,
             Pages\License::class,
             Pages\BillingAndPayments::class,
+            Pages\Locations::class,
             Pages\AuditLogs::class,
         ]);
     }
@@ -200,6 +201,7 @@ class CustomerResource extends BaseResource
             'subscription' => Pages\Subscription::route('/{record}/subscription'),
             'license' => Pages\License::route('/{record}/license'),
             'billing' => Pages\BillingAndPayments::route('/{record}/billing'),
+            'locations' => Pages\Locations::route('/{record}/locations'),
             'audit-logs' => Pages\AuditLogs::route('/{record}/audit-logs'),
         ];
     }

@@ -9,12 +9,14 @@ use App\Filament\Resources\CustomerResource;
 use App\Filament\Resources\CustomerResource\Pages\AuditLogs;
 use App\Filament\Resources\CustomerResource\Pages\BillingAndPayments;
 use App\Filament\Resources\CustomerResource\Pages\License as LicensePage;
+use App\Filament\Resources\CustomerResource\Pages\Locations;
 use App\Filament\Resources\CustomerResource\Pages\Modules;
 use App\Filament\Resources\CustomerResource\Pages\Subscription;
 use App\Filament\Resources\CustomerResource\Pages\Users;
 use App\Filament\Resources\CustomerResource\Pages\ViewCustomer;
 use App\Filament\Resources\CustomerSubscriptionResource;
 use App\Filament\Resources\LicenseResource;
+use App\Filament\Resources\LocationResource;
 use App\Filament\Resources\UserResource;
 use App\Models\AuditLog;
 use App\Models\BillingRecord;
@@ -22,6 +24,7 @@ use App\Models\Customer;
 use App\Models\CustomerModule;
 use App\Models\CustomerSubscription;
 use App\Models\License;
+use App\Models\Location;
 use App\Models\Module;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -109,6 +112,9 @@ class CustomerProfileTest extends TestCase
         AuditLog::create(['customer_id' => $customerA->id, 'module' => 'test', 'action' => 'ACTION-A']);
         AuditLog::create(['customer_id' => $customerB->id, 'module' => 'test', 'action' => 'ACTION-B']);
 
+        Location::create(['customer_id' => $customerA->id, 'location_code' => 'LOC-A', 'location_name' => 'Alpha Warehouse']);
+        Location::create(['customer_id' => $customerB->id, 'location_code' => 'LOC-B', 'location_name' => 'Beta Warehouse']);
+
         $this->actingAs($this->platformUser());
 
         $cases = [
@@ -117,6 +123,7 @@ class CustomerProfileTest extends TestCase
             [Subscription::class, CustomerSubscriptionResource::class, 'SUB-A', 'SUB-B'],
             [LicensePage::class, LicenseResource::class, 'LIC-A', 'LIC-B'],
             [BillingAndPayments::class, BillingRecordResource::class, 'INV-A', 'INV-B'],
+            [Locations::class, LocationResource::class, 'Alpha Warehouse', 'Beta Warehouse'],
             [AuditLogs::class, AuditLogResource::class, 'ACTION-A', 'ACTION-B'],
         ];
 
@@ -144,7 +151,7 @@ class CustomerProfileTest extends TestCase
         $this->assertTrue(CustomerResource::can('view', $customer));
         $this->assertFalse(CustomerResource::canAccessCustomer360($customer));
 
-        foreach ([ViewCustomer::class, Users::class, Modules::class, Subscription::class, LicensePage::class, BillingAndPayments::class, AuditLogs::class] as $page) {
+        foreach ([ViewCustomer::class, Users::class, Modules::class, Subscription::class, LicensePage::class, BillingAndPayments::class, Locations::class, AuditLogs::class] as $page) {
             $this->get($page::getUrl(['record' => $customer]))->assertForbidden();
         }
     }
@@ -154,7 +161,7 @@ class CustomerProfileTest extends TestCase
         $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACM', 'status' => 'active']);
         $this->actingAs($this->platformUser());
 
-        foreach ([ViewCustomer::class, Users::class, Modules::class, Subscription::class, LicensePage::class, BillingAndPayments::class, AuditLogs::class] as $page) {
+        foreach ([ViewCustomer::class, Users::class, Modules::class, Subscription::class, LicensePage::class, BillingAndPayments::class, Locations::class, AuditLogs::class] as $page) {
             $this->assertTrue($page::canAccess(['record' => $customer]), "{$page} should be accessible to a platform user");
             $this->get($page::getUrl(['record' => $customer]))->assertOk();
         }
@@ -207,6 +214,9 @@ class CustomerProfileTest extends TestCase
                 // form only shows it ->visibleOn('edit')) — look up by notes.
                 'invoice_date' => now()->toDateString(), 'notes' => 'BILL-NEW-MARKER',
             ], 'notes', 'BILL-NEW-MARKER'],
+            [Locations::class, Location::class, [
+                'location_code' => 'LOC-NEW', 'location_name' => 'New Warehouse',
+            ], 'location_code', 'LOC-NEW'],
         ];
 
         foreach ($cases as [$page, $modelClass, $data, $lookupField, $lookupValue]) {

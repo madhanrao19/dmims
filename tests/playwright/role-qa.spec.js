@@ -161,7 +161,7 @@ test('Platform Customer 360: old standalone nav items are gone, routes still wor
   await page.goto('/admin');
 
   const sidebar = page.locator('.fi-sidebar');
-  for (const label of ['Customer Subscriptions', 'Customer Modules', 'Licenses', 'Invoices']) {
+  for (const label of ['Customer Subscriptions', 'Customer Modules', 'Licenses', 'Invoices', 'Locations']) {
     await expect(sidebar.getByRole('link', { name: label, exact: true })).toHaveCount(0);
   }
   // "Users" is ambiguous with Customer 360's own tab label elsewhere, but
@@ -174,6 +174,42 @@ test('Platform Customer 360: old standalone nav items are gone, routes still wor
   await expect((await page.goto('/admin/users')).status()).toBe(200);
   await expect((await page.goto('/admin/billing-records')).status()).toBe(200);
   await expect((await page.goto('/admin/licenses')).status()).toBe(200);
+  await expect((await page.goto('/admin/locations')).status()).toBe(200);
+});
+
+test('Platform Customer 360: Locations tab browses and adds scoped to the selected customer', async ({ page }) => {
+  const errors = collectErrors(page);
+  await login(page, 'qa-superadmin@example.com');
+
+  await page.goto('/admin/customers');
+  await page.getByText('Datamation Inventory Demo').first().click();
+  await page.waitForURL(/\/admin\/customers\/\d+$/, { timeout: 15000 });
+  await page.goto(page.url() + '/locations');
+  await expect(page.getByRole('heading', { name: /customer locations/i })).toBeVisible({ timeout: 15000 });
+
+  const code = `LOC-${Math.random().toString(36).slice(2, 8)}`;
+  await page.getByRole('button', { name: /^add location$/i }).click();
+  await expect(page.getByRole('heading', { name: /create location/i })).toBeVisible({ timeout: 15000 });
+  // No customer picker in this modal — same Hidden-field trick as the other
+  // Customer 360 "Add X" actions.
+  await expect(page.getByText('Customer', { exact: true })).toHaveCount(0);
+  await page.getByRole('textbox', { name: /^location code/i }).fill(code);
+  await page.getByRole('textbox', { name: /^location name/i }).fill('QA New Warehouse');
+  await page.getByRole('button', { name: /^create$/i }).click();
+  await page.waitForTimeout(1500);
+
+  await page.getByPlaceholder(/search/i).last().fill(code);
+  await expect(page.getByText(code).first()).toBeVisible();
+
+  expect(errors).toEqual([]);
+});
+
+test('Tenant Locations: Company Admin keeps their own standalone nav, no Customer field', async ({ page }) => {
+  await login(page, 'qa-companyadmin@example.com');
+  await expect(page.locator('.fi-sidebar').getByRole('link', { name: 'Locations', exact: true })).toBeVisible();
+
+  await page.goto('/admin/locations/create');
+  await expect(page.getByText('Customer', { exact: true })).toHaveCount(0);
 });
 
 test('Platform Customer 360: Add User creates a user scoped to the selected customer', async ({ page }) => {

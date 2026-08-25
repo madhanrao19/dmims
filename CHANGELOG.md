@@ -6,6 +6,32 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — Platform Customer 360: Locations tab, tenant Locations stay separate
+
+- Customer 360 gained a "Locations" tab (browse + "Add Location"), identical
+  mechanism to the existing Users/Modules/Subscription/License/Billing tabs
+  — `LocationResource` now sets `$consolidatedViaCustomer360 = true`, so
+  platform users manage one customer's locations at a time through Customer
+  360 instead of a single cross-customer list.
+- Tenant users are unaffected: their own standalone "Locations" nav stays
+  exactly as before (their locations were already fully isolated per
+  customer at the model/DB layer via `BelongsToCustomer`) — only the
+  confusing, always-forced `customer_id` picker is now hidden from their
+  create/edit form, the same treatment `BillingRecordResource` already gives
+  its own `customer_id` field.
+- Fixed a bug in `BaseResource::shouldRegisterNavigation()` surfaced while
+  building this: the platform-only nav-consolidation check ran ahead of the
+  platform-user branch, so it silently hid navigation from tenant users too
+  for any resource using it — harmless for the five resources already
+  consolidated (which also hide tenant nav independently via
+  `$customerFacingViaMyCompany`), but wrong for Locations, which needed
+  platform-only hiding. Fixed and covered by a new regression test.
+- Extended `tests/Feature/CustomerProfileTest.php`, added a new test to
+  `tests/Feature/MyCompanyClusterTest.php`, and extended
+  `tests/playwright/role-qa.spec.js` (Locations gone from the platform
+  sidebar, browse+add via Customer 360, and a tenant login still seeing
+  their own Locations nav with no Customer field).
+
 ### Changed — Platform Customer 360: standalone navigation consolidated (item 10 closed)
 
 - `UserResource`, `CustomerModuleResource`, `CustomerSubscriptionResource`,

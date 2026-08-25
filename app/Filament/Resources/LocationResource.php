@@ -24,6 +24,15 @@ class LocationResource extends BaseResource
 
     protected static bool $applyCustomerScope = true;
 
+    // Platform Customer 360 Design Review, item 10 (extended 25 Aug 2026):
+    // platform users reach this via Customer 360's Locations tab instead of
+    // a standalone top-level entry that mixed every customer's locations
+    // into one list. Tenant users are unaffected by this flag — they keep
+    // their own existing top-level "Locations" nav (same as Categories/
+    // Products/Stock Movements), which was already correctly scoped to
+    // their own company via BelongsToCustomer.
+    protected static bool $consolidatedViaCustomer360 = true;
+
     protected static ?string $permission = 'manage inventory';
 
     protected static string|\BackedEnum|null $navigationIcon = null;
@@ -44,7 +53,13 @@ class LocationResource extends BaseResource
                 Forms\Components\Select::make('customer_id')
                     ->relationship('customer', 'company_name')
                     ->searchable()
-                    ->required(),
+                    ->required()
+                    // BelongsToCustomer forces this to the tenant's own
+                    // company regardless of what's submitted, so showing it
+                    // to a tenant is only ever a confusing single-option
+                    // picker — same precedent as BillingRecordResource's
+                    // own customer_id field.
+                    ->visible(fn (): bool => (bool) auth()->user()?->is_platform_user),
                 Forms\Components\Select::make('parent_id')
                     ->relationship('parent', 'location_name')
                     ->searchable(),

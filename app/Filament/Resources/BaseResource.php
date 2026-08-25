@@ -52,14 +52,19 @@ abstract class BaseResource extends Resource
      * item 10: when true, a PLATFORM user also reaches this resource's data
      * through Customer 360 (App\Filament\Resources\CustomerResource's
      * record sub-navigation) instead of a standalone top-level navigation
-     * entry, mirroring how $customerFacingViaMyCompany hides the entry for
-     * non-platform users. The resource's own routes, pages and
+     * entry — hiding it for PLATFORM users only. Whether non-platform users
+     * also lose their own standalone entry is controlled independently by
+     * $customerFacingViaMyCompany: most resources set both flags together
+     * (e.g. UserResource), but LocationResource sets only this one — tenant
+     * users keep their existing standalone "Locations" nav (already
+     * correctly scoped to their own company), only platform users are
+     * redirected to Customer 360. The resource's own routes, pages and
      * can()/getEloquentQuery() are unchanged and still fully functional —
      * Customer 360's embedded tables link straight to them, and its "Add X"
      * actions create through the same resource — only the duplicate
-     * top-level sidebar entry is hidden, for both platform and non-platform
-     * users. Deliberately NOT set on AuditLogResource: the approved target
-     * keeps "Platform Audit Logs" as its own separate, cross-customer view.
+     * top-level sidebar entry is hidden. Deliberately NOT set on
+     * AuditLogResource: the approved target keeps "Platform Audit Logs" as
+     * its own separate, cross-customer view.
      */
     protected static bool $consolidatedViaCustomer360 = false;
 
@@ -346,16 +351,13 @@ abstract class BaseResource extends Resource
             return true; // allow navigation to register for unauthenticated contexts
         }
 
-        // Customer 360 consolidation applies to platform AND non-platform
-        // users alike (unlike every check below, which only hides nav from
-        // non-platform users) — checked first, ahead of the platform-user
-        // early return.
-        if (static::$consolidatedViaCustomer360) {
-            return false;
-        }
-
         if ($user->is_platform_user) {
-            return true;
+            // Customer 360 consolidation hides nav for platform users only —
+            // e.g. LocationResource consolidates for platform users while
+            // tenant users keep their own separate standalone nav (checked
+            // further below via $customerFacingViaMyCompany instead), so this
+            // must not short-circuit before the platform-user branch.
+            return ! static::$consolidatedViaCustomer360;
         }
 
         if (static::$platformOnly) {
