@@ -702,11 +702,20 @@ sweep, not re-audited from scratch.
     `website-qa.spec.js`, `uiux-audit.spec.js` — 32 passed) against the live
     deployed site, not just locally.
 
-**⚠️ Open Low — coverage gap identified, not closed this pass:**
+**✅ Coverage gap closed (26 August 2026, follow-up):**
 - `tests/playwright/uiux-audit.spec.js` only exercises resource List/Create
-  page loads; it does not click into row-action modals. That is why this
-  bug shipped past the original UI/UX audit pass (§13) undetected. The
-  manual row-action click-through done in this pass is not yet captured as
-  a standing automated test — a future improvement would be a small,
-  targeted Playwright spec that opens (without submitting) each custom
-  action's modal per resource, added to the regular `npm run qa` suite.
+  page loads; it does not click into row-action modals, which is why this
+  bug shipped past the original UI/UX audit pass (§13) undetected. Added
+  `tests/playwright/row-actions.spec.js` to the standing `npm run qa` suite:
+  as Super Admin, it opens (never submits) every custom row/header action
+  modal app-wide — Box (Transfer, Move Out, Timeline), DocumentFile
+  (Transfer, Move Out, Timeline), StockMovement (Receive In, Stock Out,
+  Transfer, Adjust), BillingRecord (Record Payment, Issue, Cancel),
+  BarcodeRegistry (Preview/Print, Lost/Damaged, Batch Generate), Backup (Run
+  Database Backup), Export (New Export), Import (New Import) — and, for any
+  modal exposing a `->live()`-updating select, also changes it before
+  closing, which is the exact interaction that crashed Preview/Print.
+  Header actions (no record needed) always run; row actions requiring an
+  existing record skip gracefully when the QA seed hasn't created one yet,
+  keeping the spec robust across seed states. Verified passing both locally
+  (33/33 full suite, no regressions) and live against the deployed site.

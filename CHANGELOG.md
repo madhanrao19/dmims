@@ -6,6 +6,16 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — automated row-action modal sweep (`row-actions.spec.js`)
+
+- The existing `uiux-audit.spec.js` sweep only loads resource List/Create
+  pages; it never clicks into a row-action modal, which is why the Barcode
+  Registries "Preview / Print" crash below shipped undetected. Added
+  `tests/playwright/row-actions.spec.js` to `npm run qa`: opens (never
+  submits) every custom row/header action modal app-wide as Super Admin,
+  and for any modal with a `->live()`-updating select, changes it before
+  closing — the exact interaction that caused the crash.
+
 ### Fixed — Barcode Registries "Preview / Print" crashed on label size change
 
 - `BarcodeRegistryResource`'s `preview` row action and `batchPrint` bulk
