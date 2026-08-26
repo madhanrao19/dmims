@@ -49,6 +49,7 @@ class ProductResource extends BaseResource
         return $schema
             ->components([
                 Forms\Components\Select::make('customer_id')
+                    ->label('Customer')
                     ->relationship('customer', 'company_name')
                     ->searchable()
                     ->required(),
@@ -67,9 +68,11 @@ class ProductResource extends BaseResource
                 Forms\Components\TextInput::make('product_name')->required()->maxLength(255),
                 Forms\Components\Textarea::make('description')->rows(3),
                 Forms\Components\Select::make('category_id')
+                    ->label('Category')
                     ->relationship('category', 'category_name')
                     ->searchable(),
                 Forms\Components\Select::make('default_location_id')
+                    ->label('Default Location')
                     ->relationship('defaultLocation', 'location_name')
                     ->searchable(),
                 Forms\Components\TextInput::make('reorder_level')->numeric()->default(0),

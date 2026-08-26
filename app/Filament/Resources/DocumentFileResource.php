@@ -50,6 +50,7 @@ class DocumentFileResource extends BaseResource
         return $schema
             ->components([
                 Forms\Components\Select::make('customer_id')
+                    ->label('Customer')
                     ->relationship('customer', 'company_name')
                     ->searchable()
                     ->required(),
@@ -62,13 +63,16 @@ class DocumentFileResource extends BaseResource
                 Forms\Components\TextInput::make('file_reference_no')->maxLength(150),
                 Forms\Components\TextInput::make('title')->required()->maxLength(255),
                 Forms\Components\Select::make('document_type_id')
+                    ->label('Document Type')
                     ->relationship('documentType', 'type_name')
                     ->searchable(),
                 Forms\Components\Select::make('department_id')
+                    ->label('Department')
                     ->relationship('department', 'name')
                     ->searchable(),
                 Forms\Components\TextInput::make('owner_name')->maxLength(255),
                 Forms\Components\Select::make('current_box_id')
+                    ->label('Current Box')
                     ->relationship('currentBox', 'box_number')
                     ->searchable()
                     ->required(),

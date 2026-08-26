@@ -53,6 +53,7 @@ class BoxResource extends BaseResource
         return $schema
             ->components([
                 Forms\Components\Select::make('customer_id')
+                    ->label('Customer')
                     ->relationship('customer', 'company_name')
                     ->searchable()
                     ->required(),
@@ -69,6 +70,7 @@ class BoxResource extends BaseResource
                     )
                     ->validationMessages(['unique' => 'This box number is already in use for the selected customer.']),
                 Forms\Components\Select::make('current_location_id')
+                    ->label('Current Location')
                     ->relationship('currentLocation', 'location_name')
                     ->searchable()
                     ->required(),

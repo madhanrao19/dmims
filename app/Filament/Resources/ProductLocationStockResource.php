@@ -31,14 +31,17 @@ class ProductLocationStockResource extends BaseResource
         return $schema
             ->components([
                 Forms\Components\Select::make('customer_id')
+                    ->label('Customer')
                     ->relationship('customer', 'company_name')
                     ->searchable()
                     ->required(),
                 Forms\Components\Select::make('product_id')
+                    ->label('Product')
                     ->relationship('product', 'product_name')
                     ->searchable()
                     ->required(),
                 Forms\Components\Select::make('location_id')
+                    ->label('Location')
                     ->relationship('location', 'location_name')
                     ->searchable()
                     ->required(),

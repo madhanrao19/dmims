@@ -552,3 +552,92 @@ visibility (which caught and fixed one real defect — see §8)
 this document is implemented, automated-tested, and independently
 reviewed. This document only tracks the 24 August 2026 access-control
 review's scope — it does not certify the platform as a whole.
+
+---
+
+## 13. UI/UX Production-Readiness Audit — 26 August 2026
+
+System-wide sweep of every Filament resource (29) x every role (7) x
+List/Create page, plus a targeted code-pattern review of status badges,
+FK-select labels, destructive-action confirmations, and label wording,
+per the DMIMS UIUX & Design System Specification's principles (Filament's
+stock theme/components, no bespoke design system). Scope: representative
+automated coverage (every resource, every role, desktop + mobile + tablet
+nav shell), not manual per-screen review of every permutation.
+
+**Method:**
+- New `tests/playwright/uiux-audit.spec.js` (reuses `tests/playwright/
+  qa-helpers.js`, extracted from `role-qa.spec.js` to avoid re-executing
+  its top-level tests on import): for each of the 7 roles, hits every
+  resource's List and Create route, asserts status is 200/403/404 (a 500
+  or unauthorized 200 fails the sweep — this is a security check baked
+  into the UI sweep), checks for horizontal overflow at desktop, and
+  checks the nav shell renders without overflow at mobile (390x844) and
+  tablet (768x1024).
+- Grep-based review of `app/Filament/Resources/**/*.php` and
+  `app/Filament/Clusters/MyCompany/Pages/**/*.php` for: destructive
+  actions missing `->requiresConfirmation()`, status/enum columns missing
+  `->badge()`, divergent badge-color-to-meaning mappings, FK `Select`
+  fields relying on Filament's auto-generated label.
+
+**✅ Implemented (26 August 2026):**
+- **Status column inconsistency (Medium):** 10 of 17 status-bearing
+  resources rendered `status` as plain unstyled text while 7 already used
+  `->badge()->color()` (Backup, BarcodeRegistry, Box, BillingRecord,
+  Export, Import, Location). Added badge/color to the missing 10
+  (Category, CustomerSubscription, Customer, DocumentType, License,
+  LocationType, Module, StockAlert, SubscriptionPlan, User), reusing each
+  resource's own existing status vocabulary and the color convention
+  already established elsewhere (success=active/good, warning=pending/
+  transitional, danger=expired/suspended/critical, gray=inactive/
+  cancelled/archived).
+- **Internal field name leaking into labels (Medium, Rule 10):**
+  Filament's default label generator turns `customer_id` into the literal
+  label "Customer id" (confirmed in `vendor/filament/forms/.../Field.php`
+  — `ucfirst()`, not `ucwords()`, and no `_id` stripping). This affected
+  every `customer_id` Select across 19 resource forms, plus 17 further FK
+  Select fields (`module_id`, `subscription_plan_id`, `category_id`,
+  `default_location_id`, `department_id`, `parent_id`,
+  `location_type_id`, `current_location_id`, `current_box_id`,
+  `document_type_id`, `from_location_id`, `to_location_id`,
+  `from_box_id`, `to_box_id`, `product_id`, `location_id`). Added explicit
+  `->label(...)` to all of them (e.g. "Customer", "Department", "From
+  Location"). Label-only change; no relationship, query, or authorization
+  logic touched.
+- Verified via automated sweep, `vendor/bin/pint`, `vendor/bin/phpstan
+  analyse`, `php artisan test` (210 passed), `npm run build`, and the full
+  Playwright suite (`role-qa.spec.js`, `website-qa.spec.js`,
+  `uiux-audit.spec.js`).
+
+**⚠️ Open Low — deferred, not fixed this pass:**
+- **Create-action verb inconsistency:** Customer 360 embedded tables use
+  "Add User"/"Add Location" (`HasCustomerScopedEmbeddedTable`), while
+  Export/Import/BarcodeScanner use "New Export"/"New Import"/"New
+  Document"/"New Box", and most other resources fall back to Filament's
+  default `CreateAction` label. Cosmetic only; "Add" and "New" are
+  near-synonyms and existing Playwright locators (`role-qa.spec.js`)
+  assert the exact "Add User"/"Add Location" text, so a mass relabel
+  risks churn for no material usability gain. Revisit only as part of a
+  deliberate, documented copy pass.
+- **Raw numeric FK inputs instead of pickers:** a handful of fields store
+  a foreign key as a plain numeric `TextInput` rather than a searchable
+  `Select` (`StockAdjustmentApprovalResource::stock_movement_id`,
+  `LicenseLogResource::license_id`, `NotificationResource::user_id`,
+  `StockAlertResource::product_id`/`location_id`,
+  `SupportAccessLogResource::support_user_id`/`target_user_id`). Users
+  must type a database ID rather than search by name. Converting these to
+  relationship Selects is a real UX improvement but requires confirming
+  each model's relationship methods and tenant-scoping behavior per
+  field — out of scope for a label/badge pass; flagged for a follow-up
+  ticket, not fixed here to avoid an unreviewed change to data-entry
+  behavior on audit-trail tables.
+- Mobile/PWA nav-parity-with-desktop-authorization gap noted in §12 of
+  the prior pass remains open; this sweep's mobile/tablet check covers
+  nav-shell rendering only (no overflow, sidebar/topbar visible), not a
+  full parity audit.
+
+**Not in scope / already covered:** Excel/PDF export logic, Filament
+theme/viteTheme registration, branded error pages, JSON textareas on
+Subscription/License forms, Enabled Modules blank-field bug — all fixed
+in prior passes (see recent commit history) and re-verified clean by this
+sweep, not re-audited from scratch.

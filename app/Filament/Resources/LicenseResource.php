@@ -39,6 +39,7 @@ class LicenseResource extends BaseResource
         return $schema
             ->components([
                 Forms\Components\Select::make('customer_id')
+                    ->label('Customer')
                     ->relationship('customer', 'company_name')
                     ->searchable()
                     ->required(),
@@ -88,7 +89,16 @@ class LicenseResource extends BaseResource
                 Tables\Columns\TextColumn::make('deployment_mode')->sortable(),
                 Tables\Columns\TextColumn::make('license_mode')->sortable(),
                 Tables\Columns\TextColumn::make('valid_to')->date()->sortable(),
-                Tables\Columns\TextColumn::make('status')->sortable(),
+                Tables\Columns\TextColumn::make('status')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'active' => 'success',
+                        'trial' => 'info',
+                        'near_expiry' => 'warning',
+                        'expired', 'restricted', 'suspended' => 'danger',
+                        default => 'gray',
+                    })
+                    ->sortable(),
             ])
             ->defaultSort('valid_to', 'desc');
     }

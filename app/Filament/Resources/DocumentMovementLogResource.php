@@ -31,6 +31,7 @@ class DocumentMovementLogResource extends BaseResource
         return $schema
             ->components([
                 Forms\Components\Select::make('customer_id')
+                    ->label('Customer')
                     ->relationship('customer', 'company_name')
                     ->searchable()
                     ->required(),
@@ -39,15 +40,19 @@ class DocumentMovementLogResource extends BaseResource
                 Forms\Components\TextInput::make('movable_id')->maxLength(100),
                 Forms\Components\TextInput::make('action_type')->maxLength(150),
                 Forms\Components\Select::make('from_location_id')
+                    ->label('From Location')
                     ->relationship('fromLocation', 'location_name')
                     ->searchable(),
                 Forms\Components\Select::make('to_location_id')
+                    ->label('To Location')
                     ->relationship('toLocation', 'location_name')
                     ->searchable(),
                 Forms\Components\Select::make('from_box_id')
+                    ->label('From Box')
                     ->relationship('fromBox', 'box_number')
                     ->searchable(),
                 Forms\Components\Select::make('to_box_id')
+                    ->label('To Box')
                     ->relationship('toBox', 'box_number')
                     ->searchable(),
                 Forms\Components\TextInput::make('source_origin')->maxLength(255),

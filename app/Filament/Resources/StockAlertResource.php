@@ -29,6 +29,7 @@ class StockAlertResource extends BaseResource
         return $schema
             ->components([
                 Forms\Components\Select::make('customer_id')
+                    ->label('Customer')
                     ->relationship('customer', 'company_name')
                     ->searchable()
                     ->required(),
@@ -63,7 +64,15 @@ class StockAlertResource extends BaseResource
                 Tables\Columns\TextColumn::make('alert_type')->sortable()->searchable(),
                 Tables\Columns\TextColumn::make('threshold_quantity')->sortable(),
                 Tables\Columns\TextColumn::make('current_quantity')->sortable(),
-                Tables\Columns\TextColumn::make('status')->sortable(),
+                Tables\Columns\TextColumn::make('status')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'open' => 'danger',
+                        'acknowledged' => 'warning',
+                        'closed' => 'success',
+                        default => 'gray',
+                    })
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable(),
             ])
             ->filters([

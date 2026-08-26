@@ -64,7 +64,10 @@ class DocumentTypeResource extends BaseResource
             ->columns([
                 Tables\Columns\TextColumn::make('type_code')->sortable()->searchable(),
                 Tables\Columns\TextColumn::make('type_name')->sortable()->searchable(),
-                Tables\Columns\TextColumn::make('status')->sortable(),
+                Tables\Columns\TextColumn::make('status')
+                    ->badge()
+                    ->color(fn (string $state): string => $state === 'active' ? 'success' : 'gray')
+                    ->sortable(),
             ]);
     }
 

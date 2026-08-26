@@ -68,7 +68,10 @@ class SubscriptionPlanResource extends BaseResource
                 Tables\Columns\TextColumn::make('plan_name')->sortable()->searchable(),
                 Tables\Columns\TextColumn::make('billing_cycle')->sortable(),
                 Tables\Columns\TextColumn::make('price')->money('usd')->sortable(),
-                Tables\Columns\TextColumn::make('status')->sortable(),
+                Tables\Columns\TextColumn::make('status')
+                    ->badge()
+                    ->color(fn (string $state): string => $state === 'active' ? 'success' : 'gray')
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable(),
             ])
             ->defaultSort('created_at', 'desc');

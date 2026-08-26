@@ -141,7 +141,16 @@ class CustomerResource extends BaseResource
             ->columns([
                 Tables\Columns\TextColumn::make('company_name')->sortable()->searchable(),
                 Tables\Columns\TextColumn::make('company_code')->sortable()->searchable(),
-                Tables\Columns\TextColumn::make('status')->sortable(),
+                Tables\Columns\TextColumn::make('status')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'active' => 'success',
+                        'trial' => 'info',
+                        'near_expiry' => 'warning',
+                        'expired', 'suspended' => 'danger',
+                        default => 'gray',
+                    })
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('email')->sortable()->searchable(),
                 Tables\Columns\TextColumn::make('phone')->sortable(),
                 Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable(),

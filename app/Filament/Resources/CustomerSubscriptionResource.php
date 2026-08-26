@@ -36,10 +36,12 @@ class CustomerSubscriptionResource extends BaseResource
         return $schema
             ->components([
                 Forms\Components\Select::make('customer_id')
+                    ->label('Customer')
                     ->relationship('customer', 'company_name')
                     ->searchable()
                     ->required(),
                 Forms\Components\Select::make('subscription_plan_id')
+                    ->label('Subscription Plan')
                     ->relationship('subscriptionPlan', 'plan_name')
                     ->searchable(),
                 Forms\Components\TextInput::make('subscription_no')->required()->maxLength(100),
@@ -85,7 +87,16 @@ class CustomerSubscriptionResource extends BaseResource
                 Tables\Columns\TextColumn::make('customer.company_name')->label('Company')->sortable()->searchable(),
                 Tables\Columns\TextColumn::make('subscriptionPlan.plan_name')->label('Plan')->sortable(),
                 Tables\Columns\TextColumn::make('valid_to')->date()->sortable(),
-                Tables\Columns\TextColumn::make('status')->sortable(),
+                Tables\Columns\TextColumn::make('status')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'active' => 'success',
+                        'trial' => 'info',
+                        'near_expiry', 'expired_grace' => 'warning',
+                        'restricted', 'suspended' => 'danger',
+                        default => 'gray',
+                    })
+                    ->sortable(),
             ]);
     }
 

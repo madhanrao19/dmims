@@ -6,6 +6,26 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed — inconsistent status badges and internal field names leaking into labels
+
+- System-wide UI/UX audit (`docs/CONFORMANCE_GAP_ANALYSIS.md` §13): 10 of 17
+  status-bearing Filament resources rendered `status` as plain unstyled text
+  while the rest already used a colored badge. Added `->badge()->color()` to
+  the remaining 10 (Category, CustomerSubscription, Customer, DocumentType,
+  License, LocationType, Module, StockAlert, SubscriptionPlan, User), reusing
+  the color convention already established elsewhere in the app.
+- Filament's default label generator turns a field like `customer_id` into
+  the literal label "Customer id" instead of "Customer". Added explicit
+  `->label(...)` to 36 foreign-key `Select` fields across 19 resources that
+  were missing one (`customer_id`, `module_id`, `department_id`,
+  `category_id`, and others), so forms no longer expose raw database column
+  names to end users. Label-only change; no relationship, query, or
+  authorization logic touched.
+- Added `tests/playwright/uiux-audit.spec.js`, an automated sweep covering
+  every Filament resource x every role x List/Create page plus a mobile/
+  tablet nav-shell check, so future UI regressions (500s, unauthorized
+  access, layout overflow) are caught automatically.
+
 ### Fixed — Excel/PDF report downloads crashed ("Malformed UTF-8 characters")
 
 - The Reports page form uses `wire:submit="download"` (a Livewire AJAX

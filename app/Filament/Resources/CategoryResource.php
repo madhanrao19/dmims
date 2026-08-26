@@ -37,6 +37,7 @@ class CategoryResource extends BaseResource
         return $schema
             ->components([
                 Forms\Components\Select::make('customer_id')
+                    ->label('Customer')
                     ->relationship('customer', 'company_name')
                     ->searchable()
                     ->required(),
@@ -59,7 +60,10 @@ class CategoryResource extends BaseResource
             ->columns([
                 Tables\Columns\TextColumn::make('category_code')->sortable()->searchable(),
                 Tables\Columns\TextColumn::make('category_name')->sortable()->searchable(),
-                Tables\Columns\TextColumn::make('status')->sortable(),
+                Tables\Columns\TextColumn::make('status')
+                    ->badge()
+                    ->color(fn (string $state): string => $state === 'active' ? 'success' : 'gray')
+                    ->sortable(),
             ]);
     }
 

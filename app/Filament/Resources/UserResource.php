@@ -154,10 +154,12 @@ class UserResource extends BaseResource
                 Forms\Components\TextInput::make('employee_id')->maxLength(100),
                 Forms\Components\TextInput::make('phone')->maxLength(50),
                 Forms\Components\Select::make('customer_id')
+                    ->label('Customer')
                     ->relationship('customer', 'company_name')
                     ->searchable()
                     ->disabled(fn (): bool => ! static::actorCanFullyManage()),
                 Forms\Components\Select::make('department_id')
+                    ->label('Department')
                     ->relationship('department', 'name')
                     ->searchable(),
                 Forms\Components\TextInput::make('job_title')->maxLength(255),
@@ -194,7 +196,15 @@ class UserResource extends BaseResource
                 Tables\Columns\TextColumn::make('name')->sortable()->searchable(),
                 Tables\Columns\TextColumn::make('email')->sortable()->searchable(),
                 Tables\Columns\TextColumn::make('customer.company_name')->label('Company')->sortable()->searchable(),
-                Tables\Columns\TextColumn::make('status')->sortable(),
+                Tables\Columns\TextColumn::make('status')
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'active' => 'success',
+                        'pending', 'password_expired' => 'warning',
+                        'suspended', 'locked' => 'danger',
+                        default => 'gray',
+                    })
+                    ->sortable(),
                 Tables\Columns\IconColumn::make('is_platform_user')->boolean()->label('Platform User'),
                 Tables\Columns\IconColumn::make('app_authentication_secret')
                     ->label('2FA')

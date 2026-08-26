@@ -49,7 +49,10 @@ class ModuleResource extends BaseResource
             ->columns([
                 Tables\Columns\TextColumn::make('module_code')->sortable()->searchable(),
                 Tables\Columns\TextColumn::make('module_name')->sortable()->searchable(),
-                Tables\Columns\TextColumn::make('status')->sortable(),
+                Tables\Columns\TextColumn::make('status')
+                    ->badge()
+                    ->color(fn (string $state): string => $state === 'active' ? 'success' : 'gray')
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable(),
             ])
             ->defaultSort('created_at', 'desc');

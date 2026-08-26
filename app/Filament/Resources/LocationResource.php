@@ -51,6 +51,7 @@ class LocationResource extends BaseResource
         return $schema
             ->components([
                 Forms\Components\Select::make('customer_id')
+                    ->label('Customer')
                     ->relationship('customer', 'company_name')
                     ->searchable()
                     ->required()
@@ -61,9 +62,11 @@ class LocationResource extends BaseResource
                     // own customer_id field.
                     ->visible(fn (): bool => (bool) auth()->user()?->is_platform_user),
                 Forms\Components\Select::make('parent_id')
+                    ->label('Parent Location')
                     ->relationship('parent', 'location_name')
                     ->searchable(),
                 Forms\Components\Select::make('location_type_id')
+                    ->label('Location Type')
                     ->relationship('locationType', 'type_name')
                     ->searchable(),
                 Forms\Components\TextInput::make('location_code')->required()->maxLength(100)
