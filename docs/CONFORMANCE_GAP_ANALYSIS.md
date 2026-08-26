@@ -641,3 +641,72 @@ theme/viteTheme registration, branded error pages, JSON textareas on
 Subscription/License forms, Enabled Modules blank-field bug — all fixed
 in prior passes (see recent commit history) and re-verified clean by this
 sweep, not re-audited from scratch.
+
+---
+
+## 14. Row-Action Modal Crash — Barcode Registries Preview/Print — 26 August 2026
+
+**✅ Implemented (26 August 2026):**
+- **Critical, fixed:** `BarcodeRegistryResource`'s `preview` row action (label
+  "Preview / Print") and the `batchPrint` bulk action both crashed with a 500
+  ("Call to a member function `makeGetUtility()` on null") whenever the
+  modal's "Label size" `->live()` select was changed. Root cause:
+  `->modalContent()` took a `Get $get` parameter; Filament resolves
+  `Get $get` via `$this->getSchemaComponent()->makeGetUtility()`, but a
+  `modalContent()` closure is not itself bound to a schema component, so
+  `getSchemaComponent()` returns `null` on that specific code path. Found by
+  the user hitting it live in production use (not caught by the automated
+  `uiux-audit.spec.js` sweep, which only exercises List/Create page loads,
+  not row-action modals — a real coverage gap, noted below). Fixed by
+  switching both closures to the `array $data` parameter
+  (`Action::getData()`, which does not require a schema component) and
+  reading `$data['size']` instead of `$get('size')`. Reproduced the crash
+  and verified the fix with a live Playwright run against the deployed site
+  (open Preview/Print, change the size select, confirm no 500 and the modal
+  re-renders). Commit `4339a16`.
+- **Verification sweep (read-only, no code changes needed):**
+  - Grepped every `modalContent()` and every `Get $get` usage across
+    `app/Filament` — confirmed this was the only occurrence of the unsafe
+    pattern; every other `Get $get` usage is inside an actual schema field
+    closure (`->options()`, `->content()` on a Placeholder,
+    `->unique(modifyRuleUsing:)`), which is safe because the field itself is
+    the bound schema component.
+  - Live-clicked every custom row/header action across the app that opens a
+    modal (Box: Transfer, Move Out, Timeline; DocumentFile: Transfer, Move
+    Out, Timeline; StockMovement: Receive In, Stock Out, Transfer, Adjust;
+    BillingRecord: Record Payment, Issue, Cancel; BarcodeRegistry: Batch
+    Generate, including its own `->live()` "Record type" select; Backup: Run
+    Database Backup; Export: New Export; Import: New Import) — as
+    Datamation Super Admin, as a tenant Company Admin, and (a targeted
+    sweep) as all 7 QA roles. Zero crashes, zero console/network errors, and
+    role-based visibility was correct throughout (each role only saw the
+    actions its permissions allow).
+  - Checked both real customers present in the environment: `Datamation
+    Inventory Demo` (QA sandbox data) and `Madhan Inc` (a real account with
+    one live billing record) — confirmed the Cancel/Record Payment/Issue
+    action-visibility logic behaved correctly for the real record's actual
+    status (`issued`/`paid` → only "Cancel" visible) and all 6 Customer 360
+    tabs loaded cleanly for that customer. No destructive actions were
+    opened/submitted against the real customer's data.
+  - Confirmed structurally that action Select options which query related
+    records (`Location::query()`, `Box::query()`, `Product::query()` inside
+    Box/DocumentFile/StockMovement transfer actions) cannot leak across
+    tenants: all three models use the `BelongsToCustomer` global-scope
+    trait, so scoping is automatic for any query, not per-action logic that
+    could be individually missed. Empirically confirmed too — as a tenant
+    Company Admin, Box Transfer's "To Location" options only listed that
+    tenant's own locations.
+  - Final full-suite confirmation re-run after the fix: `vendor/bin/pint`,
+    `vendor/bin/phpstan analyse`, `php artisan test` (210 passed), `npm run
+    build`, and the full Playwright suite (`role-qa.spec.js`,
+    `website-qa.spec.js`, `uiux-audit.spec.js` — 32 passed) against the live
+    deployed site, not just locally.
+
+**⚠️ Open Low — coverage gap identified, not closed this pass:**
+- `tests/playwright/uiux-audit.spec.js` only exercises resource List/Create
+  page loads; it does not click into row-action modals. That is why this
+  bug shipped past the original UI/UX audit pass (§13) undetected. The
+  manual row-action click-through done in this pass is not yet captured as
+  a standing automated test — a future improvement would be a small,
+  targeted Playwright spec that opens (without submitting) each custom
+  action's modal per resource, added to the regular `npm run qa` suite.

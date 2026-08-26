@@ -6,6 +6,21 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed — Barcode Registries "Preview / Print" crashed on label size change
+
+- `BarcodeRegistryResource`'s `preview` row action and `batchPrint` bulk
+  action used a `Get $get` parameter inside `->modalContent()` to read the
+  live-updating "Label size" select. Filament resolves `Get $get` via
+  `$this->getSchemaComponent()->makeGetUtility()`, but a `modalContent()`
+  closure isn't itself bound to a schema component, so this threw "Call to
+  a member function makeGetUtility() on null" (500) every time the size
+  select changed. Switched both closures to the `array $data` parameter
+  (`Action::getData()`, which doesn't need a schema component) instead.
+- Verification sweep (see `docs/CONFORMANCE_GAP_ANALYSIS.md` §14): confirmed
+  this was the only occurrence of the unsafe pattern app-wide, live-tested
+  every other custom row/header action across all 7 roles and both real
+  customers in the environment — no other row-action bugs found.
+
 ### Fixed — inconsistent status badges and internal field names leaking into labels
 
 - System-wide UI/UX audit (`docs/CONFORMANCE_GAP_ANALYSIS.md` §13): 10 of 17
