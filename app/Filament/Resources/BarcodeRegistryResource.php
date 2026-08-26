@@ -171,10 +171,10 @@ class BarcodeRegistryResource extends BaseResource
                             ->default('medium')
                             ->live(),
                     ])
-                    ->modalContent(fn (BarcodeRegistry $record, Get $get) => view('filament.barcode-label', [
+                    ->modalContent(fn (BarcodeRegistry $record, array $data) => view('filament.barcode-label', [
                         'barcode' => $record->barcode,
                         'type' => $record->barcode_type,
-                        'size' => $get('size') ?? 'medium',
+                        'size' => $data['size'] ?? 'medium',
                     ]))
                     ->modalSubmitActionLabel('Mark as printed')
                     ->action(function (BarcodeRegistry $record): void {
@@ -210,9 +210,9 @@ class BarcodeRegistryResource extends BaseResource
                             ->default('small'),
                     ])
                     ->modalHeading('Batch print preview')
-                    ->modalContent(fn (Collection $records, Get $get) => view('filament.batch-barcode-labels', [
+                    ->modalContent(fn (Collection $records, array $data) => view('filament.batch-barcode-labels', [
                         'registries' => $records,
-                        'size' => $get('size') ?? 'small',
+                        'size' => $data['size'] ?? 'small',
                     ]))
                     ->action(function (Collection $records): void {
                         /** @var Collection<int, BarcodeRegistry> $records */
