@@ -48,9 +48,6 @@ jobs:
       - name: Static analysis (PHPStan / Larastan)
         run: vendor/bin/phpstan analyse
 
-      - name: Run PHP test suite
-        run: php artisan test
-
       - name: Build front-end assets (and PWA icons)
         run: npm run build:assets
 
@@ -59,6 +56,9 @@ jobs:
           test -f public/build/icons/icon-192.png
           test -f public/build/icons/icon-512.png
           test -f public/build/icons/apple-touch-icon.png
+
+      - name: Run PHP test suite
+        run: php artisan test
 
   dependency-review:
     if: github.event_name == 'pull_request'
