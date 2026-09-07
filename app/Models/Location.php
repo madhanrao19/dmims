@@ -13,6 +13,15 @@ class Location extends Model
 {
     use Auditable, BelongsToCustomer, HasFactory, SoftDeletes;
 
+    protected static function booted(): void
+    {
+        // ancestryPathMap()'s cache must not outlive the data it describes —
+        // invalidate on any write so a renamed/reparented/deleted location
+        // is never served a stale path from an earlier snapshot.
+        static::saved(fn () => static::$ancestryPathCache = []);
+        static::deleted(fn () => static::$ancestryPathCache = []);
+    }
+
     protected $fillable = [
         'customer_id',
         'parent_id',
@@ -60,6 +69,33 @@ class Location extends Model
         return $this->hasMany(Box::class, 'current_location_id');
     }
 
+    public function productLocationStock()
+    {
+        return $this->hasMany(ProductLocationStock::class, 'location_id');
+    }
+
+    /**
+     * Location uses SoftDeletes, so the boxes/product_location_stock FK
+     * RESTRICT constraints never fire on delete (the row is never actually
+     * removed) — without this check, a location holding active boxes or
+     * stock could be "deleted" while still being physically in use.
+     */
+    public function hasLinkedInventory(): bool
+    {
+        return $this->boxes()->exists()
+            || $this->children()->exists()
+            || $this->productLocationStock()->exists();
+    }
+
+    public function delete(): ?bool
+    {
+        if ($this->hasLinkedInventory()) {
+            return false;
+        }
+
+        return parent::delete();
+    }
+
     public function getBoxesUsedCountAttribute(): int
     {
         return $this->boxes()->count();
@@ -76,21 +112,59 @@ class Location extends Model
 
     /**
      * Human-readable ancestry chain, e.g. "Warehouse A > Rack B > Shelf S02".
-     * Computed live from the parent chain rather than a maintained
-     * `full_path` column, since hierarchies here are shallow (3-4 levels).
+     * Backed by ancestryPathMap()'s single-query cache rather than walking
+     * ->parent per record — that lazy-loaded walk turns into an N+1 (extra
+     * query per level per row) the moment this accessor is used inside a
+     * dropdown option list (BoxResource::locationOptions(), LocationResource's
+     * parent_id Select), rather than for a single record.
      */
     public function getAncestryPathAttribute(): string
     {
-        $names = [];
-        $node = $this;
-        $depth = 0;
+        return static::ancestryPathMap()[$this->id] ?? $this->location_name;
+    }
 
-        while ($node && $depth < 10) {
-            array_unshift($names, $node->location_name);
-            $node = $node->parent;
-            $depth++;
+    /**
+     * @var array<string, array<int, string>>
+     */
+    protected static array $ancestryPathCache = [];
+
+    /**
+     * All of this tenant's locations' ancestry paths, computed with one
+     * query regardless of row count or hierarchy depth. Cached for the
+     * request's lifetime, keyed by the acting user's scope — a bare
+     * un-keyed cache would leak one user's unscoped/other-tenant snapshot
+     * to the next lookup under a long-lived worker (queue, Octane), where
+     * multiple users' requests share one PHP process.
+     *
+     * @return array<int, string> location id => "Room 1 > Area A > Shelf-A01"
+     */
+    public static function ancestryPathMap(): array
+    {
+        $user = auth()->user();
+        $scopeKey = match (true) {
+            $user === null => 'guest',
+            $user->is_platform_user => 'platform',
+            default => 'customer:'.$user->customer_id,
+        };
+
+        if (isset(static::$ancestryPathCache[$scopeKey])) {
+            return static::$ancestryPathCache[$scopeKey];
         }
 
-        return implode(' > ', $names);
+        $locations = static::query()->get(['id', 'parent_id', 'location_name'])->keyBy('id');
+
+        return static::$ancestryPathCache[$scopeKey] = $locations->map(function (self $location) use ($locations): string {
+            $names = [];
+            $node = $location;
+            $depth = 0;
+
+            while ($node && $depth < 10) {
+                array_unshift($names, $node->location_name);
+                $node = $node->parent_id ? $locations->get($node->parent_id) : null;
+                $depth++;
+            }
+
+            return implode(' > ', $names);
+        })->all();
     }
 }

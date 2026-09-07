@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 
 class Box extends Model
 {
@@ -44,6 +45,21 @@ class Box extends Model
     public function files()
     {
         return $this->hasMany(DocumentFile::class, 'current_box_id');
+    }
+
+    /**
+     * Matches box_number OR box_barcode so a handheld scanner's input
+     * (which types the barcode, not the box number) resolves to a box.
+     *
+     * @return Collection<int, string>
+     */
+    public static function searchByNumberOrBarcode(string $search, int $limit = 50): Collection
+    {
+        return static::query()
+            ->where('box_number', 'like', "%{$search}%")
+            ->orWhere('box_barcode', 'like', "%{$search}%")
+            ->limit($limit)
+            ->pluck('box_number', 'id');
     }
 
     public function getCapacityPercentAttribute(): ?int

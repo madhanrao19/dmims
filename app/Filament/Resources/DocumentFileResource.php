@@ -14,6 +14,7 @@ use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Forms;
 use Filament\Notifications\Notification;
+use Filament\Resources\Pages\Page;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables;
@@ -74,8 +75,9 @@ class DocumentFileResource extends BaseResource
                 Forms\Components\Select::make('current_box_id')
                     ->label('Current Box')
                     ->relationship('currentBox', 'box_number')
-                    ->searchable()
-                    ->required(),
+                    ->searchable(['box_number', 'box_barcode'])
+                    ->preload()
+                    ->helperText('Optional — files can be registered before being boxed.'),
                 Forms\Components\Select::make('current_status')
                     ->options([
                         'active' => 'Active',
@@ -187,8 +189,7 @@ class DocumentFileResource extends BaseResource
                     ->visible(fn (DocumentFile $record): bool => $record->current_status !== 'moved_out')
                     ->authorize(fn (DocumentFile $record): bool => static::can('update', $record))
                     ->schema([
-                        Forms\Components\Select::make('to_box_id')->label('To box')
-                            ->options(fn () => Box::query()->pluck('box_number', 'id')->all())->searchable()->required(),
+                        static::boxSelect('to_box_id', 'To box'),
                         Forms\Components\Textarea::make('remarks'),
                     ])
                     ->action(function (DocumentFile $record, array $data): void {
@@ -203,7 +204,7 @@ class DocumentFileResource extends BaseResource
                     ->authorize(fn (DocumentFile $record): bool => static::can('update', $record))
                     ->schema([
                         Forms\Components\TextInput::make('destination')->label('External destination')->required(),
-                        Forms\Components\TextInput::make('borrowed_by')->label('Borrowed by'),
+                        Forms\Components\TextInput::make('borrowed_by')->label('Receiver'),
                         Forms\Components\DatePicker::make('due_date')->label('Due back'),
                         Forms\Components\Textarea::make('remarks'),
                     ])
@@ -218,8 +219,7 @@ class DocumentFileResource extends BaseResource
                     ->visible(fn (DocumentFile $record): bool => $record->current_status === 'moved_out')
                     ->authorize(fn (DocumentFile $record): bool => static::can('update', $record))
                     ->schema([
-                        Forms\Components\Select::make('to_box_id')->label('Return to box')
-                            ->options(fn () => Box::query()->pluck('box_number', 'id')->all())->searchable()->required(),
+                        static::boxSelect('to_box_id', 'Return to box'),
                         Forms\Components\Textarea::make('remarks'),
                     ])
                     ->action(function (DocumentFile $record, array $data): void {
@@ -241,13 +241,44 @@ class DocumentFileResource extends BaseResource
             ->defaultSort('created_at', 'desc');
     }
 
+    /**
+     * Document File detail page tab bar — Movement Log / Audit Log,
+     * requested by the demo-readiness review (Sep 2026). Same shape as
+     * BoxResource::getRecordSubNavigation().
+     */
+    public static function getRecordSubNavigation(Page $page): array
+    {
+        return $page->generateNavigationItems([
+            Pages\ViewDocumentFile::class,
+            Pages\MovementLog::class,
+            Pages\AuditLog::class,
+        ]);
+    }
+
     public static function getPages(): array
     {
         return [
             'index' => Pages\ListDocumentFiles::route('/'),
             'create' => Pages\CreateDocumentFile::route('/create'),
+            'view' => Pages\ViewDocumentFile::route('/{record}'),
             'edit' => Pages\EditDocumentFile::route('/{record}/edit'),
+            'movements' => Pages\MovementLog::route('/{record}/movements'),
+            'audit-log' => Pages\AuditLog::route('/{record}/audit-log'),
         ];
+    }
+
+    /**
+     * Searches box_number AND box_barcode so a handheld scanner's input
+     * (which types the barcode, not the box number) resolves to a match.
+     */
+    protected static function boxSelect(string $name, string $label): Forms\Components\Select
+    {
+        return Forms\Components\Select::make($name)
+            ->label($label)
+            ->searchable(['box_number', 'box_barcode'])
+            ->getSearchResultsUsing(fn (string $search): array => Box::searchByNumberOrBarcode($search)->all())
+            ->getOptionLabelUsing(fn ($value): ?string => Box::find($value)?->box_number)
+            ->required();
     }
 }
 
@@ -280,7 +311,11 @@ class CreateDocumentFile extends CreateRecord
         /** @var DocumentFile $record */
         $record = $this->record;
 
-        app(DocumentMovementService::class)->receiveInFile($record, $record->current_box_id);
+        // A file can now be registered before it's boxed (Current Box is
+        // optional) — nothing to log/count until it's actually assigned.
+        if ($record->current_box_id !== null) {
+            app(DocumentMovementService::class)->receiveInFile($record, $record->current_box_id);
+        }
     }
 }
 

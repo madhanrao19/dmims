@@ -6,12 +6,16 @@ use App\Filament\Concerns\HasBarcodeAction;
 use App\Filament\Resources\LocationResource\Pages;
 use App\Http\Middleware\EnsureModuleEnabled;
 use App\Models\Location;
-use Filament\Actions\EditAction;
+use Filament\Actions\Action;
+use Filament\Actions\DeleteAction;
 use Filament\Forms;
+use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\QueryException;
 use Illuminate\Validation\Rules\Unique;
 
 class LocationResource extends BaseResource
@@ -64,11 +68,14 @@ class LocationResource extends BaseResource
                 Forms\Components\Select::make('parent_id')
                     ->label('Parent Location')
                     ->relationship('parent', 'location_name')
-                    ->searchable(),
+                    ->getOptionLabelFromRecordUsing(fn (Location $record): string => $record->ancestry_path)
+                    ->searchable()
+                    ->preload(),
                 Forms\Components\Select::make('location_type_id')
                     ->label('Location Type')
                     ->relationship('locationType', 'type_name')
-                    ->searchable(),
+                    ->searchable()
+                    ->preload(),
                 Forms\Components\TextInput::make('location_code')->required()->maxLength(100)
                     ->unique(
                         ignoreRecord: true,
@@ -119,7 +126,57 @@ class LocationResource extends BaseResource
                     ->color(fn (string $state): string => $state === 'active' ? 'success' : 'gray'),
             ])
             ->recordActions([
-                EditAction::make(),
+                // A plain EditAction navigates to the standalone
+                // /locations/{id}/edit page, which is jarring when this
+                // table is embedded in Customer 360's Locations tab — edit
+                // in place instead, mirroring the in-modal action pattern
+                // already used by DocumentFileResource's Transfer/Return.
+                Action::make('edit')
+                    ->label('Edit')
+                    ->icon('heroicon-o-pencil-square')
+                    ->authorize(fn (Location $record): bool => static::can('update', $record))
+                    ->fillForm(fn (Location $record): array => $record->toArray())
+                    ->schema(fn (Schema $schema): Schema => static::form($schema))
+                    ->action(function (Location $record, array $data): void {
+                        // Every other edit path forces customer_id back to
+                        // the actor's own tenant server-side (see
+                        // ForcesOwnCustomerId) — this in-modal action is a
+                        // plain $record->update($data), not an EditRecord
+                        // page, so it would otherwise be the one edit path
+                        // in the app that skips that second layer.
+                        $user = auth()->user();
+                        if ($user && ! $user->is_platform_user && $user->customer_id) {
+                            $data['customer_id'] = $user->customer_id;
+                        }
+
+                        $record->update($data);
+                        Notification::make()->title('Location updated')->success()->send();
+                    }),
+                DeleteAction::make()
+                    ->authorize(fn (Location $record): bool => static::can('delete', $record))
+                    ->failureNotificationTitle('Cannot delete')
+                    ->failureNotificationMessage('This location still has boxes, sub-locations, or stock linked to it and cannot be deleted while those exist.')
+                    ->action(function (DeleteAction $action): void {
+                        try {
+                            $result = $action->process(static fn (Model $record): ?bool => $record->delete());
+                        } catch (QueryException $e) {
+                            if ($e->getCode() !== '23000') {
+                                throw $e;
+                            }
+
+                            $action->failure();
+
+                            return;
+                        }
+
+                        if (! $result) {
+                            $action->failure();
+
+                            return;
+                        }
+
+                        $action->success();
+                    }),
                 static::barcodeAction(),
             ])
             ->defaultSort('location_name');

@@ -68,13 +68,15 @@ class DocumentMovementLogResource extends BaseResource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('movement_no')->sortable()->searchable(),
-                Tables\Columns\TextColumn::make('action_type')->sortable()->searchable(),
-                Tables\Columns\TextColumn::make('performed_at')->dateTime()->sortable(),
-                Tables\Columns\TextColumn::make('fromLocation.location_name')->label('From Location')->sortable(),
-                Tables\Columns\TextColumn::make('toLocation.location_name')->label('To Location')->sortable(),
-                Tables\Columns\TextColumn::make('fromBox.box_number')->label('From Box')->sortable(),
-                Tables\Columns\TextColumn::make('toBox.box_number')->label('To Box')->sortable(),
+                Tables\Columns\TextColumn::make('performed_at')->label('Date & Time')->dateTime()->sortable(),
+                Tables\Columns\TextColumn::make('action_type')->label('Movement Type')->sortable()->searchable(),
+                Tables\Columns\TextColumn::make('fromLocation.location_name')->label('From Location')->sortable()->placeholder('—'),
+                Tables\Columns\TextColumn::make('fromBox.box_number')->label('From Box')->sortable()->placeholder('—'),
+                Tables\Columns\TextColumn::make('toLocation.location_name')->label('To Location')->sortable()->placeholder('—'),
+                Tables\Columns\TextColumn::make('toBox.box_number')->label('To Box')->sortable()->placeholder('—'),
+                Tables\Columns\TextColumn::make('destination')->label('Destination')->placeholder('—')->toggleable(),
+                Tables\Columns\TextColumn::make('performedBy.name')->label('Operator')->sortable(),
+                Tables\Columns\TextColumn::make('movement_no')->label('Reference / Tracking No')->sortable()->searchable(),
             ])
             ->defaultSort('performed_at', 'desc');
     }

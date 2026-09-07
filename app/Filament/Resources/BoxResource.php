@@ -13,6 +13,7 @@ use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Forms;
 use Filament\Notifications\Notification;
+use Filament\Resources\Pages\Page;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables;
@@ -72,7 +73,9 @@ class BoxResource extends BaseResource
                 Forms\Components\Select::make('current_location_id')
                     ->label('Current Location')
                     ->relationship('currentLocation', 'location_name')
+                    ->getOptionLabelFromRecordUsing(fn (Location $record): string => $record->ancestry_path)
                     ->searchable()
+                    ->preload()
                     ->required(),
                 Forms\Components\TextInput::make('source_origin')->maxLength(255),
                 Forms\Components\TextInput::make('capacity_limit')->numeric()->helperText('Maximum number of files this box can hold.'),
@@ -153,7 +156,7 @@ class BoxResource extends BaseResource
                     ->authorize(fn (Box $record): bool => static::can('update', $record))
                     ->schema([
                         Forms\Components\Select::make('to_location_id')->label('To location')
-                            ->options(fn () => Location::query()->pluck('location_name', 'id')->all())->searchable()->required(),
+                            ->options(fn () => static::locationOptions())->searchable()->preload()->required(),
                         Forms\Components\Textarea::make('remarks'),
                     ])
                     ->action(function (Box $record, array $data): void {
@@ -182,7 +185,7 @@ class BoxResource extends BaseResource
                     ->authorize(fn (Box $record): bool => static::can('update', $record))
                     ->schema([
                         Forms\Components\Select::make('to_location_id')->label('Return to location')
-                            ->options(fn () => Location::query()->pluck('location_name', 'id')->all())->searchable()->required(),
+                            ->options(fn () => static::locationOptions())->searchable()->preload()->required(),
                         Forms\Components\Textarea::make('remarks'),
                     ])
                     ->action(function (Box $record, array $data): void {
@@ -204,13 +207,38 @@ class BoxResource extends BaseResource
             ->defaultSort('created_at', 'desc');
     }
 
+    /**
+     * Box detail page tab bar — Documents Inside / Box Movement Log / Box
+     * Audit Log, requested by the demo-readiness review (Sep 2026). Same
+     * shape as CustomerResource::getRecordSubNavigation().
+     */
+    public static function getRecordSubNavigation(Page $page): array
+    {
+        return $page->generateNavigationItems([
+            Pages\ViewBox::class,
+            Pages\Documents::class,
+            Pages\MovementLog::class,
+            Pages\AuditLog::class,
+        ]);
+    }
+
     public static function getPages(): array
     {
         return [
             'index' => Pages\ListBoxes::route('/'),
             'create' => Pages\CreateBox::route('/create'),
+            'view' => Pages\ViewBox::route('/{record}'),
             'edit' => Pages\EditBox::route('/{record}/edit'),
+            'documents' => Pages\Documents::route('/{record}/documents'),
+            'movements' => Pages\MovementLog::route('/{record}/movements'),
+            'audit-log' => Pages\AuditLog::route('/{record}/audit-log'),
         ];
+    }
+
+    /** @return array<int, string> location id => "Room 1 > Area A > Shelf-A01" */
+    protected static function locationOptions(): array
+    {
+        return Location::ancestryPathMap();
     }
 }
 

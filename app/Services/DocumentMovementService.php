@@ -5,8 +5,10 @@ namespace App\Services;
 use App\Models\Box;
 use App\Models\DocumentFile;
 use App\Models\DocumentMovementLog;
+use App\Models\Location;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 
 /**
  * Document tracking operations (PRD §9 / TDD §19-20). Files live in boxes; boxes
@@ -21,6 +23,8 @@ class DocumentMovementService
 
     public function receiveInFile(DocumentFile $file, int $toBoxId, ?string $sourceOrigin = null, array $data = []): DocumentMovementLog
     {
+        $this->assertSameCustomer($file, Box::withoutGlobalScopes()->findOrFail($toBoxId));
+
         return DB::transaction(function () use ($file, $toBoxId, $sourceOrigin, $data) {
             $log = $this->log($file, 'create', array_merge($data, [
                 'to_box_id' => $toBoxId,
@@ -36,6 +40,8 @@ class DocumentMovementService
 
     public function transferFile(DocumentFile $file, int $toBoxId, array $data = []): DocumentMovementLog
     {
+        $this->assertSameCustomer($file, Box::withoutGlobalScopes()->findOrFail($toBoxId));
+
         return DB::transaction(function () use ($file, $toBoxId, $data) {
             $fromBoxId = $file->current_box_id;
 
@@ -81,6 +87,8 @@ class DocumentMovementService
 
     public function returnFile(DocumentFile $file, int $toBoxId, array $data = []): DocumentMovementLog
     {
+        $this->assertSameCustomer($file, Box::withoutGlobalScopes()->findOrFail($toBoxId));
+
         return DB::transaction(function () use ($file, $toBoxId, $data) {
             $log = $this->log($file, 'return', array_merge($data, ['to_box_id' => $toBoxId]));
 
@@ -112,6 +120,8 @@ class DocumentMovementService
 
     public function receiveInBox(Box $box, int $toLocationId, ?string $sourceOrigin = null, array $data = []): DocumentMovementLog
     {
+        $this->assertSameCustomer($box, Location::withoutGlobalScopes()->findOrFail($toLocationId));
+
         return DB::transaction(function () use ($box, $toLocationId, $sourceOrigin, $data) {
             $log = $this->log($box, 'create', array_merge($data, [
                 'to_location_id' => $toLocationId,
@@ -126,6 +136,8 @@ class DocumentMovementService
 
     public function transferBox(Box $box, int $toLocationId, array $data = []): DocumentMovementLog
     {
+        $this->assertSameCustomer($box, Location::withoutGlobalScopes()->findOrFail($toLocationId));
+
         return DB::transaction(function () use ($box, $toLocationId, $data) {
             $log = $this->log($box, 'transfer_box', array_merge($data, [
                 'from_location_id' => $box->current_location_id,
@@ -154,6 +166,8 @@ class DocumentMovementService
 
     public function returnBox(Box $box, int $toLocationId, array $data = []): DocumentMovementLog
     {
+        $this->assertSameCustomer($box, Location::withoutGlobalScopes()->findOrFail($toLocationId));
+
         return DB::transaction(function () use ($box, $toLocationId, $data) {
             $log = $this->log($box, 'return', array_merge($data, ['to_location_id' => $toLocationId]));
 
@@ -161,6 +175,21 @@ class DocumentMovementService
 
             return $log;
         });
+    }
+
+    /**
+     * A platform user's Box/Location queries aren't customer-scoped
+     * (BelongsToCustomer skips them by design), so a dropdown built from
+     * Box::query()/Location::query() can legitimately offer another
+     * customer's row — nothing else stops picking it. This is the one
+     * chokepoint every move-a-file/move-a-box operation routes through, so
+     * the check lives here rather than duplicated at every Filament action.
+     */
+    private function assertSameCustomer(DocumentFile|Box $subject, Box|Location $target): void
+    {
+        if ($subject->customer_id !== $target->customer_id) {
+            throw new InvalidArgumentException('Cannot move between different customers.');
+        }
     }
 
     /**

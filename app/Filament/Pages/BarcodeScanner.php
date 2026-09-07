@@ -4,10 +4,15 @@ namespace App\Filament\Pages;
 
 use App\Filament\Resources\BoxResource;
 use App\Filament\Resources\DocumentFileResource;
+use App\Filament\Resources\LocationResource;
 use App\Models\BarcodeScanLog;
+use App\Models\Box;
+use App\Models\DocumentFile;
 use App\Services\AccessControlService;
+use App\Services\DocumentMovementService;
 use App\Services\ScannerService;
 use Filament\Actions\Action as NotificationAction;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Concerns\InteractsWithForms;
@@ -77,6 +82,12 @@ class BarcodeScanner extends Page implements HasForms
                     ->live()
                     ->dehydrated(false)
                     ->afterStateUpdated(fn ($state) => $this->bulkMode = (bool) $state),
+                Select::make('target_box_id')
+                    ->label('Add Document Mode — Target Box')
+                    ->helperText('Set a box, then scan Document File barcodes to assign each one into it.')
+                    ->searchable(['box_number', 'box_barcode'])
+                    ->getSearchResultsUsing(fn (string $search): array => Box::searchByNumberOrBarcode($search)->all())
+                    ->getOptionLabelUsing(fn ($value): ?string => Box::find($value)?->box_number),
             ])
             ->statePath('data');
     }
@@ -98,7 +109,13 @@ class BarcodeScanner extends Page implements HasForms
 
     public function scan(): void
     {
-        $barcode = trim((string) ($this->form->getState()['barcode'] ?? ''));
+        // Read both fields from a single getState() call, before mutating
+        // $this->data below — calling getState() again afterward would
+        // re-validate the (now cleared) required 'barcode' field and abort
+        // the rest of this method via a ValidationException.
+        $state = $this->form->getState();
+        $barcode = trim((string) ($state['barcode'] ?? ''));
+        $targetBoxId = $state['target_box_id'] ?? null;
 
         if ($barcode === '') {
             return;
@@ -109,6 +126,15 @@ class BarcodeScanner extends Page implements HasForms
 
         $this->dispatch('scan-result', result: $outcome['result']);
         $this->data['barcode'] = '';
+
+        if ($outcome['result'] === 'found'
+            && $targetBoxId
+            && $outcome['registry']?->reference_table === 'document_files'
+            && $outcome['record'] instanceof DocumentFile) {
+            $this->assignScannedFileToBox($outcome['record'], (int) $targetBoxId);
+
+            return;
+        }
 
         if ($outcome['result'] === 'found' && $outcome['registry']) {
             if ($this->bulkMode) {
@@ -143,6 +169,10 @@ class BarcodeScanner extends Page implements HasForms
                         ->label('New Box')
                         ->url(BoxResource::getUrl('create'))
                         ->button(),
+                    NotificationAction::make('createLocation')
+                        ->label('New Location')
+                        ->url(LocationResource::getUrl('create'))
+                        ->button(),
                 ])
                 ->persistent()
                 ->send();
@@ -157,6 +187,64 @@ class BarcodeScanner extends Page implements HasForms
             })
             ->body("No open record for \"{$barcode}\".")
             ->warning()
+            ->send();
+    }
+
+    /**
+     * "Add Document Mode": while a target box is set, scanning a Document
+     * File assigns it into that box (receiveInFile if it was unboxed,
+     * transferFile if it's moving from another box) instead of just
+     * looking it up — then stays on this page so the operator can keep
+     * scanning, same as bulk mode's clear-and-stay behavior.
+     */
+    protected function assignScannedFileToBox(DocumentFile $file, int $boxId): void
+    {
+        $box = Box::find($boxId);
+
+        if (! $box) {
+            Notification::make()->title('Target box not found')->danger()->send();
+
+            return;
+        }
+
+        // Platform users' queries aren't customer-scoped (BelongsToCustomer
+        // skips them by design), so without this check a platform user
+        // could scan Customer A's file while Customer B's box is the scan
+        // target — silently moving a file across tenants and corrupting
+        // both customers' box/file counts.
+        if ($file->customer_id !== $box->customer_id) {
+            Notification::make()
+                ->title('Cannot assign: file and box belong to different customers')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        // canAccess() for this page only requires 'manage inventory' OR
+        // 'manage documents' (it's a shared multi-purpose scanner), which is
+        // not enough to permit *writing* to Document Files/Boxes — without
+        // this, a Stock Inventory user (no document permission at all) could
+        // reassign files they can't even see in Document Files, and it also
+        // skips the license/module gating that only DocumentFileResource's
+        // own authorization enforces for writes.
+        if (! DocumentFileResource::can('update', $file) || ! BoxResource::can('update', $box)) {
+            Notification::make()->title('You do not have permission to assign this file')->danger()->send();
+
+            return;
+        }
+
+        $service = app(DocumentMovementService::class);
+
+        if ($file->current_box_id === null) {
+            $service->receiveInFile($file, $box->id);
+        } elseif ($file->current_box_id !== $box->id) {
+            $service->transferFile($file, $box->id);
+        }
+
+        Notification::make()
+            ->title("Added to box {$box->box_number}: {$file->file_barcode}")
+            ->success()
             ->send();
     }
 }

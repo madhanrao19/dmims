@@ -719,3 +719,113 @@ sweep, not re-audited from scratch.
   existing record skip gracefully when the QA seed hasn't created one yet,
   keeping the spec robust across seed states. Verified passing both locally
   (33/33 full suite, no regressions) and live against the deployed site.
+
+---
+
+## 15. Demo-Readiness Fixes — 7 September 2026
+
+Marketing tested DMIMS ahead of a customer demo and filed 4 High-priority
+issues in a ticket doc; a follow-up review widened scope to the full demo
+workflow. All items below are implemented and verified
+(`php artisan test`: 221 passed; `vendor/bin/pint --test`: passed;
+`vendor/bin/phpstan analyse` (Larastan, level 5): no errors).
+
+**✅ Implemented (7 September 2026):**
+- **Box had no detail/view page** — only List/Create/Edit, no way to open a
+  single box and see what's inside it or its history. Added a `view` page
+  with record sub-navigation tabs: Overview, Documents Inside, Box Movement
+  Log, Box Audit Log (`BoxResource::getRecordSubNavigation()`/`getPages()`,
+  new `Pages\{ViewBox,Documents,MovementLog,AuditLog}`).
+- **Document File had the same gap** — added a `view` page with Overview,
+  Movement Log, and Audit Log tabs
+  (`DocumentFileResource`, new `Pages\{ViewDocumentFile,MovementLog,AuditLog}`).
+  Both detail pages share two new traits: `Concerns\HasScopedEmbeddedTable`
+  (embeds another resource's table scoped to an arbitrary parent record)
+  and `Concerns\HasAuditLogTab` (one row per audit event, "Changes" column
+  summarizing `old_values`/`new_values` as `field: old → new`).
+- **Customer → Location had no working Delete action** on the table (row
+  actions were incomplete) and its Edit action navigated away from the
+  Customer 360 Locations tab to a standalone page. Added a working Delete
+  (with FK-violation handling) and an in-modal Edit. `Location::delete()`
+  is now overridden with a `hasLinkedInventory()` guard blocking deletion
+  while boxes, sub-locations, or product stock are still linked —
+  previously unenforced because `Location` uses `SoftDeletes`, so the
+  database's FK `RESTRICT` constraint never actually fired on delete.
+- **Create Document File required `current_box_id`**, preventing a file
+  from being registered before it was physically boxed. Made optional;
+  `CreateDocumentFile::afterCreate()` now guards against a null box before
+  calling `DocumentMovementService::receiveInFile()` (a latent TypeError
+  otherwise). The Current Box field and the Transfer/Return box pickers now
+  match by `box_barcode` as well as `box_number` (new
+  `Box::searchByNumberOrBarcode()`), so a barcode scanner works directly in
+  those fields.
+- **"Add Document Mode" (new):** the Scan Center gained a "Target Box"
+  field; while set, scanning a Document File barcode assigns that file into
+  the target box via the existing `DocumentMovementService` instead of just
+  looking it up. Guarded for tenant isolation (file and box must share the
+  same `customer_id`) since platform users' queries aren't customer-scoped.
+- Scan Center's "unknown barcode" prompt gained a "New Location"
+  quick-create button (previously only "New Document"/"New Box").
+- Location hierarchy dropdowns (Box's Current Location, Location's Parent
+  Location, Box Transfer/Return pickers) now show the full ancestry path
+  ("Room 1 > Area A > Shelf-A01") instead of a bare name, with `->preload()`
+  added so options list without typing first — backed by a cached, single-
+  query `Location::ancestryPathMap()` (invalidated on any Location write).
+- `DocumentMovementLogResource`'s columns were expanded/relabeled to match
+  the ticket's required set (Date & Time, Movement Type, From/To Location,
+  From/To Box, Destination, Operator via a new `AuditLog::user()`/
+  `DocumentMovementLog::performedBy()` relation, Reference/Tracking No) —
+  this resource is used both standalone and embedded in the new Box/
+  Document File Movement Log tabs.
+- Cosmetic: "Borrowed by" relabeled to "Receiver" on the Document File Move
+  Out action.
+
+**Verified already working, no fix needed:** batch barcode printing (via
+`BarcodeRegistryResource`'s bulk action), Box-level transfer/move-out/return
+actions (already at parity with Document File), external dispatch with
+receiver + optional return date (already `borrowed_by`/`due_date`, just
+relabeled above), and Box's Current Location (already a displayed name, not
+a raw ID).
+
+**⚠️ Open — not reproduced, no fix shipped:** the original "Location edit
+malfunction" ticket item could not be reproduced from source — no defect
+was found in the plain `EditAction`. The in-modal edit UX change above is
+the best diagnosis shipped for this item; if the reporter still sees a
+distinct error live, it needs a follow-up fix driven from reproduction
+evidence, not a further guess against source alone.
+
+**Security review (same pass) — found and fixed before reaching the demo:**
+- **High:** "Add Document Mode" wrote to Document Files/Boxes without
+  checking `DocumentFileResource::can('update')`/`BoxResource::can('update')`
+  — a role with only `manage inventory` could reassign a file it couldn't
+  even see in Document Files, bypassing license/module gating too. Fixed:
+  both checks now required before the write.
+- **High:** `DocumentMovementService`'s transfer/return/receive-in methods
+  had no same-customer check on the target box/location — for a platform
+  user (whose Box/Location queries aren't customer-scoped), the Transfer/
+  Return action's own dropdown could legitimately offer another customer's
+  box/location. Fixed with a single `assertSameCustomer()` guard at the
+  service layer (one chokepoint, not four duplicated call-site checks).
+- **Medium:** the new Audit Log tabs gated on the record's view permission,
+  not `view audit logs` (Security & Access Control Matrix §14 restricts
+  audit logs to SA/Management/Company Admin) — Viewer/Supervisor/Stock/
+  Document roles could see the full audit trail for any box/file they could
+  view. Fixed: `canAccess()` now also requires `AuditLogResource::can('view')`.
+- **Medium:** `HasAuditLogTab`'s query had no explicit `customer_id` filter
+  of its own (`AuditLog` has no `BelongsToCustomer` scope); safe today only
+  transitively via the parent record. Fixed as defense-in-depth.
+- **Low:** `Location::ancestryPathMap()`'s cache was unkeyed (would serve
+  one user's snapshot to the next request under a long-lived worker). Fixed
+  by keying on the acting user's scope.
+- **Low:** the new Location in-modal edit action was the only edit path
+  skipping `ForcesOwnCustomerId`'s server-side re-assertion — not currently
+  exploitable, fixed for consistency.
+- **Low:** "Documents Inside" tab's `date_added` column was an N+1 (one
+  query per row); replaced with a single correlated subquery.
+
+**Regression tests:** `tests/Feature/DemoReadinessFixesTest.php` (11 tests)
+— unboxed file creation, Location delete guard, Box/Document File tab
+rendering, scan-to-box assignment, the cross-tenant scan guard, Add
+Document Mode permission gating, Audit Log tab access control, and the
+`DocumentMovementService` cross-customer transfer guard. Full suite:
+221/221 passing.

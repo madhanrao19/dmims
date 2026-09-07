@@ -6,6 +6,126 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — Box and Document File detail pages, "Add Document Mode" scanning, and demo-readiness fixes
+
+Marketing tested DMIMS ahead of a customer demo and filed 4 High-priority
+issues; a follow-up review widened scope to the full demo workflow. All
+items below are implemented and verified (`php artisan test`: 218 passed).
+
+- **Box detail page**: `BoxResource` gained a `view` page with record
+  sub-navigation tabs (Overview, Documents Inside, Box Movement Log, Box
+  Audit Log) — previously List/Create/Edit only, with no way to open a
+  single box and see what's inside it or its history. New pages:
+  `app/Filament/Resources/BoxResource/Pages/{ViewBox,Documents,MovementLog,AuditLog}.php`.
+- **Document File detail page**: `DocumentFileResource` gained the same
+  treatment — a `view` page with Overview, Movement Log, and Audit Log tabs
+  (new `app/Filament/Resources/DocumentFileResource/Pages/{ViewDocumentFile,MovementLog,AuditLog}.php`).
+- Two new shared traits back both: `HasScopedEmbeddedTable` (embeds another
+  resource's table scoped to an arbitrary parent record) and
+  `HasAuditLogTab` (one row per audit event, with a "Changes" column
+  summarizing `old_values`/`new_values` as `field: old → new`, not one row
+  per changed field).
+- **Create Document File**: `current_box_id` (Current Box) is no longer
+  required — a file can now be registered before it's boxed.
+  `CreateDocumentFile::afterCreate()` now guards against a null box before
+  calling `DocumentMovementService::receiveInFile()`, fixing a latent
+  TypeError that an unboxed create would otherwise have hit. The Current
+  Box field (and the Transfer/Return box pickers) now also match by
+  `box_barcode`, not just `box_number`, via a new
+  `Box::searchByNumberOrBarcode()` helper, so a barcode scan works directly
+  in those fields.
+- **"Add Document Mode"** (new): the Scan Center (`app/Filament/Pages/BarcodeScanner.php`)
+  gained a "Target Box" field; while set, scanning a Document File barcode
+  assigns that file into the target box (via the existing
+  `DocumentMovementService`) instead of just looking it up. Includes a
+  tenant-isolation guard (file and box must share the same `customer_id`),
+  since platform users' queries aren't customer-scoped.
+- Scan Center's existing "unknown barcode" prompt gained a "New Location"
+  quick-create button, alongside the existing "New Document"/"New Box".
+- **Customer → Location**: `LocationResource`'s table gained a working
+  Delete action (previously missing entirely) with FK-violation handling,
+  and the plain Edit action was replaced with an in-modal edit so editing a
+  location no longer navigates away from the Customer 360 Locations tab.
+  `Location` gained a `hasLinkedInventory()` guard and overrides `delete()`
+  to block deletion when boxes, sub-locations, or product stock are still
+  linked — `Location` uses `SoftDeletes`, so the database's FK `RESTRICT`
+  constraint never actually fired on a (soft) delete, and nothing else
+  enforced this.
+- Location hierarchy dropdowns (Box's Current Location, Location's Parent
+  Location, Box Transfer/Return location pickers) now show the full
+  ancestry path (e.g. "Room 1 > Area A > Shelf-A01") instead of a bare
+  location name, and gained `->preload()` so options list without typing
+  first. Backed by a new cached `Location::ancestryPathMap()` (one query,
+  invalidated on any Location write) to avoid an N+1.
+- `DocumentMovementLogResource`'s table columns were expanded/relabeled to
+  Date & Time, Movement Type, From/To Location, From/To Box, Destination,
+  Operator (via a new `AuditLog::user()`/`DocumentMovementLog::performedBy()`
+  relation), and Reference/Tracking No — this resource is used both
+  standalone and embedded in the new Box/Document File Movement Log tabs.
+- Cosmetic: "Borrowed by" relabeled to "Receiver" on the Document File Move
+  Out action.
+- Verified already working, no fix needed: batch barcode printing (already
+  supported via `BarcodeRegistryResource`'s bulk action), Box-level
+  transfer/move-out/return actions (already had full parity with Document
+  File), external dispatch with receiver + optional return date (already
+  implemented as `borrowed_by`/`due_date`, just relabeled above), and Box's
+  Current Location (already displayed as a name, not a raw ID).
+- Known follow-up, not done in this pass: the original "Location edit
+  malfunction" ticket item could not be reproduced from source (no defect
+  found in the plain `EditAction`) — the in-modal edit UX change above is
+  the best diagnosis shipped; if the reporter still sees a distinct error
+  live, it needs a follow-up fix from reproduction evidence.
+- New `tests/Feature/DemoReadinessFixesTest.php` (11 tests): unboxed file
+  creation, Location delete guard, Box/Document File tab rendering,
+  scan-to-box assignment, the cross-tenant scan guard, permission gating on
+  Add Document Mode, Audit Log tab access control, and the
+  `DocumentMovementService` cross-customer transfer guard.
+
+### Fixed — security review findings on the above (same pass)
+
+A security review of the demo-readiness diff (above) found and these fixes
+close, before this reached the demo:
+
+- **High**: "Add Document Mode" (`BarcodeScanner::assignScannedFileToBox()`)
+  wrote to Document Files/Boxes without checking
+  `DocumentFileResource::can('update')`/`BoxResource::can('update')` — a
+  role with only `manage inventory` (no document permission at all) could
+  reassign a file they couldn't even see in Document Files, and the write
+  skipped the license/module gates that only resource-level authorization
+  enforces. Now requires both checks before writing.
+- **High**: `DocumentMovementService`'s file/box transfer, return, and
+  receive-in methods had no check that the target box/location belongs to
+  the same customer as the file/box being moved — for a platform user
+  (whose Box/Location queries aren't customer-scoped), the Transfer/Return
+  action's own dropdown could legitimately offer another customer's
+  box/location. Added a single `assertSameCustomer()` guard at the service
+  layer (the one chokepoint every caller routes through) rather than
+  duplicating the check at each Filament action; it throws
+  `InvalidArgumentException` if the customer doesn't match.
+- **Medium**: the new Box/Document File Audit Log tabs gated on the same
+  permission as viewing the record itself, but Security & Access Control
+  Matrix §14 restricts audit logs to SA/Management/Company Admin only —
+  Viewer/Supervisor/Stock/Document roles could see the full audit trail
+  (actor, timestamp, every changed field's old/new value) for any box or
+  file they could otherwise view. `canAccess()` on both tabs now also
+  requires `AuditLogResource::can('view', ...)`.
+- **Medium**: `HasAuditLogTab`'s query had no explicit `customer_id` filter
+  of its own (`AuditLog` has no `BelongsToCustomer` scope) — safe today only
+  because it's transitively scoped via the already-scoped parent record, but
+  now filters explicitly as defense-in-depth against future reuse.
+- **Low**: `Location::ancestryPathMap()`'s cache was a single unkeyed array,
+  which would serve one user's snapshot to the next request under a
+  long-lived worker (queue/Octane) sharing one PHP process. Now keyed by the
+  acting user's scope (platform vs. `customer_id`).
+- **Low**: `LocationResource`'s new in-modal edit action was the only edit
+  path in the app that didn't force `customer_id` back to the actor's own
+  tenant server-side (`ForcesOwnCustomerId`'s pattern, applied elsewhere via
+  `EditRecord`) — not currently exploitable (the field is platform-only and
+  `BelongsToCustomer` re-overwrites it anyway) but now consistent with every
+  other edit path.
+- **Low**: the "Documents Inside" tab's `date_added` column ran one query
+  per row (N+1) — replaced with a single correlated subquery.
+
 ### Added — automated row-action modal sweep (`row-actions.spec.js`)
 
 - The existing `uiux-audit.spec.js` sweep only loads resource List/Create
