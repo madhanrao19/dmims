@@ -829,3 +829,64 @@ rendering, scan-to-box assignment, the cross-tenant scan guard, Add
 Document Mode permission gating, Audit Log tab access control, and the
 `DocumentMovementService` cross-customer transfer guard. Full suite:
 221/221 passing.
+
+## 16. Demo-Readiness Correction Pass — 8 September 2026
+
+An external review of commit `5cfff19` (§15 above) against the original
+demo scenarios found real gaps in the scan → act workflow and movement-
+tracking integrity that §15 missed. Every claim was independently
+re-verified against source (two read-only audits) before fixing anything —
+all confirmed, one with a minor nuance (Box's audit log did already get a
+generic `current_file_count` entry; it just didn't identify which file).
+
+**✅ Fixed (8 September 2026):**
+- **Dispatched-file scan bug** — scanning a moved-out file into a box via
+  Add Document Mode was indistinguishable from a never-boxed file (both
+  have `current_box_id = null`) and was logged as a fresh `'create'`
+  intake instead of a `'return'` — `returned_at` never set, stale
+  `destination`/`due_date` left in place. `BarcodeScanner::assignScannedFileToBox()`
+  now checks `current_status === 'moved_out'` first and routes to
+  `DocumentMovementService::returnFile()`.
+- **Scans now land somewhere actionable** — `ScannerService::recordUrl()`
+  always linked to `edit`, ignoring the `view` pages added in §15, and
+  those view pages had zero header actions. Fixed both: `recordUrl()` now
+  prefers `view` when the resource has one; Transfer/Move Out/Return/
+  Timeline were extracted into reusable methods and added as header
+  actions on the Box/Document File View and Edit pages (same
+  authorization as the List page's row actions — verified with a Viewer
+  role test).
+- **Edit forms no longer bypass movement tracking** — `current_location_id`/
+  `current_box_id` were plain editable fields on Edit with no logging;
+  correcting placement there left `DocumentMovementLog` and box file
+  counts silently wrong. Now locked on Edit (matching the existing
+  `current_file_count` pattern) — Create is unaffected; corrections go
+  through Transfer/Move Out/Return instead.
+- **Box Audit Log now identifies the file** — `DocumentMovementService`
+  writes an explicit `file_linked`/`file_unlinked` entry (with the file's
+  barcode) on every box entry/exit, not just the incidental generic
+  `current_file_count` delta.
+- **Location gained its own Overview + Audit Log tab** — previously
+  List/Create/Edit only; needed for the demo script's "create a shelf via
+  scan, review its audit history" step.
+- Scan Center's quick-create buttons now carry the scanned code into the
+  destination Create form; a new "Scan Documents In" button on the Box
+  view page pre-selects that box as the Add Document Mode target.
+
+**Confirmed not bugs, unchanged by this pass:** Audit Log's single
+"Changes" column (an explicit prior decision, not the ticket's literal
+separate Field/Old/New columns); unboxed file creation logging no
+movement event (correct — nothing moved).
+
+**⚠️ Still open:** the "Location edit malfunction" ticket wording remains
+unreproduced from source across two review passes — needs a live
+reproduction with the exact error. Reserving barcode labels for
+not-yet-existing records (pre-printing) remains deferred as a larger,
+separate feature.
+
+**Regression tests:** `tests/Feature/DemoCorrectionPassTest.php` (12
+tests) — the dispatched-file return-workflow fix, working Transfer actions
+on both View pages, Edit-form field locking (and other fields still
+saving), Box Audit Log file identification, Location Audit Log tenant
+isolation, RBAC on the new header actions, and safe handling of a
+malicious barcode value through the quick-create query param. Full suite:
+236/236 passing.

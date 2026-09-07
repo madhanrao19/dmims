@@ -64,7 +64,12 @@ class BarcodeScanner extends Page implements HasForms
 
     public function mount(): void
     {
-        $this->form->fill();
+        // Supports Box::ViewBox's "Scan Documents In" header action, which
+        // links here with ?target_box_id=… pre-selected so an operator
+        // doesn't have to search for the box they just came from.
+        $this->form->fill([
+            'target_box_id' => request()->integer('target_box_id') ?: null,
+        ]);
     }
 
     public function form(Schema $schema): Schema
@@ -163,15 +168,15 @@ class BarcodeScanner extends Page implements HasForms
                 ->actions([
                     NotificationAction::make('createDocument')
                         ->label('New Document')
-                        ->url(DocumentFileResource::getUrl('create'))
+                        ->url(DocumentFileResource::getUrl('create', ['file_barcode' => $barcode]))
                         ->button(),
                     NotificationAction::make('createBox')
                         ->label('New Box')
-                        ->url(BoxResource::getUrl('create'))
+                        ->url(BoxResource::getUrl('create', ['box_barcode' => $barcode]))
                         ->button(),
                     NotificationAction::make('createLocation')
                         ->label('New Location')
-                        ->url(LocationResource::getUrl('create'))
+                        ->url(LocationResource::getUrl('create', ['barcode' => $barcode]))
                         ->button(),
                 ])
                 ->persistent()
@@ -236,7 +241,15 @@ class BarcodeScanner extends Page implements HasForms
 
         $service = app(DocumentMovementService::class);
 
-        if ($file->current_box_id === null) {
+        // A dispatched file also has current_box_id === null (moveOutFile()
+        // clears it), identical to a never-boxed file — current_status is
+        // the only thing that tells them apart. Routing a dispatched file
+        // through receiveInFile() instead of returnFile() would log it as a
+        // fresh 'create' and never set returned_at, silently losing the
+        // fact that it was ever sent out.
+        if ($file->current_status === 'moved_out') {
+            $service->returnFile($file, $box->id);
+        } elseif ($file->current_box_id === null) {
             $service->receiveInFile($file, $box->id);
         } elseif ($file->current_box_id !== $box->id) {
             $service->transferFile($file, $box->id);

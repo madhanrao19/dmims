@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AuditLog;
 use App\Models\Box;
 use App\Models\DocumentFile;
 use App\Models\DocumentMovementLog;
@@ -33,6 +34,7 @@ class DocumentMovementService
 
             $file->update(['current_box_id' => $toBoxId, 'current_status' => 'active']);
             $this->adjustBoxFileCount($toBoxId, 1);
+            $this->logFileLinkage($toBoxId, $file, 'file_linked');
 
             return $log;
         });
@@ -53,6 +55,8 @@ class DocumentMovementService
             $file->update(['current_box_id' => $toBoxId, 'current_status' => 'active']);
             $this->adjustBoxFileCount($fromBoxId, -1);
             $this->adjustBoxFileCount($toBoxId, 1);
+            $this->logFileLinkage($fromBoxId, $file, 'file_unlinked');
+            $this->logFileLinkage($toBoxId, $file, 'file_linked');
 
             return $log;
         });
@@ -80,6 +84,7 @@ class DocumentMovementService
                 'returned_at' => null,
             ]);
             $this->adjustBoxFileCount($fromBoxId, -1);
+            $this->logFileLinkage($fromBoxId, $file, 'file_unlinked');
 
             return $log;
         });
@@ -98,6 +103,7 @@ class DocumentMovementService
                 'returned_at' => now(),
             ]);
             $this->adjustBoxFileCount($toBoxId, 1);
+            $this->logFileLinkage($toBoxId, $file, 'file_linked');
 
             return $log;
         });
@@ -114,6 +120,31 @@ class DocumentMovementService
         }
 
         Box::whereKey($boxId)->lockForUpdate()->first()?->increment('current_file_count', $delta);
+    }
+
+    /**
+     * The Auditable trait already writes a generic "current_file_count: N ->
+     * N±1" row against the Box whenever adjustBoxFileCount() saves it — but
+     * that doesn't say which file moved. This adds a purpose-built entry so
+     * the Box's own Audit Log tab can show real file-linking history, not
+     * just a bare count delta.
+     */
+    protected function logFileLinkage(?int $boxId, DocumentFile $file, string $action): void
+    {
+        if (! $boxId) {
+            return;
+        }
+
+        AuditLog::create([
+            'customer_id' => $file->customer_id,
+            'user_id' => auth()->id(),
+            'module' => 'boxes',
+            'action' => $action,
+            'auditable_type' => Box::class,
+            'auditable_id' => $boxId,
+            'old_values' => $action === 'file_unlinked' ? ['file_barcode' => $file->file_barcode] : null,
+            'new_values' => $action === 'file_linked' ? ['file_barcode' => $file->file_barcode] : null,
+        ]);
     }
 
     // ----- Box operations --------------------------------------------------

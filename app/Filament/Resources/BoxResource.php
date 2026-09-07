@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Concerns\HasBarcodeAction;
+use App\Filament\Pages\BarcodeScanner;
 use App\Filament\Resources\BoxResource\Pages;
 use App\Http\Middleware\EnsureModuleEnabled;
 use App\Models\Box;
@@ -62,6 +63,9 @@ class BoxResource extends BaseResource
                     ->required()
                     ->visible(fn (): bool => (bool) auth()->user()?->is_platform_user),
                 Forms\Components\TextInput::make('box_barcode')->required()->maxLength(150)
+                    // Carries the scanned code over from the Scan Center's
+                    // "unknown barcode → New Box" quick-create link.
+                    ->default(fn (string $operation): ?string => $operation === 'create' ? request()->query('box_barcode') : null)
                     ->unique(
                         ignoreRecord: true,
                         modifyRuleUsing: fn (Unique $rule, Get $get): Unique => $rule->where('customer_id', $get('customer_id')),
@@ -79,7 +83,18 @@ class BoxResource extends BaseResource
                     ->getOptionLabelFromRecordUsing(fn (Location $record): string => $record->ancestry_path)
                     ->searchable()
                     ->preload()
-                    ->required(),
+                    ->required()
+                    // Editing this directly here would change the box's
+                    // location without going through transferBoxAction()/
+                    // moveOutBoxAction()/returnBoxAction() — silently
+                    // skipping the DocumentMovementLog entry those write.
+                    // Create still sets it freely; corrections after that
+                    // go through Transfer/Move Out/Return instead.
+                    ->disabled(fn (string $operation): bool => $operation === 'edit')
+                    ->dehydrated(fn (string $operation): bool => $operation !== 'edit')
+                    ->helperText(fn (string $operation): ?string => $operation === 'edit'
+                        ? 'Use Transfer, Move Out, or Return to change this — keeps movement history accurate.'
+                        : null),
                 Forms\Components\TextInput::make('source_origin')->maxLength(255),
                 Forms\Components\TextInput::make('capacity_limit')->numeric()->helperText('Maximum number of files this box can hold.'),
                 Forms\Components\TextInput::make('current_file_count')
@@ -154,62 +169,103 @@ class BoxResource extends BaseResource
                     ->preload(),
             ])
             ->recordActions([
-                Action::make('transferBox')
-                    ->label('Transfer')
-                    ->icon('heroicon-o-arrows-right-left')
-                    ->visible(fn (Box $record): bool => $record->status !== 'moved_out')
-                    ->authorize(fn (Box $record): bool => static::can('update', $record))
-                    ->schema([
-                        Forms\Components\Select::make('to_location_id')->label('To location')
-                            ->options(fn () => static::locationOptions())->searchable()->preload()->required(),
-                        Forms\Components\Textarea::make('remarks'),
-                    ])
-                    ->action(function (Box $record, array $data): void {
-                        app(DocumentMovementService::class)->transferBox($record, (int) $data['to_location_id'], $data);
-                        Notification::make()->title('Box transferred')->success()->send();
-                    }),
-                Action::make('moveOutBox')
-                    ->label('Move Out')
-                    ->icon('heroicon-o-arrow-up-tray')
-                    ->color('danger')
-                    ->visible(fn (Box $record): bool => $record->status !== 'moved_out')
-                    ->authorize(fn (Box $record): bool => static::can('update', $record))
-                    ->schema([
-                        Forms\Components\TextInput::make('destination')->label('External destination')->required(),
-                        Forms\Components\Textarea::make('remarks'),
-                    ])
-                    ->action(function (Box $record, array $data): void {
-                        app(DocumentMovementService::class)->moveOutBox($record, $data['destination'], $data);
-                        Notification::make()->title('Box moved out')->success()->send();
-                    }),
-                Action::make('returnBox')
-                    ->label('Return')
-                    ->icon('heroicon-o-arrow-uturn-left')
-                    ->color('success')
-                    ->visible(fn (Box $record): bool => $record->status === 'moved_out')
-                    ->authorize(fn (Box $record): bool => static::can('update', $record))
-                    ->schema([
-                        Forms\Components\Select::make('to_location_id')->label('Return to location')
-                            ->options(fn () => static::locationOptions())->searchable()->preload()->required(),
-                        Forms\Components\Textarea::make('remarks'),
-                    ])
-                    ->action(function (Box $record, array $data): void {
-                        app(DocumentMovementService::class)->returnBox($record, (int) $data['to_location_id'], $data);
-                        Notification::make()->title('Box returned')->success()->send();
-                    }),
-                Action::make('timeline')
-                    ->label('Timeline')
-                    ->icon('heroicon-o-clock')
-                    ->modalHeading(fn (Box $record): string => "Activity timeline — Box {$record->box_number}")
-                    ->modalContent(fn (Box $record) => view('filament.activity-timeline', [
-                        'entries' => app(MovementTimelineService::class)->forBox($record),
-                    ]))
-                    ->modalSubmitAction(false)
-                    ->modalCancelActionLabel('Close'),
+                static::transferBoxAction(),
+                static::moveOutBoxAction(),
+                static::returnBoxAction(),
+                static::timelineAction(),
                 EditAction::make(),
                 static::barcodeAction(),
             ])
             ->defaultSort('created_at', 'desc');
+    }
+
+    /**
+     * Extracted from table()'s recordActions so ViewBox/EditBox can also
+     * expose it as a header action — a box reached by scanning its barcode
+     * (which now lands on the view page) needs Transfer/Move Out/Return
+     * available there too, not only from the Boxes list row.
+     */
+    public static function transferBoxAction(): Action
+    {
+        return Action::make('transferBox')
+            ->label('Transfer')
+            ->icon('heroicon-o-arrows-right-left')
+            ->visible(fn (Box $record): bool => $record->status !== 'moved_out')
+            ->authorize(fn (Box $record): bool => static::can('update', $record))
+            ->schema([
+                Forms\Components\Select::make('to_location_id')->label('To location')
+                    ->options(fn () => static::locationOptions())->searchable()->preload()->required(),
+                Forms\Components\Textarea::make('remarks'),
+            ])
+            ->action(function (Box $record, array $data): void {
+                app(DocumentMovementService::class)->transferBox($record, (int) $data['to_location_id'], $data);
+                Notification::make()->title('Box transferred')->success()->send();
+            });
+    }
+
+    public static function moveOutBoxAction(): Action
+    {
+        return Action::make('moveOutBox')
+            ->label('Move Out')
+            ->icon('heroicon-o-arrow-up-tray')
+            ->color('danger')
+            ->visible(fn (Box $record): bool => $record->status !== 'moved_out')
+            ->authorize(fn (Box $record): bool => static::can('update', $record))
+            ->schema([
+                Forms\Components\TextInput::make('destination')->label('External destination')->required(),
+                Forms\Components\Textarea::make('remarks'),
+            ])
+            ->action(function (Box $record, array $data): void {
+                app(DocumentMovementService::class)->moveOutBox($record, $data['destination'], $data);
+                Notification::make()->title('Box moved out')->success()->send();
+            });
+    }
+
+    public static function returnBoxAction(): Action
+    {
+        return Action::make('returnBox')
+            ->label('Return')
+            ->icon('heroicon-o-arrow-uturn-left')
+            ->color('success')
+            ->visible(fn (Box $record): bool => $record->status === 'moved_out')
+            ->authorize(fn (Box $record): bool => static::can('update', $record))
+            ->schema([
+                Forms\Components\Select::make('to_location_id')->label('Return to location')
+                    ->options(fn () => static::locationOptions())->searchable()->preload()->required(),
+                Forms\Components\Textarea::make('remarks'),
+            ])
+            ->action(function (Box $record, array $data): void {
+                app(DocumentMovementService::class)->returnBox($record, (int) $data['to_location_id'], $data);
+                Notification::make()->title('Box returned')->success()->send();
+            });
+    }
+
+    public static function timelineAction(): Action
+    {
+        return Action::make('timeline')
+            ->label('Timeline')
+            ->icon('heroicon-o-clock')
+            ->modalHeading(fn (Box $record): string => "Activity timeline — Box {$record->box_number}")
+            ->modalContent(fn (Box $record) => view('filament.activity-timeline', [
+                'entries' => app(MovementTimelineService::class)->forBox($record),
+            ]))
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel('Close');
+    }
+
+    /**
+     * Deep-links to the Scan Center with this box pre-selected as the
+     * "Add Document Mode" target, so an operator can start "create a box,
+     * then scan files into it" from the box itself rather than navigating
+     * to Scan Center and searching for the box again.
+     */
+    public static function scanDocumentsInAction(): Action
+    {
+        return Action::make('scanDocumentsIn')
+            ->label('Scan Documents In')
+            ->icon('heroicon-o-qr-code')
+            ->authorize(fn (Box $record): bool => static::can('update', $record))
+            ->url(fn (Box $record): string => BarcodeScanner::getUrl(['target_box_id' => $record->id]));
     }
 
     /**
@@ -283,4 +339,16 @@ class CreateBox extends CreateRecord
 class EditBox extends EditRecord
 {
     protected static string $resource = BoxResource::class;
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            BoxResource::scanDocumentsInAction(),
+            BoxResource::transferBoxAction(),
+            BoxResource::moveOutBoxAction(),
+            BoxResource::returnBoxAction(),
+            BoxResource::timelineAction(),
+            ...parent::getHeaderActions(),
+        ];
+    }
 }

@@ -100,6 +100,16 @@ class ScannerService
             default => null,
         };
 
-        return $resource ? $resource::getUrl('edit', ['record' => $registry->reference_id]) : null;
+        if (! $resource) {
+            return null;
+        }
+
+        // Prefer the detail view (Overview + Movement/Audit Log tabs, plus
+        // Transfer/Move Out/Return header actions) over the plain edit form
+        // where one exists, so scanning a box/file lands somewhere the
+        // operator can actually act on it, not just edit its fields.
+        $page = $resource::hasPage('view') ? 'view' : 'edit';
+
+        return $resource::getUrl($page, ['record' => $registry->reference_id]);
     }
 }

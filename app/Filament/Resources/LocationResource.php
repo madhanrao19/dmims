@@ -10,6 +10,7 @@ use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Forms;
 use Filament\Notifications\Notification;
+use Filament\Resources\Pages\Page;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables;
@@ -91,6 +92,9 @@ class LocationResource extends BaseResource
                     ->validationMessages(['unique' => 'This location code is already in use for the selected customer.']),
                 Forms\Components\TextInput::make('location_name')->required()->maxLength(255),
                 Forms\Components\TextInput::make('barcode')->maxLength(100)
+                    // Carries the scanned code over from the Scan Center's
+                    // "unknown barcode → New Location" quick-create link.
+                    ->default(fn (string $operation): ?string => $operation === 'create' ? request()->query('barcode') : null)
                     ->unique(
                         ignoreRecord: true,
                         modifyRuleUsing: fn (Unique $rule, Get $get): Unique => $rule->where('customer_id', $get('customer_id')),
@@ -189,12 +193,27 @@ class LocationResource extends BaseResource
             ->defaultSort('location_name');
     }
 
+    /**
+     * Location detail page tab bar — Overview / Audit Log, so "review a
+     * shelf's audit history" (the final step of the original demo script)
+     * has a page to land on, matching the Box/Document File pattern.
+     */
+    public static function getRecordSubNavigation(Page $page): array
+    {
+        return $page->generateNavigationItems([
+            Pages\ViewLocation::class,
+            Pages\AuditLog::class,
+        ]);
+    }
+
     public static function getPages(): array
     {
         return [
             'index' => Pages\ListLocations::route('/'),
             'create' => Pages\CreateLocation::route('/create'),
+            'view' => Pages\ViewLocation::route('/{record}'),
             'edit' => Pages\EditLocation::route('/{record}/edit'),
+            'audit-log' => Pages\AuditLog::route('/{record}/audit-log'),
         ];
     }
 }

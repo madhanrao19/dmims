@@ -59,6 +59,9 @@ class DocumentFileResource extends BaseResource
                     ->required()
                     ->visible(fn (): bool => (bool) auth()->user()?->is_platform_user),
                 Forms\Components\TextInput::make('file_barcode')->required()->maxLength(150)
+                    // Carries the scanned code over from the Scan Center's
+                    // "unknown barcode → New Document" quick-create link.
+                    ->default(fn (string $operation): ?string => $operation === 'create' ? request()->query('file_barcode') : null)
                     ->unique(
                         ignoreRecord: true,
                         modifyRuleUsing: fn (Unique $rule, Get $get): Unique => $rule->where('customer_id', $get('customer_id')),
@@ -82,7 +85,18 @@ class DocumentFileResource extends BaseResource
                     ->relationship('currentBox', 'box_number')
                     ->searchable(['box_number', 'box_barcode'])
                     ->preload()
-                    ->helperText('Optional — files can be registered before being boxed.'),
+                    // Editing this directly here would change the file's
+                    // box without going through transferFileAction()/
+                    // moveOutFileAction()/returnFileAction() — silently
+                    // skipping the DocumentMovementLog entry and box
+                    // file-count adjustment those write. Create still sets
+                    // it freely (optional); corrections after that go
+                    // through Transfer/Move Out/Return instead.
+                    ->disabled(fn (string $operation): bool => $operation === 'edit')
+                    ->dehydrated(fn (string $operation): bool => $operation !== 'edit')
+                    ->helperText(fn (string $operation): string => $operation === 'edit'
+                        ? 'Use Transfer, Move Out, or Return to change this — keeps movement history accurate.'
+                        : 'Optional — files can be registered before being boxed.'),
                 Forms\Components\Select::make('current_status')
                     ->options([
                         'active' => 'Active',
@@ -195,62 +209,88 @@ class DocumentFileResource extends BaseResource
                     }),
             ])
             ->recordActions([
-                Action::make('transferFile')
-                    ->label('Transfer')
-                    ->icon('heroicon-o-arrows-right-left')
-                    ->visible(fn (DocumentFile $record): bool => $record->current_status !== 'moved_out')
-                    ->authorize(fn (DocumentFile $record): bool => static::can('update', $record))
-                    ->schema([
-                        static::boxSelect('to_box_id', 'To box'),
-                        Forms\Components\Textarea::make('remarks'),
-                    ])
-                    ->action(function (DocumentFile $record, array $data): void {
-                        app(DocumentMovementService::class)->transferFile($record, (int) $data['to_box_id'], $data);
-                        Notification::make()->title('File transferred')->success()->send();
-                    }),
-                Action::make('moveOutFile')
-                    ->label('Move Out')
-                    ->icon('heroicon-o-arrow-up-tray')
-                    ->color('danger')
-                    ->visible(fn (DocumentFile $record): bool => $record->current_status !== 'moved_out')
-                    ->authorize(fn (DocumentFile $record): bool => static::can('update', $record))
-                    ->schema([
-                        Forms\Components\TextInput::make('destination')->label('External destination')->required(),
-                        Forms\Components\TextInput::make('borrowed_by')->label('Receiver'),
-                        Forms\Components\DatePicker::make('due_date')->label('Due back'),
-                        Forms\Components\Textarea::make('remarks'),
-                    ])
-                    ->action(function (DocumentFile $record, array $data): void {
-                        app(DocumentMovementService::class)->moveOutFile($record, $data['destination'], $data);
-                        Notification::make()->title('File moved out')->success()->send();
-                    }),
-                Action::make('returnFile')
-                    ->label('Return')
-                    ->icon('heroicon-o-arrow-uturn-left')
-                    ->color('success')
-                    ->visible(fn (DocumentFile $record): bool => $record->current_status === 'moved_out')
-                    ->authorize(fn (DocumentFile $record): bool => static::can('update', $record))
-                    ->schema([
-                        static::boxSelect('to_box_id', 'Return to box'),
-                        Forms\Components\Textarea::make('remarks'),
-                    ])
-                    ->action(function (DocumentFile $record, array $data): void {
-                        app(DocumentMovementService::class)->returnFile($record, (int) $data['to_box_id'], $data);
-                        Notification::make()->title('File returned')->success()->send();
-                    }),
-                Action::make('timeline')
-                    ->label('Timeline')
-                    ->icon('heroicon-o-clock')
-                    ->modalHeading(fn (DocumentFile $record): string => "Activity timeline — {$record->title}")
-                    ->modalContent(fn (DocumentFile $record) => view('filament.activity-timeline', [
-                        'entries' => app(MovementTimelineService::class)->forDocumentFile($record),
-                    ]))
-                    ->modalSubmitAction(false)
-                    ->modalCancelActionLabel('Close'),
+                static::transferFileAction(),
+                static::moveOutFileAction(),
+                static::returnFileAction(),
+                static::timelineAction(),
                 EditAction::make(),
                 static::barcodeAction(),
             ])
             ->defaultSort('created_at', 'desc');
+    }
+
+    /**
+     * Extracted from table()'s recordActions so ViewDocumentFile/EditDocumentFile
+     * can also expose it as a header action — a file reached by scanning its
+     * barcode (which now lands on the view page) needs Transfer/Move Out/
+     * Return available there too, not only from the Document Files list row.
+     */
+    public static function transferFileAction(): Action
+    {
+        return Action::make('transferFile')
+            ->label('Transfer')
+            ->icon('heroicon-o-arrows-right-left')
+            ->visible(fn (DocumentFile $record): bool => $record->current_status !== 'moved_out')
+            ->authorize(fn (DocumentFile $record): bool => static::can('update', $record))
+            ->schema([
+                static::boxSelect('to_box_id', 'To box'),
+                Forms\Components\Textarea::make('remarks'),
+            ])
+            ->action(function (DocumentFile $record, array $data): void {
+                app(DocumentMovementService::class)->transferFile($record, (int) $data['to_box_id'], $data);
+                Notification::make()->title('File transferred')->success()->send();
+            });
+    }
+
+    public static function moveOutFileAction(): Action
+    {
+        return Action::make('moveOutFile')
+            ->label('Move Out')
+            ->icon('heroicon-o-arrow-up-tray')
+            ->color('danger')
+            ->visible(fn (DocumentFile $record): bool => $record->current_status !== 'moved_out')
+            ->authorize(fn (DocumentFile $record): bool => static::can('update', $record))
+            ->schema([
+                Forms\Components\TextInput::make('destination')->label('External destination')->required(),
+                Forms\Components\TextInput::make('borrowed_by')->label('Receiver'),
+                Forms\Components\DatePicker::make('due_date')->label('Due back'),
+                Forms\Components\Textarea::make('remarks'),
+            ])
+            ->action(function (DocumentFile $record, array $data): void {
+                app(DocumentMovementService::class)->moveOutFile($record, $data['destination'], $data);
+                Notification::make()->title('File moved out')->success()->send();
+            });
+    }
+
+    public static function returnFileAction(): Action
+    {
+        return Action::make('returnFile')
+            ->label('Return')
+            ->icon('heroicon-o-arrow-uturn-left')
+            ->color('success')
+            ->visible(fn (DocumentFile $record): bool => $record->current_status === 'moved_out')
+            ->authorize(fn (DocumentFile $record): bool => static::can('update', $record))
+            ->schema([
+                static::boxSelect('to_box_id', 'Return to box'),
+                Forms\Components\Textarea::make('remarks'),
+            ])
+            ->action(function (DocumentFile $record, array $data): void {
+                app(DocumentMovementService::class)->returnFile($record, (int) $data['to_box_id'], $data);
+                Notification::make()->title('File returned')->success()->send();
+            });
+    }
+
+    public static function timelineAction(): Action
+    {
+        return Action::make('timeline')
+            ->label('Timeline')
+            ->icon('heroicon-o-clock')
+            ->modalHeading(fn (DocumentFile $record): string => "Activity timeline — {$record->title}")
+            ->modalContent(fn (DocumentFile $record) => view('filament.activity-timeline', [
+                'entries' => app(MovementTimelineService::class)->forDocumentFile($record),
+            ]))
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel('Close');
     }
 
     /**
@@ -334,4 +374,15 @@ class CreateDocumentFile extends CreateRecord
 class EditDocumentFile extends EditRecord
 {
     protected static string $resource = DocumentFileResource::class;
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            DocumentFileResource::transferFileAction(),
+            DocumentFileResource::moveOutFileAction(),
+            DocumentFileResource::returnFileAction(),
+            DocumentFileResource::timelineAction(),
+            ...parent::getHeaderActions(),
+        ];
+    }
 }

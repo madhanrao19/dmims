@@ -6,6 +6,68 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed — correction pass on demo-readiness work (per external review of commit 5cfff19)
+
+An external review of the demo-readiness commit against the original demo
+scenarios found real gaps in the scan → act workflow and movement-tracking
+integrity. Every claim was independently re-verified against source before
+fixing (236 tests passing, up from 224; Pint/Larastan clean):
+
+- **Dispatched-file scan bug (data integrity)**: scanning a moved-out
+  (dispatched) file into a target box via "Add Document Mode" was
+  indistinguishable from a never-boxed file (both have `current_box_id =
+  null`) and got logged as a fresh `'create'` intake instead of a
+  `'return'` — `returned_at` was never set and stale `destination`/
+  `due_date` were left in place. `BarcodeScanner::assignScannedFileToBox()`
+  now checks `current_status === 'moved_out'` first and routes to
+  `DocumentMovementService::returnFile()`.
+- **Scans now open a page with working actions**: `ScannerService::recordUrl()`
+  previously always linked to the `edit` page even though `view` pages
+  exist; it now prefers `view` when the resource has one. Transfer/Move
+  Out/Return/Timeline (previously only List-page row actions) were
+  extracted into reusable methods and are now also header actions on the
+  Box/Document File View and Edit pages, so an operator can act on a
+  record immediately after scanning it instead of returning to the list.
+- **Edit forms no longer bypass movement tracking**: `current_location_id`
+  (Box) / `current_box_id` (Document File) are now locked on the Edit form
+  (matching the existing `current_file_count` read-only pattern) — Create
+  is unaffected. Direct edits previously changed placement with no
+  `DocumentMovementLog` entry and no box file-count adjustment; corrections
+  now go through Transfer/Move Out/Return, which already log correctly.
+- **Box Audit Log now identifies which file moved**: previously only a
+  generic `current_file_count: N → N±1` entry appeared (from the model's
+  own audit trail incidentally firing). `DocumentMovementService` now
+  writes an explicit `file_linked`/`file_unlinked` audit entry naming the
+  file's barcode whenever a file enters or leaves a box.
+- **Location gained its own Overview + Audit Log tab** (previously
+  List/Create/Edit only), for the demo script's "create a shelf via scan,
+  review its audit history" step — same pattern as Box/Document File.
+- **Scan Center quality-of-life**: the "unknown barcode" quick-create
+  buttons (New Document/Box/Location) now carry the scanned code into the
+  destination Create form instead of opening it blank; a new "Scan
+  Documents In" button on the Box view page deep-links to Scan Center with
+  that box pre-selected as the Add Document Mode target.
+
+**Confirmed not bugs (already explicit decisions, unchanged by this pass)**:
+Audit Log's single "Changes" column vs. literal separate Field/Old/New
+columns; unboxed file creation logging no movement event (nothing moved,
+nothing to log).
+
+**Still open**: the original "Location edit malfunction" ticket wording has
+not been reproduced from source in two review passes now — needs a live
+reproduction with the exact error to act on. Reserving barcode labels for
+records that don't exist yet (pre-printing) remains a deferred, larger
+feature, not addressed in this pass.
+
+New `tests/Feature/DemoCorrectionPassTest.php` (12 tests): the dispatched-
+file return-workflow fix, working Transfer actions on both View pages,
+Edit-form field locking (and that other fields still save normally),
+Box Audit Log file identification, Location Audit Log tenant isolation and
+rendering, RBAC on the new header actions (a Viewer cannot execute
+Transfer/Move Out/Return from either View page), and that a
+malicious/HTML barcode value passed through the quick-create query param
+is never rendered unsafely.
+
 ### Added — Box and Document File detail pages, "Add Document Mode" scanning, and demo-readiness fixes
 
 Marketing tested DMIMS ahead of a customer demo and filed 4 High-priority
