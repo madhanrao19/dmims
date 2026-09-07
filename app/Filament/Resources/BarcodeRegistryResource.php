@@ -128,6 +128,8 @@ class BarcodeRegistryResource extends BaseResource
                         Forms\Components\Select::make('record_ids')
                             ->label('Records without a barcode yet')
                             ->multiple()
+                            ->searchable()
+                            ->preload()
                             ->required()
                             ->options(function (Get $get) {
                                 $type = $get('type');

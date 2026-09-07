@@ -54,7 +54,10 @@ class DocumentFileResource extends BaseResource
                     ->label('Customer')
                     ->relationship('customer', 'company_name')
                     ->searchable()
-                    ->required(),
+                    ->preload()
+                    ->default(fn (): ?int => auth()->user()?->is_platform_user ? null : auth()->user()?->customer_id)
+                    ->required()
+                    ->visible(fn (): bool => (bool) auth()->user()?->is_platform_user),
                 Forms\Components\TextInput::make('file_barcode')->required()->maxLength(150)
                     ->unique(
                         ignoreRecord: true,
@@ -66,11 +69,13 @@ class DocumentFileResource extends BaseResource
                 Forms\Components\Select::make('document_type_id')
                     ->label('Document Type')
                     ->relationship('documentType', 'type_name')
-                    ->searchable(),
+                    ->searchable()
+                    ->preload(),
                 Forms\Components\Select::make('department_id')
                     ->label('Department')
                     ->relationship('department', 'name')
-                    ->searchable(),
+                    ->searchable()
+                    ->preload(),
                 Forms\Components\TextInput::make('owner_name')->maxLength(255),
                 Forms\Components\Select::make('current_box_id')
                     ->label('Current Box')
@@ -96,6 +101,7 @@ class DocumentFileResource extends BaseResource
                 Forms\Components\Select::make('tags')
                     ->relationship('tags', 'name')
                     ->multiple()
+                    ->searchable()
                     ->preload()
                     ->createOptionForm([
                         Forms\Components\TextInput::make('name')->required(),
@@ -144,6 +150,7 @@ class DocumentFileResource extends BaseResource
                 Tables\Filters\SelectFilter::make('tags')
                     ->relationship('tags', 'name')
                     ->multiple()
+                    ->searchable()
                     ->preload(),
                 Tables\Filters\SelectFilter::make('current_status')
                     ->options([
@@ -157,13 +164,18 @@ class DocumentFileResource extends BaseResource
                     ]),
                 Tables\Filters\SelectFilter::make('department_id')
                     ->relationship('department', 'name')
-                    ->label('Department'),
+                    ->label('Department')
+                    ->searchable()
+                    ->preload(),
                 Tables\Filters\SelectFilter::make('current_box_id')
                     ->relationship('currentBox', 'box_number')
                     ->label('Box')
-                    ->searchable(),
+                    ->searchable()
+                    ->preload(),
                 Tables\Filters\SelectFilter::make('warehouse')
                     ->label('Warehouse/Shelf')
+                    ->searchable()
+                    ->preload()
                     ->options(fn () => Location::query()->pluck('location_name', 'id')->all())
                     ->query(function ($query, array $data) {
                         return $query->when(

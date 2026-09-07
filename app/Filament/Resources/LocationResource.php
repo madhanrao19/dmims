@@ -58,6 +58,13 @@ class LocationResource extends BaseResource
                     ->label('Customer')
                     ->relationship('customer', 'company_name')
                     ->searchable()
+                    ->preload()
+                    // Hidden fields still feed Get::get('customer_id') below
+                    // (location_code/barcode uniqueness scoping) — without a
+                    // default a tenant user's hidden field resolves to null,
+                    // silently disabling that scoping and letting a raw DB
+                    // constraint violation through instead of an inline error.
+                    ->default(fn (): ?int => auth()->user()?->is_platform_user ? null : auth()->user()?->customer_id)
                     ->required()
                     // BelongsToCustomer forces this to the tenant's own
                     // company regardless of what's submitted, so showing it

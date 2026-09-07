@@ -33,7 +33,10 @@ class LicenseLogResource extends BaseResource
                     ->label('Customer')
                     ->relationship('customer', 'company_name')
                     ->searchable()
-                    ->required(),
+                    ->preload()
+                    ->default(fn (): ?int => auth()->user()?->is_platform_user ? null : auth()->user()?->customer_id)
+                    ->required()
+                    ->visible(fn (): bool => (bool) auth()->user()?->is_platform_user),
                 Forms\Components\TextInput::make('license_id')->numeric()->required(),
                 Forms\Components\TextInput::make('action')->required()->maxLength(100),
                 Forms\Components\Textarea::make('old_value')->rows(3),

@@ -27,7 +27,10 @@ class SupportAccessLogResource extends BaseResource
                     ->label('Customer')
                     ->relationship('customer', 'company_name')
                     ->searchable()
-                    ->required(),
+                    ->preload()
+                    ->default(fn (): ?int => auth()->user()?->is_platform_user ? null : auth()->user()?->customer_id)
+                    ->required()
+                    ->visible(fn (): bool => (bool) auth()->user()?->is_platform_user),
                 Forms\Components\TextInput::make('support_user_id')->numeric()->required()->exists('users', 'id'),
                 Forms\Components\TextInput::make('target_user_id')->numeric()->required()->exists('users', 'id'),
                 Forms\Components\Textarea::make('reason')->required()->maxLength(65535),

@@ -34,16 +34,21 @@ class ProductLocationStockResource extends BaseResource
                     ->label('Customer')
                     ->relationship('customer', 'company_name')
                     ->searchable()
-                    ->required(),
+                    ->preload()
+                    ->default(fn (): ?int => auth()->user()?->is_platform_user ? null : auth()->user()?->customer_id)
+                    ->required()
+                    ->visible(fn (): bool => (bool) auth()->user()?->is_platform_user),
                 Forms\Components\Select::make('product_id')
                     ->label('Product')
                     ->relationship('product', 'product_name')
                     ->searchable()
+                    ->preload()
                     ->required(),
                 Forms\Components\Select::make('location_id')
                     ->label('Location')
                     ->relationship('location', 'location_name')
                     ->searchable()
+                    ->preload()
                     ->required(),
                 Forms\Components\TextInput::make('quantity_on_hand')->numeric()->default(0),
                 Forms\Components\TextInput::make('reserved_quantity')->numeric()->default(0),

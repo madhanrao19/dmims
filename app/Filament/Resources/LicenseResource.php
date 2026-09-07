@@ -42,7 +42,10 @@ class LicenseResource extends BaseResource
                     ->label('Customer')
                     ->relationship('customer', 'company_name')
                     ->searchable()
-                    ->required(),
+                    ->preload()
+                    ->default(fn (): ?int => auth()->user()?->is_platform_user ? null : auth()->user()?->customer_id)
+                    ->required()
+                    ->visible(fn (): bool => (bool) auth()->user()?->is_platform_user),
                 Forms\Components\TextInput::make('license_no')->required()->maxLength(100),
                 Forms\Components\TextInput::make('deployment_mode')->default('DatamationOnPremHosted')->required()->maxLength(100),
                 Forms\Components\TextInput::make('license_mode')->default('InternalSubscription')->required()->maxLength(100),

@@ -39,17 +39,23 @@ class StockMovementResource extends BaseResource
                     ->label('Customer')
                     ->relationship('customer', 'company_name')
                     ->searchable()
-                    ->required(),
+                    ->preload()
+                    ->default(fn (): ?int => auth()->user()?->is_platform_user ? null : auth()->user()?->customer_id)
+                    ->required()
+                    ->visible(fn (): bool => (bool) auth()->user()?->is_platform_user),
                 Forms\Components\TextInput::make('movement_no')->required()->maxLength(100),
                 Forms\Components\Select::make('product_id')
                     ->relationship('product', 'product_name')
-                    ->searchable(),
+                    ->searchable()
+                    ->preload(),
                 Forms\Components\Select::make('from_location_id')
                     ->relationship('fromLocation', 'location_name')
-                    ->searchable(),
+                    ->searchable()
+                    ->preload(),
                 Forms\Components\Select::make('to_location_id')
                     ->relationship('toLocation', 'location_name')
-                    ->searchable(),
+                    ->searchable()
+                    ->preload(),
                 Forms\Components\TextInput::make('quantity')->numeric()->required(),
                 Forms\Components\Select::make('movement_type')
                     ->options([
@@ -86,7 +92,7 @@ class StockMovementResource extends BaseResource
                     ->authorize(fn (): bool => static::can('create'))
                     ->schema([
                         static::productSelect(),
-                        Forms\Components\Select::make('to_location_id')->label('To location')->options(static::locationOptions())->searchable()->required(),
+                        Forms\Components\Select::make('to_location_id')->label('To location')->options(static::locationOptions())->searchable()->preload()->required(),
                         static::quantityInput(),
                         Forms\Components\Textarea::make('remarks'),
                     ])
@@ -101,7 +107,7 @@ class StockMovementResource extends BaseResource
                     ->authorize(fn (): bool => static::can('create'))
                     ->schema([
                         static::productSelect(),
-                        Forms\Components\Select::make('from_location_id')->label('From location')->options(static::locationOptions())->searchable()->required(),
+                        Forms\Components\Select::make('from_location_id')->label('From location')->options(static::locationOptions())->searchable()->preload()->required(),
                         static::quantityInput(),
                         Forms\Components\Textarea::make('remarks'),
                     ])
@@ -115,8 +121,8 @@ class StockMovementResource extends BaseResource
                     ->authorize(fn (): bool => static::can('create'))
                     ->schema([
                         static::productSelect(),
-                        Forms\Components\Select::make('from_location_id')->label('From location')->options(static::locationOptions())->searchable()->required(),
-                        Forms\Components\Select::make('to_location_id')->label('To location')->options(static::locationOptions())->searchable()->required()->different('from_location_id'),
+                        Forms\Components\Select::make('from_location_id')->label('From location')->options(static::locationOptions())->searchable()->preload()->required(),
+                        Forms\Components\Select::make('to_location_id')->label('To location')->options(static::locationOptions())->searchable()->preload()->required()->different('from_location_id'),
                         static::quantityInput(),
                         Forms\Components\Textarea::make('remarks'),
                     ])
@@ -131,7 +137,7 @@ class StockMovementResource extends BaseResource
                     ->authorize(fn (): bool => static::can('create'))
                     ->schema([
                         static::productSelect(),
-                        Forms\Components\Select::make('location_id')->label('Location')->options(static::locationOptions())->searchable()->required(),
+                        Forms\Components\Select::make('location_id')->label('Location')->options(static::locationOptions())->searchable()->preload()->required(),
                         Forms\Components\TextInput::make('delta')->label('Adjustment (+/-)')->numeric()->required()
                             ->helperText('Positive adds stock, negative removes it.'),
                         Forms\Components\Textarea::make('reason')->required(),
@@ -150,6 +156,7 @@ class StockMovementResource extends BaseResource
             ->label('Product')
             ->options(fn () => Product::query()->pluck('product_name', 'id')->all())
             ->searchable()
+            ->preload()
             ->required();
     }
 

@@ -34,7 +34,10 @@ class DocumentMovementLogResource extends BaseResource
                     ->label('Customer')
                     ->relationship('customer', 'company_name')
                     ->searchable()
-                    ->required(),
+                    ->preload()
+                    ->default(fn (): ?int => auth()->user()?->is_platform_user ? null : auth()->user()?->customer_id)
+                    ->required()
+                    ->visible(fn (): bool => (bool) auth()->user()?->is_platform_user),
                 Forms\Components\TextInput::make('movement_no')->maxLength(100),
                 Forms\Components\TextInput::make('movable_type')->maxLength(150),
                 Forms\Components\TextInput::make('movable_id')->maxLength(100),
@@ -42,19 +45,23 @@ class DocumentMovementLogResource extends BaseResource
                 Forms\Components\Select::make('from_location_id')
                     ->label('From Location')
                     ->relationship('fromLocation', 'location_name')
-                    ->searchable(),
+                    ->searchable()
+                    ->preload(),
                 Forms\Components\Select::make('to_location_id')
                     ->label('To Location')
                     ->relationship('toLocation', 'location_name')
-                    ->searchable(),
+                    ->searchable()
+                    ->preload(),
                 Forms\Components\Select::make('from_box_id')
                     ->label('From Box')
                     ->relationship('fromBox', 'box_number')
-                    ->searchable(),
+                    ->searchable()
+                    ->preload(),
                 Forms\Components\Select::make('to_box_id')
                     ->label('To Box')
                     ->relationship('toBox', 'box_number')
-                    ->searchable(),
+                    ->searchable()
+                    ->preload(),
                 Forms\Components\TextInput::make('source_origin')->maxLength(255),
                 Forms\Components\TextInput::make('destination')->maxLength(255),
                 Forms\Components\TextInput::make('scanned_barcode')->maxLength(150),

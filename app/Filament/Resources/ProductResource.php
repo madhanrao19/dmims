@@ -52,7 +52,10 @@ class ProductResource extends BaseResource
                     ->label('Customer')
                     ->relationship('customer', 'company_name')
                     ->searchable()
-                    ->required(),
+                    ->preload()
+                    ->default(fn (): ?int => auth()->user()?->is_platform_user ? null : auth()->user()?->customer_id)
+                    ->required()
+                    ->visible(fn (): bool => (bool) auth()->user()?->is_platform_user),
                 Forms\Components\TextInput::make('sku')->required()->maxLength(100)
                     ->unique(
                         ignoreRecord: true,
@@ -70,11 +73,13 @@ class ProductResource extends BaseResource
                 Forms\Components\Select::make('category_id')
                     ->label('Category')
                     ->relationship('category', 'category_name')
-                    ->searchable(),
+                    ->searchable()
+                    ->preload(),
                 Forms\Components\Select::make('default_location_id')
                     ->label('Default Location')
                     ->relationship('defaultLocation', 'location_name')
-                    ->searchable(),
+                    ->searchable()
+                    ->preload(),
                 Forms\Components\TextInput::make('reorder_level')->numeric()->default(0),
                 Forms\Components\TextInput::make('unit_cost')->numeric()->step('0.01')->default(0),
                 Forms\Components\TextInput::make('unit_price')->numeric()->step('0.01')->default(0),

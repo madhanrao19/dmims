@@ -41,11 +41,15 @@ class CustomerModuleResource extends BaseResource
                     ->label('Customer')
                     ->relationship('customer', 'company_name')
                     ->searchable()
-                    ->required(),
+                    ->preload()
+                    ->default(fn (): ?int => auth()->user()?->is_platform_user ? null : auth()->user()?->customer_id)
+                    ->required()
+                    ->visible(fn (): bool => (bool) auth()->user()?->is_platform_user),
                 Forms\Components\Select::make('module_id')
                     ->label('Module')
                     ->relationship('module', 'module_name')
                     ->searchable()
+                    ->preload()
                     ->required()
                     // customer_modules has a unique(customer_id, module_id)
                     // constraint the form never validated — submitting a

@@ -57,7 +57,10 @@ class BoxResource extends BaseResource
                     ->label('Customer')
                     ->relationship('customer', 'company_name')
                     ->searchable()
-                    ->required(),
+                    ->preload()
+                    ->default(fn (): ?int => auth()->user()?->is_platform_user ? null : auth()->user()?->customer_id)
+                    ->required()
+                    ->visible(fn (): bool => (bool) auth()->user()?->is_platform_user),
                 Forms\Components\TextInput::make('box_barcode')->required()->maxLength(150)
                     ->unique(
                         ignoreRecord: true,
@@ -99,6 +102,7 @@ class BoxResource extends BaseResource
                 Forms\Components\Select::make('tags')
                     ->relationship('tags', 'name')
                     ->multiple()
+                    ->searchable()
                     ->preload()
                     ->createOptionForm([
                         Forms\Components\TextInput::make('name')->required(),
@@ -146,6 +150,7 @@ class BoxResource extends BaseResource
                 Tables\Filters\SelectFilter::make('tags')
                     ->relationship('tags', 'name')
                     ->multiple()
+                    ->searchable()
                     ->preload(),
             ])
             ->recordActions([

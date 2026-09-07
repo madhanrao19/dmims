@@ -40,7 +40,10 @@ class CategoryResource extends BaseResource
                     ->label('Customer')
                     ->relationship('customer', 'company_name')
                     ->searchable()
-                    ->required(),
+                    ->preload()
+                    ->default(fn (): ?int => auth()->user()?->is_platform_user ? null : auth()->user()?->customer_id)
+                    ->required()
+                    ->visible(fn (): bool => (bool) auth()->user()?->is_platform_user),
                 Forms\Components\TextInput::make('category_code')->maxLength(100),
                 Forms\Components\TextInput::make('category_name')->required()->maxLength(255),
                 Forms\Components\Textarea::make('description')->rows(3),

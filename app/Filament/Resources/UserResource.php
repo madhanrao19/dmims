@@ -157,11 +157,13 @@ class UserResource extends BaseResource
                     ->label('Customer')
                     ->relationship('customer', 'company_name')
                     ->searchable()
+                    ->preload()
                     ->disabled(fn (): bool => ! static::actorCanFullyManage()),
                 Forms\Components\Select::make('department_id')
                     ->label('Department')
                     ->relationship('department', 'name')
-                    ->searchable(),
+                    ->searchable()
+                    ->preload(),
                 Forms\Components\TextInput::make('job_title')->maxLength(255),
                 Forms\Components\Select::make('status')
                     ->options([
@@ -185,6 +187,8 @@ class UserResource extends BaseResource
                             ? $query
                             : $query->whereNotIn('name', self::PLATFORM_ROLES),
                     )
+                    ->searchable()
+                    ->preload()
                     ->disabled(fn (): bool => ! static::actorCanFullyManage()),
             ]);
     }
