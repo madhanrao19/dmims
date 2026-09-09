@@ -315,7 +315,10 @@ cd /var/www/dmims
 sudo -u appuser php artisan migrate --force
 
 # Seed the roles & permissions the access control depends on (no demo data).
-# Safe on every environment, including production.
+# Safe on every environment, including production. Also seeds the default
+# location type taxonomy (Warehouse/Building/Floor/Room/Rack/Shelf/Cabinet) —
+# without it, the Location Chain Builder / Batch Generate "Type" dropdowns
+# are empty on a fresh install.
 sudo -u appuser php artisan db:seed --class=RolesAndPermissionsSeeder --force
 
 # STAGING ONLY: seed the QA sample accounts (one per role). Never run this

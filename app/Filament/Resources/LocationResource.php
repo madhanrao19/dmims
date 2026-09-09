@@ -6,6 +6,8 @@ use App\Filament\Concerns\HasBarcodeAction;
 use App\Filament\Resources\LocationResource\Pages;
 use App\Http\Middleware\EnsureModuleEnabled;
 use App\Models\Location;
+use App\Models\LocationType;
+use Closure;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Forms;
@@ -17,6 +19,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rules\Unique;
 
 class LocationResource extends BaseResource
@@ -190,7 +193,197 @@ class LocationResource extends BaseResource
                     }),
                 static::barcodeAction(),
             ])
+            ->headerActions([
+                static::createChainAction(),
+                static::batchGenerateAction(),
+            ])
             ->defaultSort('location_name');
+    }
+
+    /**
+     * Bulk-creates a whole nested-parent chain of locations (e.g. Warehouse
+     * > Building > Rack) in one submit, instead of one at a time. Each row
+     * threads into the next row's parent_id — reuses an existing sibling
+     * (matched by location_code under the same parent) instead of
+     * duplicating it, so re-running the builder to extend a chain is safe.
+     * Wrapped in one DB::transaction() so a mid-chain collision leaves
+     * nothing partially created. Every row goes through Location::create()
+     * (never a raw insert/upsert), which keeps the parent-cycle/cross-tenant
+     * guard in Location::booted() active.
+     */
+    protected static function createChainAction(): Action
+    {
+        return Action::make('createChain')
+            ->label('Location Chain Builder')
+            ->icon('heroicon-o-squares-2x2')
+            ->authorize(fn (): bool => static::can('create'))
+            ->slideOver()
+            ->schema([
+                static::customerIdField(),
+                Forms\Components\Select::make('starting_parent_id')
+                    ->label('Starting Parent (optional)')
+                    ->options(fn (): array => Location::ancestryPathMap())
+                    ->searchable(),
+                Forms\Components\Repeater::make('levels')
+                    ->label('Location Chain')
+                    ->schema([
+                        Forms\Components\Select::make('location_type_id')
+                            ->label('Type')
+                            ->options(fn (): array => LocationType::where('status', 'active')->orderBy('sort_order')->pluck('type_name', 'id')->all())
+                            ->required(),
+                        Forms\Components\TextInput::make('location_code')->label('Code')->required()->maxLength(100),
+                        Forms\Components\TextInput::make('location_name')->label('Name')->required()->maxLength(255),
+                        Forms\Components\TextInput::make('barcode')->label('Barcode (optional)')->maxLength(100),
+                    ])
+                    ->columns(4)
+                    ->addActionLabel('+ Add Level')
+                    ->reorderableWithButtons()
+                    ->collapsible()
+                    ->minItems(1)
+                    ->default([
+                        ['location_type_id' => null, 'location_code' => '', 'location_name' => '', 'barcode' => null],
+                        ['location_type_id' => null, 'location_code' => '', 'location_name' => '', 'barcode' => null],
+                    ])
+                    ->helperText('Add one row per level, top to bottom — e.g. Warehouse -> Building -> Rack.'),
+            ])
+            ->action(function (array $data): void {
+                $customerId = $data['customer_id'] ?? auth()->user()?->customer_id;
+
+                try {
+                    DB::transaction(function () use ($data, $customerId): void {
+                        $parentId = $data['starting_parent_id'] ?? null;
+
+                        foreach ($data['levels'] as $level) {
+                            $existing = Location::where('customer_id', $customerId)
+                                ->where('parent_id', $parentId)
+                                ->where('location_code', $level['location_code'])
+                                ->first();
+
+                            $node = $existing ?? Location::create([
+                                'customer_id' => $customerId,
+                                'parent_id' => $parentId,
+                                'location_type_id' => $level['location_type_id'],
+                                'location_code' => $level['location_code'],
+                                'location_name' => $level['location_name'],
+                                'barcode' => $level['barcode'] ?: null,
+                                'status' => 'active',
+                            ]);
+
+                            $parentId = $node->id;
+                        }
+                    });
+                } catch (QueryException $e) {
+                    Notification::make()
+                        ->title('Chain not created')
+                        ->body('A location code or barcode in this chain is already in use. Nothing was saved.')
+                        ->danger()
+                        ->send();
+
+                    return;
+                }
+
+                Notification::make()->title('Location chain created')->success()->send();
+            });
+    }
+
+    /**
+     * Creates a flat range of sibling locations under one parent (e.g.
+     * SHELF-01..SHELF-10) from a code/name/barcode prefix + start/end
+     * number. A duplicate code or barcode is skipped (not an error) and
+     * counted, matching the pattern; the whole range still runs inside one
+     * DB::transaction() so an unexpected mid-loop failure rolls back
+     * cleanly instead of leaving a partial batch.
+     */
+    protected static function batchGenerateAction(): Action
+    {
+        return Action::make('batchGenerate')
+            ->label('Batch Generate')
+            ->icon('heroicon-o-squares-plus')
+            ->authorize(fn (): bool => static::can('create'))
+            ->schema([
+                static::customerIdField(),
+                Forms\Components\Select::make('parent_id')
+                    ->label('Parent Location')
+                    ->options(fn (): array => Location::ancestryPathMap())
+                    ->searchable()
+                    ->helperText('Leave blank to create top-level locations.'),
+                Forms\Components\Select::make('location_type_id')
+                    ->label('Type')
+                    ->options(fn (): array => LocationType::where('status', 'active')->orderBy('sort_order')->pluck('type_name', 'id')->all()),
+                Forms\Components\TextInput::make('code_prefix')->label('Code Prefix')->required()->maxLength(80),
+                Forms\Components\TextInput::make('name_prefix')->label('Name Prefix')->required()->maxLength(200)
+                    ->helperText('e.g. "SHELF-" generates SHELF-01, SHELF-02, ...'),
+                Forms\Components\TextInput::make('barcode_prefix')->label('Barcode Prefix (optional)')->maxLength(80),
+                Forms\Components\TextInput::make('start_number')->numeric()->required()->default(1),
+                Forms\Components\TextInput::make('end_number')->numeric()->required()->default(10)
+                    ->rules([
+                        fn (Get $get): Closure => function (string $attribute, $value, Closure $fail) use ($get): void {
+                            $start = (int) $get('start_number');
+                            if ((int) $value < $start) {
+                                $fail("End number must be greater than or equal to start number ({$start}).");
+                            }
+                            if ((int) $value - $start > 500) {
+                                $fail('Batch is limited to 500 locations at a time.');
+                            }
+                        },
+                    ]),
+            ])
+            ->action(function (array $data): void {
+                $customerId = $data['customer_id'] ?? auth()->user()?->customer_id;
+                $created = 0;
+                $skipped = 0;
+
+                DB::transaction(function () use ($data, $customerId, &$created, &$skipped): void {
+                    for ($n = (int) $data['start_number']; $n <= (int) $data['end_number']; $n++) {
+                        $suffix = str_pad((string) $n, 2, '0', STR_PAD_LEFT);
+                        $code = $data['code_prefix'].$suffix;
+                        $barcode = filled($data['barcode_prefix'] ?? null) ? $data['barcode_prefix'].$suffix : null;
+
+                        $exists = Location::where('customer_id', $customerId)
+                            ->where(fn ($q) => $q->where('location_code', $code)->when($barcode, fn ($q2) => $q2->orWhere('barcode', $barcode)))
+                            ->exists();
+
+                        if ($exists) {
+                            $skipped++;
+
+                            continue;
+                        }
+
+                        Location::create([
+                            'customer_id' => $customerId,
+                            'parent_id' => $data['parent_id'] ?? null,
+                            'location_type_id' => $data['location_type_id'] ?? null,
+                            'location_code' => $code,
+                            'location_name' => $data['name_prefix'].$suffix,
+                            'barcode' => $barcode,
+                            'status' => 'active',
+                        ]);
+                        $created++;
+                    }
+                });
+
+                Notification::make()
+                    ->title('Batch Generation Complete')
+                    ->body("Created {$created}. Skipped {$skipped} duplicate(s).")
+                    ->success()
+                    ->send();
+            });
+    }
+
+    /**
+     * customer_id field shared by the two bulk-create actions above — same
+     * platform-user-only visibility/default pattern as form()'s own field.
+     */
+    protected static function customerIdField(): Forms\Components\Select
+    {
+        return Forms\Components\Select::make('customer_id')
+            ->label('Customer')
+            ->relationship('customer', 'company_name')
+            ->searchable()
+            ->preload()
+            ->default(fn (): ?int => auth()->user()?->is_platform_user ? null : auth()->user()?->customer_id)
+            ->required()
+            ->visible(fn (): bool => (bool) auth()->user()?->is_platform_user);
     }
 
     /**

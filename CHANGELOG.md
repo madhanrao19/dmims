@@ -6,6 +6,56 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — Location Chain Builder, Location Batch Generate, and a richer Box View page
+
+UI/UX ported from a reference implementation the user shared (screenshots + a full old
+codebase export), adapted to this codebase's own adjacency-list `Location` model and
+`headerActions()` convention rather than copied verbatim — the reference project uses a
+different architecture (`kalnoy/nestedset`) that was deliberately not adopted:
+
+- **Location Chain Builder**: new "Location Chain Builder" header action on the
+  Locations table — a slide-over with a repeating row list (Type / Code / Name /
+  Barcode per row, reorder/collapse/"+ Add Level") that creates a whole nested chain of
+  locations (e.g. Warehouse → Building → Rack) in one submit instead of one at a time.
+  Each row threads into the next row's `parent_id`; an existing sibling (matched by
+  `location_code` under the same parent) is reused instead of duplicated, so re-running
+  the builder to extend a chain is safe. The whole chain is wrapped in one
+  `DB::transaction()` — a mid-chain code/barcode collision rolls back everything instead
+  of leaving a partial chain committed (a gap in the reference implementation, fixed on
+  port). Every row goes through `Location::create()`, never a raw insert, so the
+  parent-cycle/cross-tenant guard added last session stays active.
+- **Location Batch Generate**: new "Batch Generate" header action alongside it — creates
+  a flat range of sibling locations under one chosen parent (e.g. `SHELF-01`..`SHELF-10`)
+  from a code/name/barcode prefix + start/end number. A duplicate code or barcode is
+  skipped (not an error) and counted in the completion notification; capped at 500 per
+  batch (mirrors `BarcodeRegistryResource`'s own `reserve` action's 200-cap convention).
+  Same `DB::transaction()`-wrapped, `Location::create()`-only approach as the chain
+  builder.
+- **Default location types seeded**: new `LocationTypesSeeder` (Warehouse, Building,
+  Floor, Room, Rack, Shelf, Cabinet — the hierarchy already documented in
+  `docs/DMIMS Data Migration Strategy & Execution Guide.md` §13), called from
+  `RolesAndPermissionsSeeder` (the one seeder that runs unconditionally in every
+  environment) — without this, both new "Type" dropdowns above would be empty on a
+  fresh install, since `location_types` ships with zero rows otherwise.
+- **Richer Box View page**: `BoxResource` gained a real `infolist()` — a deliberate,
+  scoped exception to this app's otherwise-universal "no `infolist()` override, View
+  falls back to a read-only form embed" convention (every other View page is
+  unaffected). Overview now shows Identification / Current Location (an
+  "Exact Physical Path" breadcrumb walking the location ancestry with `↳` nesting and
+  each level's own barcode, plus a separate "Assigned Node Barcode" badge) / Contents
+  (Total/Active/Moved Out file counts) / Notes cards, instead of the previous flat
+  disabled-form-fields layout. `ViewBox.php` needed zero changes — Filament's
+  `ViewRecord::content()` already switches from form-embed to infolist-embed
+  automatically the moment `infolist()` exists, so the existing "Add Document Mode"
+  scan-toggle prepend keeps working unchanged. `DocumentFileResource`'s View page is
+  intentionally left untouched (no screenshots were provided for it, and a
+  `DocumentFile` sits in a `Box`, not directly in a `Location` — a different breadcrumb
+  shape, a separate future task if wanted).
+
+9 new tests across `LocationChainBuilderTest.php`, `LocationBatchGenerateTest.php`, and
+`BoxViewInfolistTest.php`. 282 tests passing (was 273); Pint and Larastan (level 5)
+clean.
+
 ### Added — barcode pre-printing/reservation, box/location capacity enforcement, and status/box desync guard
 
 Fixes the three items deferred in the entry below (per its recommendation, after a

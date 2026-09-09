@@ -14,8 +14,10 @@ use Closure;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Forms;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Page;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables;
@@ -147,6 +149,83 @@ class BoxResource extends BaseResource
                     ]),
                 Forms\Components\Textarea::make('remarks')->rows(3),
             ]);
+    }
+
+    /**
+     * Deliberate, scoped exception to this app's "no infolist() override"
+     * convention (see ViewBox's own doc-comment — every other View page
+     * falls back to a read-only form embed). Box's screenshots need
+     * TextEntry-shaped breadcrumb/badge/count rendering a disabled form
+     * field can't produce without hand-rolled Blade. ViewBox::content()
+     * needs no change for this to take effect: Filament's ViewRecord
+     * switches from form-embed to infolist-embed automatically the moment
+     * this method returns non-empty components.
+     */
+    public static function infolist(Schema $schema): Schema
+    {
+        return $schema->components([
+            Section::make('Identification')
+                ->columns(2)
+                ->schema([
+                    TextEntry::make('box_barcode')->label('Barcode')->fontFamily('mono')->copyable(),
+                    TextEntry::make('box_number')->label('Box Number'),
+                    TextEntry::make('status')
+                        ->badge()
+                        ->color(fn (string $state): string => match ($state) {
+                            'active' => 'success',
+                            'closed', 'archived' => 'gray',
+                            'moved_out' => 'info',
+                            'damaged', 'missing' => 'danger',
+                            default => 'gray',
+                        }),
+                    TextEntry::make('source_origin')->label('Origin')->placeholder('—'),
+                    TextEntry::make('created_at')->dateTime(),
+                ]),
+            Section::make('Current Location')
+                ->schema([
+                    TextEntry::make('location_details')
+                        ->label('Exact Physical Path')
+                        ->getStateUsing(function (Box $record): string {
+                            if (! $record->currentLocation) {
+                                return $record->status === 'moved_out' ? 'Dispatched — not currently placed' : 'Not placed';
+                            }
+
+                            $nodes = [];
+                            $node = $record->currentLocation;
+                            $depth = 0;
+
+                            while ($node && $depth < 10) {
+                                $nodes[] = $node;
+                                $node = $node->parent;
+                                $depth++;
+                            }
+
+                            return collect(array_reverse($nodes))
+                                ->map(function (Location $n): string {
+                                    $typeLabel = $n->locationType !== null ? $n->locationType->type_name : 'Location';
+
+                                    return e($typeLabel).': '.e($n->location_name).($n->barcode ? ' (Barcode: '.e($n->barcode).')' : '');
+                                })
+                                ->implode('<br> &#8618; ');
+                        })
+                        ->html(),
+                    TextEntry::make('currentLocation.barcode')->label('Assigned Node Barcode')->badge()->placeholder('—'),
+                ]),
+            Section::make('Contents')
+                ->columns(3)
+                ->schema([
+                    TextEntry::make('files_total')->label('Total Files')
+                        ->getStateUsing(fn (Box $record): int => $record->files()->count()),
+                    TextEntry::make('files_active')->label('Active')
+                        ->getStateUsing(fn (Box $record): int => $record->files()->where('current_status', 'active')->count()),
+                    TextEntry::make('files_moved_out')->label('Moved Out')
+                        ->getStateUsing(fn (Box $record): int => $record->files()->where('current_status', 'moved_out')->count()),
+                ]),
+            Section::make('Notes')
+                ->schema([
+                    TextEntry::make('remarks')->hiddenLabel()->placeholder('No remarks.'),
+                ]),
+        ]);
     }
 
     public static function table(Table $table): Table

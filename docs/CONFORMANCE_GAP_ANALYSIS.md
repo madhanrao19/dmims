@@ -1014,3 +1014,29 @@ verified against both the SQLite test driver and the actual local dev
 database — MySQL/staging behavior relies on Laravel 13's native
 cross-driver `Blueprint::change()` and was not independently verified
 against a live MySQL instance.
+
+## 19. Location Chain Builder, Batch Generate, and Box View Redesign — 9 September 2026
+
+Ported UI/UX from a reference implementation of this system the user shared
+(screenshots + a full export of an older codebase) — see `CHANGELOG.md` for
+the feature-level description. Two things worth recording here specifically:
+
+- **Deliberate exception to the "no `infolist()` override" convention**:
+  `BoxResource` now has a real `infolist()`. Every other resource's View page
+  (`DocumentFileResource`, `LocationResource`, etc.) still falls back to
+  Filament's default read-only form embed, as before — this is a single,
+  scoped exception for Box only, not a new app-wide pattern. If a future
+  change wants the same richer layout on `DocumentFileResource`'s View page,
+  design it fresh (a `DocumentFile` sits in a `Box`, not directly in a
+  `Location` — a different breadcrumb shape) rather than assuming this one
+  generalizes.
+- **`LocationType` is no longer empty by default**: `LocationTypesSeeder`
+  (called from `RolesAndPermissionsSeeder`) seeds the 7-level hierarchy
+  already documented in `docs/DMIMS Data Migration Strategy & Execution
+  Guide.md` §13. Any environment seeded before this change needs
+  `php artisan db:seed --class=RolesAndPermissionsSeeder --force` re-run
+  (idempotent, safe to re-run) to pick up the new types.
+
+**Regression tests:** 9 new tests across `LocationChainBuilderTest.php`,
+`LocationBatchGenerateTest.php`, `BoxViewInfolistTest.php`. Full suite:
+282/282 passing; Pint and Larastan (level 5) clean.

@@ -118,5 +118,7 @@ class RolesAndPermissionsSeeder extends Seeder
             $role = Role::firstOrCreate(['name' => $roleName]);
             $role->syncPermissions($permissions === '*' ? self::PERMISSIONS : $permissions);
         }
+
+        $this->call(LocationTypesSeeder::class);
     }
 }
