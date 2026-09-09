@@ -1,60 +1,32 @@
 <?php
 
-namespace App\Filament\Resources\BoxResource\Pages;
+namespace App\Filament\Resources\BoxResource\RelationManagers;
 
-use App\Filament\Resources\BoxResource;
 use App\Filament\Resources\DocumentFileResource;
 use App\Models\Box;
 use App\Models\DocumentMovementLog;
-use Filament\Resources\Pages\Concerns\InteractsWithRecord;
-use Filament\Resources\Pages\Page;
-use Filament\Schemas\Components\EmbeddedTable;
-use Filament\Schemas\Schema;
+use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Concerns\InteractsWithTable;
-use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Box detail tab: files currently stored in this box. Custom columns rather
+ * Box View tab: files currently stored in this box. Custom columns rather
  * than reusing DocumentFileResource::table() wholesale — that table is
  * tuned for the general Document Files list (owner, tags, due date) and is
- * missing several columns the ticket asks for here (File Reference No,
- * Document Type, Department), so it isn't a drop-in fit.
+ * missing several columns wanted here (File Reference No, Document Type,
+ * Department).
  */
-class Documents extends Page implements HasTable
+class DocumentFilesRelationManager extends RelationManager
 {
-    use InteractsWithRecord;
-    use InteractsWithTable;
+    protected static string $relationship = 'files';
 
-    protected static string $resource = BoxResource::class;
-
-    protected static ?string $navigationLabel = 'Documents Inside';
-
-    protected static ?string $title = 'Documents Inside';
-
-    public static function canAccess(array $parameters = []): bool
-    {
-        return BoxResource::can('view', $parameters['record'] ?? null);
-    }
-
-    public function mount(int|string $record): void
-    {
-        $this->record = $this->resolveRecord($record);
-    }
-
-    public function content(Schema $schema): Schema
-    {
-        return $schema->components([
-            EmbeddedTable::make(),
-        ]);
-    }
+    protected static ?string $title = 'Documents in this Box';
 
     public function table(Table $table): Table
     {
         /** @var Box $box */
-        $box = $this->getRecord();
+        $box = $this->getOwnerRecord();
 
         // A per-row DocumentMovementLog query in the column's ->state()
         // closure would be an N+1 (one extra query per file in the box) —

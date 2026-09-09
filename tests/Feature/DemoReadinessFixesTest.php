@@ -3,10 +3,10 @@
 namespace Tests\Feature;
 
 use App\Filament\Pages\BarcodeScanner;
-use App\Filament\Resources\BoxResource\Pages\AuditLog as BoxAuditLog;
-use App\Filament\Resources\BoxResource\Pages\Documents as BoxDocuments;
-use App\Filament\Resources\BoxResource\Pages\MovementLog as BoxMovementLog;
 use App\Filament\Resources\BoxResource\Pages\ViewBox;
+use App\Filament\Resources\BoxResource\RelationManagers\AuditLogRelationManager;
+use App\Filament\Resources\BoxResource\RelationManagers\DocumentFilesRelationManager;
+use App\Filament\Resources\BoxResource\RelationManagers\MovementLogRelationManager;
 use App\Filament\Resources\DocumentFileResource\Pages\AuditLog as DocumentAuditLog;
 use App\Filament\Resources\DocumentFileResource\Pages\CreateDocumentFile;
 use App\Filament\Resources\DocumentFileResource\Pages\MovementLog as DocumentMovementLog;
@@ -132,9 +132,9 @@ class DemoReadinessFixesTest extends TestCase
         DocumentFile::create(['customer_id' => $this->customer->id, 'file_barcode' => 'FBC-1', 'title' => 'Contract', 'current_status' => 'active', 'current_box_id' => $box->id]);
 
         Livewire::test(ViewBox::class, ['record' => $box->id])->assertOk();
-        Livewire::test(BoxDocuments::class, ['record' => $box->id])->assertOk()->assertSee('FBC-1');
-        Livewire::test(BoxMovementLog::class, ['record' => $box->id])->assertOk();
-        Livewire::test(BoxAuditLog::class, ['record' => $box->id])->assertOk();
+        Livewire::test(DocumentFilesRelationManager::class, ['ownerRecord' => $box, 'pageClass' => ViewBox::class])->assertOk()->assertSee('FBC-1');
+        Livewire::test(MovementLogRelationManager::class, ['ownerRecord' => $box, 'pageClass' => ViewBox::class])->assertOk();
+        Livewire::test(AuditLogRelationManager::class, ['ownerRecord' => $box, 'pageClass' => ViewBox::class])->assertOk();
     }
 
     public function test_document_file_detail_tabs_render(): void
@@ -231,12 +231,24 @@ class DemoReadinessFixesTest extends TestCase
     {
         // Security & Access Control Matrix §14: Viewer can view boxes but
         // not audit logs — the tab must gate on 'view audit logs', not just
-        // on being able to view the box itself.
+        // on being able to view the box itself. Asserted directly against
+        // canViewForRecord() (what the parent page consults to decide
+        // whether to even show the tab) rather than via Livewire::test's
+        // initial mount — RelationManager's own CanAuthorizeAccess trait
+        // only re-checks on hydrate (a follow-up request), not first mount,
+        // since it's normally a defense-in-depth backstop behind the
+        // parent page's own tab-visibility gate.
         $user = $this->tenantUser('Viewer', ['document_tracking']);
         $this->actingAs($user);
         $box = $this->box();
 
-        Livewire::test(BoxAuditLog::class, ['record' => $box->id])->assertForbidden();
+        $this->assertFalse(AuditLogRelationManager::canViewForRecord($box, ViewBox::class));
+
+        // End-to-end: the parent page must not render the tab at all for
+        // this role, not just fail a direct hit against the tab component.
+        Livewire::test(ViewBox::class, ['record' => $box->id])
+            ->assertOk()
+            ->assertDontSee('System Activity Log');
     }
 
     public function test_document_movement_service_rejects_cross_customer_transfer(): void

@@ -6,6 +6,41 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed — Box View: inline tabs and a header Scan Mode toggle (closer match to reference UI/UX)
+
+Follow-up refinement after the first pass below — the user asked for a closer match to
+two specific pieces of the reference screenshots:
+
+- **Documents in this Box / Physical Movement History / System Activity Log now render
+  as inline tabs on the Box View page itself**, instead of three separate sub-navigation
+  pages reached via the left sidebar. Implemented with Filament's native `RelationManager`
+  tab strip (`BoxResource::getRelations()`) — the same mechanism the reference project
+  uses — rather than the previous `getRecordSubNavigation()` array of standalone pages.
+  New `Box::movementLogs()`/`Box::auditLogs()` model relations (manually scoped by
+  `movable_type`/`auditable_type`, since those are plain string columns, not a Laravel
+  morph map) back the two new relation managers; `Box::files()` (already existed) backs
+  the third. The three old `BoxResource\Pages\{Documents,MovementLog,AuditLog}` page
+  classes were deleted (their logic moved into the new relation managers, not
+  duplicated) rather than left as orphaned, unlinked routes.
+- **"Add Document Mode" is now a header action** ("Scan Mode: ON"/"Scan Mode: OFF",
+  bolt/pause icon, success/gray color — matching the reference's button), instead of an
+  in-page checkbox. The scan input form itself is unchanged and still fully functional
+  (this codebase's version is a real, working feature — unlike the reference project's
+  own "Scan Mode" toggle, which a full read of its source showed was legacy/dead code
+  superseded by a different scan flow elsewhere).
+
+The Audit Log tab's RBAC restriction (SA/Management/Company Admin only) is preserved via
+`AuditLogRelationManager::canViewForRecord()` — tested both directly and end-to-end
+(confirming the tab is absent from the rendered page for a Viewer, not just that a direct
+hit against the tab component is rejected).
+
+3 existing tests updated (Box sub-page references → relation manager references, one
+assertion changed from `assertForbidden()` on direct RelationManager mount to asserting
+`canViewForRecord()` directly + page-level `assertDontSee()` — RelationManager's own
+authorization hook only re-checks on Livewire hydrate/subsequent-request, not initial
+mount, since it's a defense-in-depth backstop behind the parent page's own tab-visibility
+gate). 282 tests passing; Pint and Larastan (level 5) clean.
+
 ### Added — Location Chain Builder, Location Batch Generate, and a richer Box View page
 
 UI/UX ported from a reference implementation the user shared (screenshots + a full old

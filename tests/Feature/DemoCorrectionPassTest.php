@@ -3,9 +3,9 @@
 namespace Tests\Feature;
 
 use App\Filament\Pages\BarcodeScanner;
-use App\Filament\Resources\BoxResource\Pages\AuditLog as BoxAuditLog;
 use App\Filament\Resources\BoxResource\Pages\EditBox;
 use App\Filament\Resources\BoxResource\Pages\ViewBox;
+use App\Filament\Resources\BoxResource\RelationManagers\AuditLogRelationManager;
 use App\Filament\Resources\DocumentFileResource;
 use App\Filament\Resources\DocumentFileResource\Pages\CreateDocumentFile;
 use App\Filament\Resources\DocumentFileResource\Pages\EditDocumentFile;
@@ -344,7 +344,7 @@ class DemoCorrectionPassTest extends TestCase
 
         app(DocumentMovementService::class)->receiveInFile($file, $box->id);
 
-        Livewire::test(BoxAuditLog::class, ['record' => $box->id])
+        Livewire::test(AuditLogRelationManager::class, ['ownerRecord' => $box, 'pageClass' => ViewBox::class])
             ->assertOk()
             ->assertSee('file_linked')
             ->assertSee('FBC-LINK');

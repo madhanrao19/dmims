@@ -8,6 +8,7 @@ use App\Models\Box;
 use App\Models\DocumentFile;
 use App\Services\DocumentMovementService;
 use App\Services\ScannerService;
+use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
@@ -16,10 +17,14 @@ use Filament\Schemas\Schema;
 use InvalidArgumentException;
 
 /**
- * "Overview" tab of the Box detail page. No infolist() override on
- * BoxResource, so ViewRecord falls back to embedding BoxResource::form()
- * read-only — same default Filament uses for every other view page in this
- * app that doesn't define a dedicated infolist.
+ * Single-page Box View — Identification/Current Location/Contents/Notes
+ * cards via BoxResource::infolist() (a deliberate, scoped exception to this
+ * app's "no infolist() override" convention — see that method's own
+ * doc-comment), plus a "Scan Mode" header toggle for the inline
+ * scan-to-assign form. Documents in this Box / Physical Movement History /
+ * System Activity Log render as inline RelationManager tabs below this
+ * page's content (BoxResource::getRelations()), not as separate
+ * sub-navigation pages.
  */
 class ViewBox extends ViewRecord
 {
@@ -28,9 +33,10 @@ class ViewBox extends ViewRecord
     protected static ?string $navigationLabel = 'Overview';
 
     /**
-     * Demo script (Scenario 1) expects an ON/OFF "Add Document Mode" right
-     * on the box's own detail page, not only via the separate Scan Center.
-     * These back the `filament.box-assignment` view prepended in content().
+     * Demo script (Scenario 1) expects an ON/OFF scan mode right on the
+     * box's own detail page, not only via the separate Scan Center. These
+     * back the `filament.box-assignment` view prepended in content() and
+     * the "Scan Mode" header action below.
      */
     public bool $addDocumentMode = false;
 
@@ -44,6 +50,7 @@ class ViewBox extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            $this->scanModeToggleAction(),
             BoxResource::scanDocumentsInAction(),
             BoxResource::transferBoxAction(),
             BoxResource::moveOutBoxAction(),
@@ -53,13 +60,30 @@ class ViewBox extends ViewRecord
         ];
     }
 
+    /**
+     * Header toggle for the "Add Document Mode" scan form below — flips
+     * $addDocumentMode and re-renders; the actual scan-to-assign logic
+     * lives in scanDocument() below, unchanged.
+     */
+    protected function scanModeToggleAction(): Action
+    {
+        return Action::make('scanModeToggle')
+            ->label(fn (): string => $this->addDocumentMode ? 'Scan Mode: ON' : 'Scan Mode: OFF')
+            ->icon(fn (): string => $this->addDocumentMode ? 'heroicon-o-bolt' : 'heroicon-o-pause')
+            ->color(fn (): string => $this->addDocumentMode ? 'success' : 'gray')
+            ->visible(fn (): bool => BoxResource::can('update', $this->getRecord()))
+            ->action(function (): void {
+                $this->addDocumentMode = ! $this->addDocumentMode;
+            });
+    }
+
     public function content(Schema $schema): Schema
     {
         $schema = parent::content($schema);
 
         return $schema->components([
             ViewComponent::make('filament.box-assignment')
-                ->visible(fn (): bool => BoxResource::can('update', $this->getRecord())),
+                ->visible(fn (): bool => $this->addDocumentMode && BoxResource::can('update', $this->getRecord())),
             ...$schema->getComponents(),
         ]);
     }

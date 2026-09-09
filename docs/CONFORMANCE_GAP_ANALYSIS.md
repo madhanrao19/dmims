@@ -1040,3 +1040,46 @@ the feature-level description. Two things worth recording here specifically:
 **Regression tests:** 9 new tests across `LocationChainBuilderTest.php`,
 `LocationBatchGenerateTest.php`, `BoxViewInfolistTest.php`. Full suite:
 282/282 passing; Pint and Larastan (level 5) clean.
+
+## 20. Box View — Inline RelationManager Tabs (Follow-up) — 9 September 2026
+
+The user asked for a closer match to the reference screenshots on two specific
+points: Box View's Documents/Movement/Audit tabs should render inline on one page
+(not as separate sub-navigation pages), and the scan-toggle should be a header
+button, not an in-page checkbox.
+
+**✅ Fixed:**
+- `BoxResource::getRecordSubNavigation()` (3 separate pages) replaced with
+  `BoxResource::getRelations()` (Filament's native inline `RelationManager` tab
+  strip — confirmed this is the same mechanism the reference project itself uses).
+  `Box::movementLogs()`/`Box::auditLogs()` are new manually-scoped `hasMany`
+  relations (`movable_type`/`auditable_type` are plain string columns in this
+  schema, not a Laravel morph map, so `morphMany` doesn't apply directly).
+  `app/Filament/Resources/BoxResource/Pages/{Documents,MovementLog,AuditLog}.php`
+  were deleted — their table/column logic moved into the 3 new
+  `BoxResource/RelationManagers/*` classes rather than kept as duplicated,
+  now-orphaned pages.
+- `ViewBox`'s "Add Document Mode" checkbox became a header `Action` labeled
+  "Scan Mode: ON"/"Scan Mode: OFF" (icon + color matching the reference). The
+  underlying scan-to-assign logic (`scanDocument()`) is untouched and fully
+  functional — worth noting the reference project's own equivalent toggle was
+  traced to dead code during the original UI/UX research pass; this codebase's
+  version is a real, tested feature, not a cosmetic port of a non-functional one.
+
+**Testing nuance recorded for future reference:** `RelationManager`'s
+`CanAuthorizeAccess` trait (`hydrateCanAuthorizeAccess()`) only re-checks
+authorization on Livewire *hydrate* (a follow-up request), not on the component's
+initial `mount()` — by design, since a RelationManager is normally only reachable
+through its parent page, which already gates tab visibility via
+`canViewForRecord()` before the tab is ever rendered. Testing
+`Livewire::test(SomeRelationManager::class, [...])->assertForbidden()` directly
+therefore does **not** exercise that gate on first load. The correct test is
+either a direct call to `SomeRelationManager::canViewForRecord($record, $pageClass)`,
+or (better, end-to-end) asserting the tab is absent from the parent page's
+rendered output for that role — both are now used together in
+`DemoReadinessFixesTest::test_viewer_cannot_access_box_audit_log_tab()`.
+
+**Regression tests:** 3 existing tests updated (page-class references →
+relation-manager references in `DemoCorrectionPassTest.php` and
+`DemoReadinessFixesTest.php`); no new test files. Full suite: 282/282 passing;
+Pint and Larastan (level 5) clean.

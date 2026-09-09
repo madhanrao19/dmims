@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Concerns\HasBarcodeAction;
 use App\Filament\Pages\BarcodeScanner;
 use App\Filament\Resources\BoxResource\Pages;
+use App\Filament\Resources\BoxResource\RelationManagers;
 use App\Http\Middleware\EnsureModuleEnabled;
 use App\Models\Box;
 use App\Models\Location;
@@ -16,7 +17,6 @@ use Filament\Actions\EditAction;
 use Filament\Forms;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
-use Filament\Resources\Pages\Page;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
@@ -382,18 +382,18 @@ class BoxResource extends BaseResource
     }
 
     /**
-     * Box detail page tab bar — Documents Inside / Box Movement Log / Box
-     * Audit Log, requested by the demo-readiness review (Sep 2026). Same
-     * shape as CustomerResource::getRecordSubNavigation().
+     * Box View tabs — Documents in this Box / Physical Movement History /
+     * System Activity Log render inline on the same page (Filament's
+     * standard RelationManager tab strip), not as separate sub-navigation
+     * pages — matches the demo-readiness UI/UX request (Sep 2026).
      */
-    public static function getRecordSubNavigation(Page $page): array
+    public static function getRelations(): array
     {
-        return $page->generateNavigationItems([
-            Pages\ViewBox::class,
-            Pages\Documents::class,
-            Pages\MovementLog::class,
-            Pages\AuditLog::class,
-        ]);
+        return [
+            RelationManagers\DocumentFilesRelationManager::class,
+            RelationManagers\MovementLogRelationManager::class,
+            RelationManagers\AuditLogRelationManager::class,
+        ];
     }
 
     public static function getPages(): array
@@ -403,9 +403,6 @@ class BoxResource extends BaseResource
             'create' => Pages\CreateBox::route('/create'),
             'view' => Pages\ViewBox::route('/{record}'),
             'edit' => Pages\EditBox::route('/{record}/edit'),
-            'documents' => Pages\Documents::route('/{record}/documents'),
-            'movements' => Pages\MovementLog::route('/{record}/movements'),
-            'audit-log' => Pages\AuditLog::route('/{record}/audit-log'),
         ];
     }
 
