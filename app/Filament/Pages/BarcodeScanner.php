@@ -239,24 +239,12 @@ class BarcodeScanner extends Page implements HasForms
             return;
         }
 
-        $service = app(DocumentMovementService::class);
-
-        // A dispatched file also has current_box_id === null (moveOutFile()
-        // clears it), identical to a never-boxed file — current_status is
-        // the only thing that tells them apart. Routing a dispatched file
-        // through receiveInFile() instead of returnFile() would log it as a
-        // fresh 'create' and never set returned_at, silently losing the
-        // fact that it was ever sent out.
-        if ($file->current_status === 'moved_out') {
-            $service->returnFile($file, $box->id);
-        } elseif ($file->current_box_id === null) {
-            $service->receiveInFile($file, $box->id);
-        } elseif ($file->current_box_id !== $box->id) {
-            $service->transferFile($file, $box->id);
-        }
+        $changed = app(DocumentMovementService::class)->assignFileToBox($file, $box);
 
         Notification::make()
-            ->title("Added to box {$box->box_number}: {$file->file_barcode}")
+            ->title($changed
+                ? "Added to box {$box->box_number}: {$file->file_barcode}"
+                : "Already in box {$box->box_number}: {$file->file_barcode}")
             ->success()
             ->send();
     }

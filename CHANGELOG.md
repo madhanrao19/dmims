@@ -68,6 +68,31 @@ Transfer/Move Out/Return from either View page), and that a
 malicious/HTML barcode value passed through the quick-create query param
 is never rendered unsafely.
 
+### Added — Tag management, inline box scanning, and staging demo-data seeding
+
+- **Tag management UI**: new `TagResource` (Document Tracking group) for
+  creating/editing/listing the `Tag` model that document files and boxes
+  already supported tagging against. Fixed a bug found while adding it:
+  `Tag` was missing the `customer()` relationship every other tenant-scoped
+  model defines, which 500'd the create form's customer picker for
+  platform users.
+- **Inline "Add Document Mode" on the Box view page**: an operator can now
+  toggle scanning on and scan Document File barcodes directly from a box's
+  Overview tab instead of only via the separate Scan Center.
+  `DocumentMovementService::assignFileToBox()` centralizes the
+  return/receive/transfer routing decision (previously duplicated in
+  `BarcodeScanner`) so both entry points share one implementation.
+- **`DemoScenariosSeeder`** (staging only, gated the same way as
+  `QASampleUsersSeeder`): seeds an isolated demo tenant, locations, boxes
+  and files for the 5-scenario client demo script. See
+  `docs/DEMO_SCENARIO_DATA.md`.
+- **Staging seeding no longer uses well-known passwords**: `QASampleUsersSeeder`
+  now runs on `staging` (previously local/testing only) but requires
+  `DMIMS_QA_PASSWORD` (≥12 chars) there instead of falling back to the
+  local-only default of `"password"`; `DemoScenariosSeeder` requires
+  `DMIMS_DEMO_PASSWORD` the same way. `deploy-ubuntu-24.sh` gained a
+  matching `--seed-demo-scenarios` flag, refused outside `--env staging`.
+
 ### Added — Box and Document File detail pages, "Add Document Mode" scanning, and demo-readiness fixes
 
 Marketing tested DMIMS ahead of a customer demo and filed 4 High-priority

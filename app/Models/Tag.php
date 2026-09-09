@@ -12,6 +12,11 @@ class Tag extends Model
 
     protected $fillable = ['customer_id', 'name', 'color'];
 
+    public function customer()
+    {
+        return $this->belongsTo(Customer::class);
+    }
+
     public function documentFiles()
     {
         return $this->morphedByMany(DocumentFile::class, 'taggable');

@@ -310,4 +310,108 @@ class DemoCorrectionPassTest extends TestCase
         $response->assertOk();
         $response->assertDontSee('<script>alert(1)</script>', false);
     }
+
+    private function registerBarcode(DocumentFile $file): void
+    {
+        BarcodeRegistry::create([
+            'customer_id' => $this->customer->id,
+            'barcode' => $file->file_barcode,
+            'barcode_type' => 'document_file',
+            'reference_table' => 'document_files',
+            'reference_id' => $file->id,
+            'status' => 'active',
+        ]);
+    }
+
+    public function test_add_document_mode_off_ignores_scans(): void
+    {
+        $this->platformAdmin();
+        $box = $this->box('B1');
+        $file = DocumentFile::create(['customer_id' => $this->customer->id, 'file_barcode' => 'FBC-OFF', 'title' => 'Contract', 'current_status' => 'active']);
+        $this->registerBarcode($file);
+
+        Livewire::test(ViewBox::class, ['record' => $box->id])
+            ->assertSet('addDocumentMode', false)
+            ->set('scannedFileBarcode', 'FBC-OFF')
+            ->call('scanDocument');
+
+        $this->assertNull($file->fresh()->current_box_id);
+    }
+
+    public function test_add_document_mode_assigns_an_unboxed_file(): void
+    {
+        $this->platformAdmin();
+        $box = $this->box('B1');
+        $file = DocumentFile::create(['customer_id' => $this->customer->id, 'file_barcode' => 'FBC-NEW', 'title' => 'Contract', 'current_status' => 'active']);
+        $this->registerBarcode($file);
+
+        Livewire::test(ViewBox::class, ['record' => $box->id])
+            ->set('addDocumentMode', true)
+            ->set('scannedFileBarcode', 'FBC-NEW')
+            ->call('scanDocument');
+
+        $this->assertSame($box->id, $file->fresh()->current_box_id);
+        $this->assertDatabaseHas('document_movement_logs', [
+            'movable_type' => 'document_file',
+            'movable_id' => $file->id,
+            'action_type' => 'create',
+            'to_box_id' => $box->id,
+        ]);
+    }
+
+    public function test_add_document_mode_transfers_a_file_from_another_box(): void
+    {
+        $this->platformAdmin();
+        $originalBox = $this->box('B1');
+        $newBox = $this->box('B2');
+        $file = DocumentFile::create(['customer_id' => $this->customer->id, 'file_barcode' => 'FBC-XFER', 'title' => 'Contract', 'current_status' => 'active', 'current_box_id' => $originalBox->id]);
+        $this->registerBarcode($file);
+
+        Livewire::test(ViewBox::class, ['record' => $newBox->id])
+            ->set('addDocumentMode', true)
+            ->set('scannedFileBarcode', 'FBC-XFER')
+            ->call('scanDocument');
+
+        $this->assertSame($newBox->id, $file->fresh()->current_box_id);
+    }
+
+    public function test_add_document_mode_returns_a_dispatched_file(): void
+    {
+        $this->platformAdmin();
+        $originalBox = $this->box('B1');
+        $newBox = $this->box('B2');
+        $file = DocumentFile::create(['customer_id' => $this->customer->id, 'file_barcode' => 'FBC-DISP', 'title' => 'Contract', 'current_status' => 'active', 'current_box_id' => $originalBox->id]);
+        app(DocumentMovementService::class)->moveOutFile($file, 'Client office');
+        $file->refresh();
+        $this->registerBarcode($file);
+
+        Livewire::test(ViewBox::class, ['record' => $newBox->id])
+            ->set('addDocumentMode', true)
+            ->set('scannedFileBarcode', 'FBC-DISP')
+            ->call('scanDocument');
+
+        $file->refresh();
+        $this->assertSame($newBox->id, $file->current_box_id);
+        $this->assertSame('active', $file->current_status);
+        $this->assertNotNull($file->returned_at);
+    }
+
+    public function test_viewer_cannot_use_add_document_mode_toggle(): void
+    {
+        // Viewer holds 'view documents' but not 'manage documents' — the
+        // toggle's own visible() gate and scanDocument()'s re-check must
+        // both refuse a Viewer, mirroring the header actions' authorization.
+        $user = $this->tenantUser('Viewer');
+        $box = $this->box('B1');
+        $file = DocumentFile::create(['customer_id' => $this->customer->id, 'file_barcode' => 'FBC-VWR', 'title' => 'Contract', 'current_status' => 'active']);
+        $this->registerBarcode($file);
+
+        Livewire::actingAs($user)
+            ->test(ViewBox::class, ['record' => $box->id])
+            ->set('addDocumentMode', true)
+            ->set('scannedFileBarcode', 'FBC-VWR')
+            ->call('scanDocument');
+
+        $this->assertNull($file->fresh()->current_box_id);
+    }
 }

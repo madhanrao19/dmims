@@ -43,7 +43,7 @@ class BarcodeRegistryResource extends BaseResource
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-qr-code';
 
-    protected static ?string $navigationLabel = 'Barcode Center';
+    protected static ?string $navigationLabel = 'Barcodes';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Shared Services';
 

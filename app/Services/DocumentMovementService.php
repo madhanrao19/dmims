@@ -110,6 +110,35 @@ class DocumentMovementService
     }
 
     /**
+     * Assign a scanned/selected Document File into a Box, choosing
+     * return/receive/transfer by the file's current state. Shared by the
+     * Scan Center's Add Document Mode and the Box view page's inline
+     * toggle so this decision logic (including the dispatched-file nuance
+     * — moveOutFile() clears current_box_id, identical to a never-boxed
+     * file, so current_status is checked first) lives in one place.
+     *
+     * @return bool whether anything actually changed (false = already in this box)
+     */
+    public function assignFileToBox(DocumentFile $file, Box $box): bool
+    {
+        $this->assertSameCustomer($file, $box);
+
+        if ($file->current_status !== 'moved_out' && $file->current_box_id === $box->id) {
+            return false;
+        }
+
+        if ($file->current_status === 'moved_out') {
+            $this->returnFile($file, $box->id);
+        } elseif ($file->current_box_id === null) {
+            $this->receiveInFile($file, $box->id);
+        } else {
+            $this->transferFile($file, $box->id);
+        }
+
+        return true;
+    }
+
+    /**
      * Keep Box.current_file_count derived from actual file movements instead
      * of relying on manual edits, which drift from reality.
      */
@@ -216,7 +245,7 @@ class DocumentMovementService
      * chokepoint every move-a-file/move-a-box operation routes through, so
      * the check lives here rather than duplicated at every Filament action.
      */
-    private function assertSameCustomer(DocumentFile|Box $subject, Box|Location $target): void
+    protected function assertSameCustomer(DocumentFile|Box $subject, Box|Location $target): void
     {
         if ($subject->customer_id !== $target->customer_id) {
             throw new InvalidArgumentException('Cannot move between different customers.');

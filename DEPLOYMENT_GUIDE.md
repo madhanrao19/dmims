@@ -20,16 +20,20 @@ different `--repo-dir` / `--domain` / `--db-*` values and an explicit `--env sta
 `--env production` flag. The flag does two things:
 
 1. Sets `APP_ENV` in `.env` to match.
-2. Gates test data: `--seed-qa-users` (which seeds the `QASampleUsersSeeder` demo/QA accounts) is
-   **only accepted with `--env staging`** — the script refuses it outright with `--env production`,
+2. Gates test data: `--seed-qa-users` (`QASampleUsersSeeder`) and `--seed-demo-scenarios`
+   (`DemoScenariosSeeder`, the client-demo dataset — see `docs/DEMO_SCENARIO_DATA.md`) are **only
+   accepted with `--env staging`** — the script refuses both outright with `--env production`,
    twice over (once at argument parsing, once again inside the seeding step). There is no flag,
    override, or manual step that puts QA sample accounts or demo data on the production database.
+   Both require an env var to be exported first (`DMIMS_QA_PASSWORD` / `DMIMS_DEMO_PASSWORD`,
+   ≥12 characters) — staging is reachable over the public internet, so neither seeder will fall
+   back to a well-known default password there.
 
 Never run the bare `php artisan db:seed` (no `--class`) against staging or production — it invokes
 `DatabaseSeeder`, which creates a demo customer and an `admin@example.com` / `password` login
 intended for local evaluation only. Both the script and this guide only ever call the specific
 `RolesAndPermissionsSeeder` (safe everywhere, no demo data) and, on staging only,
-`QASampleUsersSeeder`.
+`QASampleUsersSeeder` / `DemoScenariosSeeder`.
 
 ---
 
@@ -48,13 +52,18 @@ sudo ./deploy-ubuntu-24.sh --env production \
   --admin-email dm_it@datamationgroup.com
 
 # Staging (separate directory, domain and database from production;
-# --seed-qa-users is only valid here)
-sudo ./deploy-ubuntu-24.sh --env staging \
+# --seed-qa-users / --seed-demo-scenarios are only valid here)
+export DMIMS_QA_PASSWORD='choose-a-strong-staging-password'
+export DMIMS_DEMO_PASSWORD='choose-a-different-strong-password'
+sudo -E ./deploy-ubuntu-24.sh --env staging \
   --repo-dir /var/www/dmims-staging --repo-url https://github.com/your-org/dmims.git \
   --domain staging.your-domain.com \
   --db-database dmims_staging --db-username dmims_user --db-password 'your_secure_password' \
-  --admin-email dm_it@datamationgroup.com --seed-qa-users
+  --admin-email dm_it@datamationgroup.com --seed-qa-users --seed-demo-scenarios
 ```
+
+> `sudo -E` preserves the exported `DMIMS_QA_PASSWORD`/`DMIMS_DEMO_PASSWORD` env vars into the
+> root shell the script runs in — plain `sudo` would drop them and both seeders would refuse to run.
 
 Run `sudo ./deploy-ubuntu-24.sh --help` for the full option list (branch selection, skipping
 Apache/queue/tunnel setup, admin password, etc.). Everything in Parts 1–10 below documents what
@@ -291,9 +300,19 @@ sudo -u appuser php artisan migrate --force
 # Safe on every environment, including production.
 sudo -u appuser php artisan db:seed --class=RolesAndPermissionsSeeder --force
 
-# STAGING ONLY: seed the QA sample accounts (one per role, password
-# "password" — see QASampleUsersSeeder). Never run this on production.
-sudo -u appuser php artisan db:seed --class=QASampleUsersSeeder --force
+# STAGING ONLY: seed the QA sample accounts (one per role). Never run this
+# on production. On staging the "password" default QASampleUsersSeeder uses
+# on local/testing is refused (staging is reachable over the public
+# internet) — pass a real password via DMIMS_QA_PASSWORD instead. `sudo -u`
+# does not forward a plain `export`ed var, so pass it through `env`:
+sudo -u appuser env DMIMS_QA_PASSWORD='choose-a-strong-staging-password' \
+  php artisan db:seed --class=QASampleUsersSeeder --force
+
+# STAGING ONLY: seed the client-demo dataset for the live demo walkthrough
+# (DemoScenariosSeeder — see docs/DEMO_SCENARIO_DATA.md for what gets
+# created and how to run each scenario against it). Never run on production.
+sudo -u appuser env DMIMS_DEMO_PASSWORD='choose-a-different-strong-password' \
+  php artisan db:seed --class=DemoScenariosSeeder --force
 
 # Create the first platform administrator (prompts for a password if omitted).
 # Datamation's standard default platform admin identity is
@@ -309,8 +328,10 @@ sudo -u appuser php artisan dmims:create-admin dm_it@datamationgroup.com --name=
 > `admin@example.com` / `password` login. That is for local evaluation only and
 > must never exist on staging or production — always specify `--class` as
 > shown above. `deploy-ubuntu-24.sh` enforces this: it only ever calls
-> `RolesAndPermissionsSeeder`, and `QASampleUsersSeeder` only when both
-> `--seed-qa-users` and `--env staging` are given (refused otherwise).
+> `RolesAndPermissionsSeeder`, `QASampleUsersSeeder` only when both
+> `--seed-qa-users` and `--env staging` are given, and `DemoScenariosSeeder`
+> only when both `--seed-demo-scenarios` and `--env staging` are given
+> (refused otherwise).
 
 > Database backups can be taken from the admin panel (Platform → Backups → "Run Database Backup")
 > or scheduled via the cron job in Part 13. Ensure the `mysqldump` and `mysql`

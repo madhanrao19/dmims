@@ -41,6 +41,7 @@ DB_PASSWORD=""
 ADMIN_EMAIL=""
 ADMIN_PASSWORD=""
 SEED_QA_USERS="false"
+SEED_DEMO_SCENARIOS="false"
 SKIP_APACHE="false"
 SKIP_QUEUE="false"
 SKIP_TUNNEL="false"
@@ -71,7 +72,12 @@ Options:
   --seed-qa-users       Seed the QA sample accounts (QASampleUsersSeeder).
                         Only allowed with --env staging — refused outright on
                         --env production so dev/test accounts can never land
-                        on a production database.
+                        on a production database. Requires DMIMS_QA_PASSWORD
+                        to be exported first (>=12 characters).
+  --seed-demo-scenarios Seed the client-demo dataset (DemoScenariosSeeder).
+                        Only allowed with --env staging, same as
+                        --seed-qa-users. Requires DMIMS_DEMO_PASSWORD to be
+                        exported first (>=12 characters).
   --skip-apache         Do not configure Apache
   --skip-queue          Do not configure queue worker service
   --skip-tunnel         Do not install/configure cloudflared
@@ -95,6 +101,7 @@ while [[ $# -gt 0 ]]; do
     --admin-email) ADMIN_EMAIL="$2"; shift 2 ;;
     --admin-password) ADMIN_PASSWORD="$2"; shift 2 ;;
     --seed-qa-users) SEED_QA_USERS="true"; shift ;;
+    --seed-demo-scenarios) SEED_DEMO_SCENARIOS="true"; shift ;;
     --skip-apache) SKIP_APACHE="true"; shift ;;
     --skip-queue) SKIP_QUEUE="true"; shift ;;
     --skip-tunnel) SKIP_TUNNEL="true"; shift ;;
@@ -123,6 +130,12 @@ fi
 if [[ "$SEED_QA_USERS" == "true" && "$ENVIRONMENT" == "production" ]]; then
   echo "ERROR: --seed-qa-users is not allowed with --env production. QA sample" >&2
   echo "accounts and demo/test data must never be seeded into production." >&2
+  exit 1
+fi
+
+if [[ "$SEED_DEMO_SCENARIOS" == "true" && "$ENVIRONMENT" == "production" ]]; then
+  echo "ERROR: --seed-demo-scenarios is not allowed with --env production. Demo" >&2
+  echo "accounts and data must never be seeded into production." >&2
   exit 1
 fi
 
@@ -258,6 +271,21 @@ function seed_database() {
     fi
     echo "Seeding QA sample users (staging only)..."
     php artisan db:seed --class=QASampleUsersSeeder --force
+  fi
+
+  if [[ "$SEED_DEMO_SCENARIOS" == "true" ]]; then
+    # Guarded again here, not just at the top of the script: this function
+    # must refuse to run demo seeding on production even if called directly.
+    if [[ "$ENVIRONMENT" != "staging" ]]; then
+      echo "ERROR: refusing to seed demo scenarios outside --env staging." >&2
+      exit 1
+    fi
+    if [[ -z "${DMIMS_DEMO_PASSWORD:-}" ]]; then
+      echo "ERROR: DMIMS_DEMO_PASSWORD must be exported before --seed-demo-scenarios." >&2
+      exit 1
+    fi
+    echo "Seeding demo scenario data (staging only)..."
+    php artisan db:seed --class=DemoScenariosSeeder --force
   fi
 }
 
