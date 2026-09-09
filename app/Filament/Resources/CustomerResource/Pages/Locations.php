@@ -39,7 +39,13 @@ class Locations extends Page implements HasTable
 
     public function table(Table $table): Table
     {
+        $customerId = $this->getRecord()->getKey();
+
         return $this->customerScopedResourceTable($table)
-            ->headerActions([$this->customerScopedCreateAction('Add Location')]);
+            ->headerActions([
+                $this->customerScopedCreateAction('Add Location'),
+                LocationResource::createChainAction($customerId),
+                LocationResource::batchGenerateAction($customerId),
+            ]);
     }
 }

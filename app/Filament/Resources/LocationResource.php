@@ -210,8 +210,14 @@ class LocationResource extends BaseResource
      * nothing partially created. Every row goes through Location::create()
      * (never a raw insert/upsert), which keeps the parent-cycle/cross-tenant
      * guard in Location::booted() active.
+     *
+     * $lockedCustomerId: set when embedded in Customer 360's Locations tab
+     * (CustomerResource\Pages\Locations) — same lock-not-hide-then-force
+     * pattern as HasCustomerScopedEmbeddedTable::customerScopedCreateAction(),
+     * so this bulk action can't be used to create locations under a
+     * different, browser-selected customer.
      */
-    protected static function createChainAction(): Action
+    public static function createChainAction(?int $lockedCustomerId = null): Action
     {
         return Action::make('createChain')
             ->label('Location Chain Builder')
@@ -219,7 +225,7 @@ class LocationResource extends BaseResource
             ->authorize(fn (): bool => static::can('create'))
             ->slideOver()
             ->schema([
-                static::customerIdField(),
+                $lockedCustomerId ? Forms\Components\Hidden::make('customer_id')->default($lockedCustomerId) : static::customerIdField(),
                 Forms\Components\Select::make('starting_parent_id')
                     ->label('Starting Parent (optional)')
                     ->options(fn (): array => Location::ancestryPathMap())
@@ -246,8 +252,8 @@ class LocationResource extends BaseResource
                     ])
                     ->helperText('Add one row per level, top to bottom — e.g. Warehouse -> Building -> Rack.'),
             ])
-            ->action(function (array $data): void {
-                $customerId = $data['customer_id'] ?? auth()->user()?->customer_id;
+            ->action(function (array $data) use ($lockedCustomerId): void {
+                $customerId = $lockedCustomerId ?? $data['customer_id'] ?? auth()->user()?->customer_id;
 
                 try {
                     DB::transaction(function () use ($data, $customerId): void {
@@ -293,15 +299,17 @@ class LocationResource extends BaseResource
      * counted, matching the pattern; the whole range still runs inside one
      * DB::transaction() so an unexpected mid-loop failure rolls back
      * cleanly instead of leaving a partial batch.
+     *
+     * $lockedCustomerId: see createChainAction()'s doc-comment — same lock.
      */
-    protected static function batchGenerateAction(): Action
+    public static function batchGenerateAction(?int $lockedCustomerId = null): Action
     {
         return Action::make('batchGenerate')
             ->label('Batch Generate')
             ->icon('heroicon-o-squares-plus')
             ->authorize(fn (): bool => static::can('create'))
             ->schema([
-                static::customerIdField(),
+                $lockedCustomerId ? Forms\Components\Hidden::make('customer_id')->default($lockedCustomerId) : static::customerIdField(),
                 Forms\Components\Select::make('parent_id')
                     ->label('Parent Location')
                     ->options(fn (): array => Location::ancestryPathMap())
@@ -328,8 +336,8 @@ class LocationResource extends BaseResource
                         },
                     ]),
             ])
-            ->action(function (array $data): void {
-                $customerId = $data['customer_id'] ?? auth()->user()?->customer_id;
+            ->action(function (array $data) use ($lockedCustomerId): void {
+                $customerId = $lockedCustomerId ?? $data['customer_id'] ?? auth()->user()?->customer_id;
                 $created = 0;
                 $skipped = 0;
 

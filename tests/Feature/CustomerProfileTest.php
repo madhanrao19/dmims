@@ -25,6 +25,7 @@ use App\Models\CustomerModule;
 use App\Models\CustomerSubscription;
 use App\Models\License;
 use App\Models\Location;
+use App\Models\LocationType;
 use App\Models\Module;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -228,6 +229,50 @@ class CustomerProfileTest extends TestCase
             $this->assertNotNull($created, "{$page} should have created a {$modelClass} record");
             $this->assertSame($customer->id, $created->customer_id, "{$page} must force customer_id to the selected customer, not the tampered value submitted for {$modelClass}");
         }
+    }
+
+    /**
+     * Location Chain Builder and Batch Generate, embedded on Customer 360's
+     * Locations tab (LocationResource::createChainAction()/
+     * batchGenerateAction() called with $lockedCustomerId), must be as
+     * tamper-resistant as the plain "Add Location" create action above —
+     * a submitted customer_id must never override the tab's own customer.
+     */
+    public function test_customer_360_bulk_location_actions_lock_the_customer(): void
+    {
+        $customer = Customer::create(['company_name' => 'Alpha', 'company_code' => 'ALP', 'status' => 'active']);
+        $otherCustomer = Customer::create(['company_name' => 'Beta', 'company_code' => 'BET', 'status' => 'active']);
+        $this->actingAs($this->platformSuperAdmin());
+
+        $buildingTypeId = LocationType::where('type_code', 'building')->value('id');
+
+        Livewire::test(Locations::class, ['record' => $customer->getKey()])
+            ->callTableAction('createChain', data: [
+                'customer_id' => $otherCustomer->getKey(),
+                'levels' => [
+                    ['location_type_id' => $buildingTypeId, 'location_code' => 'CHAIN-A', 'location_name' => 'Chain A', 'barcode' => null],
+                ],
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $chained = Location::where('location_code', 'CHAIN-A')->first();
+        $this->assertNotNull($chained);
+        $this->assertSame($customer->id, $chained->customer_id, 'createChain must force customer_id to the tab\'s own customer');
+
+        Livewire::test(Locations::class, ['record' => $customer->getKey()])
+            ->callTableAction('batchGenerate', data: [
+                'customer_id' => $otherCustomer->getKey(),
+                'location_type_id' => $buildingTypeId,
+                'code_prefix' => 'BATCH-',
+                'name_prefix' => 'Batch ',
+                'start_number' => 1,
+                'end_number' => 2,
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $batched = Location::where('location_code', 'BATCH-01')->first();
+        $this->assertNotNull($batched);
+        $this->assertSame($customer->id, $batched->customer_id, 'batchGenerate must force customer_id to the tab\'s own customer');
     }
 
     /**

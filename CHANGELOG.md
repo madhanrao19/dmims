@@ -6,6 +6,23 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — Location Chain Builder and Batch Generate now available on Customer 360's Locations tab
+
+Both bulk-create actions previously only lived on the main `/admin/locations` list page's
+header. The Customer 360 → Locations tab (`CustomerResource\Pages\Locations`, embedding
+`LocationResource`'s table scoped to one customer) only ever exposed a single-row "Add
+Location" create action, which looked like a stale/missing deployment to a platform user
+building out a customer's hierarchy from that tab. `LocationResource::createChainAction()`/
+`batchGenerateAction()` now take an optional `$lockedCustomerId` — when set, the
+`customer_id` field is replaced with a `Hidden` fixed to that customer (not just visually
+hidden — the action closure also force-overwrites `$customerId` from the parameter,
+ignoring anything submitted), the same lock-not-hide-then-force pattern already used by
+`HasCustomerScopedEmbeddedTable::customerScopedCreateAction()`. The main Locations page's
+own `table()` is unaffected (calls both with no argument, unlocked). New test
+`CustomerProfileTest::test_customer_360_bulk_location_actions_lock_the_customer` confirms a
+tampered `customer_id` in the submitted data can't redirect either action to a different
+customer. 284 tests passing (was 283); Pint and Larastan (level 5) clean.
+
 ### Fixed — Location Chain Builder chain depth was silently truncated past 10 levels
 
 The Repeater itself already had no row cap (`+ Add Level` was always unlimited — the
