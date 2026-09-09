@@ -890,3 +890,59 @@ saving), Box Audit Log file identification, Location Audit Log tenant
 isolation, RBAC on the new header actions, and safe handling of a
 malicious barcode value through the quick-create query param. Full suite:
 236/236 passing.
+
+## 17. Review of a Parallel Codex Session's Barcode Work — 9 September 2026
+
+A separate, uncommitted local checkout (`DMIMS-CODEX`, one commit behind
+`main`) contained another AI agent's large, unreviewed rewrite of the
+barcode/movement subsystem (label pre-printing/reservation, a global
+`unique(barcode)` constraint, capacity-aware move validation, a
+scan-to-destination picker, print/retire/replace actions). Reviewed in
+full for genuinely portable fixes rather than adopted wholesale.
+
+**✅ Fixed (9 September 2026):**
+- **`Box.current_file_count` drift** — `DocumentMovementService::adjustBoxFileCount()`
+  applied a `+1`/`-1` delta; any write path that ever bypassed the service
+  left the count permanently wrong. Now recomputed from `files()->count()`
+  on every move — self-healing.
+- **Location hierarchy integrity** — nothing validated `parent_id` beyond
+  the FK existing, so a Location could become its own ancestor (infinite
+  loop risk in `getAncestryPathAttribute()`) or be reparented into another
+  customer's tree. `Location::booted()` now cancels a `parent_id` change
+  that would create either. New `tests/Feature/LocationHierarchyTest.php`.
+- **Accessibility** — Box view page's "Add Document Mode" checkbox gained
+  `role="switch"` / `aria-label`.
+
+**Investigated, found already correct:** the Codex diff's rationale for
+hardening `CreateRecord`/`EditRecord` claimed `current_location_id`/
+`current_box_id` being `disabled()` on Edit (§16) was client-side only and
+bypassable via a crafted Livewire request. Traced through
+`vendor/filament/schemas/src/Components/Concerns/HasState.php::dehydrateState()`:
+a non-dehydrated field's key is stripped from the state array server-side,
+per the field's own definition, before `mutateFormDataBeforeSave()` ever
+runs — not based on client-supplied state. No change needed.
+
+**⚠️ New gap found, not yet fixed (needs a decision):**
+`DocumentFileResource`'s `current_status` and `BoxResource`'s `status`
+fields are freely editable on Edit — unlike their sibling
+`current_box_id`/`current_location_id`. Setting `current_status` to
+`'moved_out'` (or back to `'active'`) directly via Edit bypasses Move
+Out/Return and leaves `current_box_id` stale, reproducing §16's
+dispatched-file bug via a different path. Can't simply lock the field:
+`damaged`/`missing`/`archived`/`closed` have no dedicated action and are
+only reachable through this Select today. Needs either a narrower guard
+(reject only the `moved_out`/`active` transitions on direct edit) or
+dedicated status-change actions — deferred pending that decision.
+
+**Deliberately not ported:** barcode pre-printing/reservation + global
+uniqueness constraint (needs a duplicate-barcode data check and a
+tenant-policy decision on global vs. per-customer uniqueness first — see
+`docs/DMIMS Database Dictionary.md` for the current per-customer model);
+box/location capacity enforcement during moves (`capacity_limit`/
+`box_capacity` exist but nothing reads them at move time — real gap,
+large change, best done incrementally); a scan-to-destination picker
+built on non-public Livewire internals (`$wire.__instance`) — flagged as
+a maintenance risk, not ported without a safer implementation.
+
+**Regression tests:** `tests/Feature/LocationHierarchyTest.php` (2 new
+tests). Full suite: 254/254 passing; Pint and Larastan (level 5) clean.

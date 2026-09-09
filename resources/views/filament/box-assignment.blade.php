@@ -1,7 +1,7 @@
 <x-filament::section heading="Add Document Mode">
     <div class="space-y-4">
         <label class="flex items-center gap-2">
-            <input type="checkbox" wire:model.live="addDocumentMode" class="fi-checkbox-input rounded" />
+            <input type="checkbox" role="switch" aria-label="Add Document Mode" wire:model.live="addDocumentMode" class="fi-checkbox-input rounded" />
             <span class="text-sm font-medium">Toggle ON, then scan each Document File barcode to add it to this box.</span>
         </label>
 

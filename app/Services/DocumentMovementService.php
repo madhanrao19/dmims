@@ -33,7 +33,7 @@ class DocumentMovementService
             ]));
 
             $file->update(['current_box_id' => $toBoxId, 'current_status' => 'active']);
-            $this->adjustBoxFileCount($toBoxId, 1);
+            $this->adjustBoxFileCount($toBoxId);
             $this->logFileLinkage($toBoxId, $file, 'file_linked');
 
             return $log;
@@ -53,8 +53,8 @@ class DocumentMovementService
             ]));
 
             $file->update(['current_box_id' => $toBoxId, 'current_status' => 'active']);
-            $this->adjustBoxFileCount($fromBoxId, -1);
-            $this->adjustBoxFileCount($toBoxId, 1);
+            $this->adjustBoxFileCount($fromBoxId);
+            $this->adjustBoxFileCount($toBoxId);
             $this->logFileLinkage($fromBoxId, $file, 'file_unlinked');
             $this->logFileLinkage($toBoxId, $file, 'file_linked');
 
@@ -83,7 +83,7 @@ class DocumentMovementService
                 'due_date' => $data['due_date'] ?? null,
                 'returned_at' => null,
             ]);
-            $this->adjustBoxFileCount($fromBoxId, -1);
+            $this->adjustBoxFileCount($fromBoxId);
             $this->logFileLinkage($fromBoxId, $file, 'file_unlinked');
 
             return $log;
@@ -102,7 +102,7 @@ class DocumentMovementService
                 'current_status' => 'active',
                 'returned_at' => now(),
             ]);
-            $this->adjustBoxFileCount($toBoxId, 1);
+            $this->adjustBoxFileCount($toBoxId);
             $this->logFileLinkage($toBoxId, $file, 'file_linked');
 
             return $log;
@@ -140,15 +140,18 @@ class DocumentMovementService
 
     /**
      * Keep Box.current_file_count derived from actual file movements instead
-     * of relying on manual edits, which drift from reality.
+     * of relying on manual edits, which drift from reality. Recomputed from
+     * files() membership rather than incremented by $delta, so it self-heals
+     * if any prior write path ever left the count out of sync.
      */
-    protected function adjustBoxFileCount(?int $boxId, int $delta): void
+    protected function adjustBoxFileCount(?int $boxId): void
     {
         if (! $boxId) {
             return;
         }
 
-        Box::whereKey($boxId)->lockForUpdate()->first()?->increment('current_file_count', $delta);
+        $box = Box::whereKey($boxId)->lockForUpdate()->first();
+        $box?->update(['current_file_count' => $box->files()->count()]);
     }
 
     /**

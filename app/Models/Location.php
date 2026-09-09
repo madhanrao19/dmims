@@ -20,6 +20,34 @@ class Location extends Model
         // is never served a stale path from an earlier snapshot.
         static::saved(fn () => static::$ancestryPathCache = []);
         static::deleted(fn () => static::$ancestryPathCache = []);
+
+        // children()/boxes() and getAncestryPathAttribute()'s parent walk
+        // assume a well-formed, single-tenant tree — nothing before this
+        // stopped a parent_id edit from creating a cycle (a location
+        // becoming its own ancestor, infinite-looping the ancestry walk) or
+        // pointing at another customer's location (BelongsToCustomer's
+        // tenant scope only guards customer_id, not parent_id).
+        static::saving(function (self $location): ?bool {
+            if (! $location->isDirty('parent_id') || ! $location->parent_id) {
+                return null;
+            }
+
+            $node = static::withoutGlobalScopes()->find($location->parent_id);
+
+            for ($depth = 0; $node && $depth < 50; $depth++) {
+                if ($node->customer_id !== $location->customer_id) {
+                    return false;
+                }
+
+                if ($location->exists && $node->id === $location->id) {
+                    return false;
+                }
+
+                $node = $node->parent_id ? static::withoutGlobalScopes()->find($node->parent_id) : null;
+            }
+
+            return null;
+        });
     }
 
     protected $fillable = [
