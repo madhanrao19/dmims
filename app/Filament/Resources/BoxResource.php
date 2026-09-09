@@ -194,7 +194,12 @@ class BoxResource extends BaseResource
                             $node = $record->currentLocation;
                             $depth = 0;
 
-                            while ($node && $depth < 10) {
+                            // 50 matches Location::booted()'s own cycle-guard
+                            // walk depth — the Location Chain Builder has no
+                            // row cap, so a real chain should never be this
+                            // deep either; this only bounds a genuinely
+                            // corrupted/cyclic tree.
+                            while ($node && $depth < 50) {
                                 $nodes[] = $node;
                                 $node = $node->parent;
                                 $depth++;

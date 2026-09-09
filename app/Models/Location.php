@@ -186,7 +186,11 @@ class Location extends Model
             $node = $location;
             $depth = 0;
 
-            while ($node && $depth < 10) {
+            // 50 matches booted()'s own cycle-guard walk depth above — high
+            // enough that no real chain (the Location Chain Builder has no
+            // row cap) hits it, only a genuinely corrupted/cyclic tree that
+            // somehow bypassed that guard.
+            while ($node && $depth < 50) {
                 array_unshift($names, $node->location_name);
                 $node = $node->parent_id ? $locations->get($node->parent_id) : null;
                 $depth++;

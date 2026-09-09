@@ -121,4 +121,47 @@ class LocationChainBuilderTest extends TestCase
         // committed either, even though its own code didn't collide.
         $this->assertDatabaseMissing('locations', ['customer_id' => $this->customer->id, 'location_code' => 'BLD-Z']);
     }
+
+    /**
+     * The reference implementation's own sample only shows 6 levels
+     * (Area/Building/Floor/Room/Rack/Shelf) — confirms this app's Repeater
+     * has no row cap and the resulting chain isn't truncated anywhere
+     * downstream (ancestryPathMap()/Box's physical-path breadcrumb both
+     * previously capped ancestor walks at 10, silently cutting off a chain
+     * deeper than that).
+     */
+    public function test_chain_builder_supports_a_chain_deeper_than_the_reference_sample(): void
+    {
+        $this->platformAdmin();
+        $buildingTypeId = $this->buildingType();
+
+        $levels = [];
+        for ($i = 1; $i <= 15; $i++) {
+            $levels[] = [
+                'location_type_id' => $buildingTypeId,
+                'location_code' => "LVL-{$i}",
+                'location_name' => "Level {$i}",
+                'barcode' => null,
+            ];
+        }
+
+        Livewire::test(ListLocations::class)
+            ->callTableAction('createChain', data: [
+                'customer_id' => $this->customer->id,
+                'levels' => $levels,
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $this->assertSame(15, Location::where('customer_id', $this->customer->id)->count());
+
+        $leaf = Location::where('customer_id', $this->customer->id)->where('location_code', 'LVL-15')->firstOrFail();
+        $path = $leaf->ancestry_path;
+
+        // All 15 names present, in order — not truncated to the first 10.
+        for ($i = 1; $i <= 15; $i++) {
+            $this->assertStringContainsString("Level {$i}", $path);
+        }
+        $this->assertLessThan(strpos($path, 'Level 2'), strpos($path, 'Level 1'));
+        $this->assertLessThan(strpos($path, 'Level 15'), strpos($path, 'Level 14'));
+    }
 }

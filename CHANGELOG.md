@@ -6,6 +6,20 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed — Location Chain Builder chain depth was silently truncated past 10 levels
+
+The Repeater itself already had no row cap (`+ Add Level` was always unlimited — the
+reference implementation's own sample only shows 6 levels, this app's had no limit to
+begin with). The actual gap was downstream: `Location::ancestryPathMap()` and
+`BoxResource`'s "Exact Physical Path" breadcrumb both capped their ancestor walk at 10
+levels, so a chain built deeper than that (e.g. Warehouse > Building > Floor > Room >
+Rack > Shelf > Cabinet > ... past 10) would silently show a truncated path in every
+dropdown/breadcrumb that uses them, with no error. Both raised to 50, matching the
+existing `Location::booted()` cycle-guard's own walk depth — high enough that no real
+chain hits it, only a genuinely corrupted/cyclic tree the guard failed to catch. New test
+builds and verifies a 15-level chain (`LocationChainBuilderTest::test_chain_builder_supports_a_chain_deeper_than_the_reference_sample`).
+283 tests passing (was 282); Pint and Larastan (level 5) clean.
+
 ### Changed — Box View: inline tabs and a header Scan Mode toggle (closer match to reference UI/UX)
 
 Follow-up refinement after the first pass below — the user asked for a closer match to
