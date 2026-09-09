@@ -290,6 +290,24 @@ sudo -u appuser php artisan key:generate
 
 ## **PART 6: RUN MIGRATIONS & SEEDERS**
 
+> **First deploy after 9 September 2026 only:** migration
+> `2026_09_09_000000_add_barcode_reservation_support` widens
+> `barcode_registry.status`/`barcode_scan_logs.scan_result` (adds `'unused'`)
+> and makes `barcode_registry.reference_table`/`reference_id` nullable, using
+> Laravel's native `Blueprint::change()` (no `doctrine/dbal` dependency).
+> It was verified against SQLite (the test suite) and a local dev database,
+> but not independently verified against a live MySQL/MariaDB instance
+> before this release — after running `migrate --force` below, confirm it
+> landed correctly:
+> ```bash
+> sudo -u appuser php artisan tinker --execute="print_r(Schema::getColumns('barcode_registry'));"
+> # reference_table / reference_id should show nullable: true
+> ```
+> or check directly in MySQL: `SHOW COLUMNS FROM barcode_registry LIKE 'status';`
+> should list `active,inactive,retired,unused`. The migration is additive and
+> its `down()` refuses to roll back while any `'unused'` rows exist, so it is
+> safe to apply — this is a verification step, not a rollback contingency.
+
 ```bash
 cd /var/www/dmims
 
