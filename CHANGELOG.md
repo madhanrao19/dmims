@@ -6,6 +6,52 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — barcode pre-printing/reservation, box/location capacity enforcement, and status/box desync guard
+
+Fixes the three items deferred in the entry below (per its recommendation, after a
+design pass — see `docs/CONFORMANCE_GAP_ANALYSIS.md` §17 for the full writeup and the
+Explore/Plan-agent research behind each decision):
+
+- **`current_status` (DocumentFile) / `status` (Box) can no longer desync from
+  box/location assignment on Edit**: these fields were freely editable (unlike
+  `current_box_id`/`current_location_id`, which are locked), so setting `current_status`
+  to `'moved_out'`/`'active'` directly reproduced the dispatched-file bug from a
+  different angle. Both Select fields now reject only that specific transition when
+  it doesn't match the record's real box/location assignment — every administrative
+  value (`archived`/`missing`/`damaged`/`closed`, and Box's `closed`/`archived`/
+  `damaged`/`missing`) stays freely editable, since no dedicated action exists for
+  them. 6 new tests in `DemoCorrectionPassTest.php`.
+- **Barcode pre-printing/reservation (MVP)**: `BarcodeService::reserve()` pre-generates
+  N `'unused'` `barcode_registry` rows (no reference yet) for a customer+type;
+  `claim()` attaches one to a newly-created record whose barcode was pre-filled from
+  a reservation, no-op for a manually-typed barcode. Scanning a reserved label now
+  redirects straight to that record type's Create form instead of the generic
+  "unknown barcode" prompt. New "Reserve Labels" header action on Barcode Center. Per-
+  customer barcode uniqueness (this project's existing, deliberate policy — see
+  `2026_08_18_000001_scope_barcode_uniqueness_to_customer.php`) is unchanged; no
+  global uniqueness constraint was added. New migration widens `barcode_registry.status`
+  and `barcode_scan_logs.scan_result` to add `'unused'`, and makes `reference_table`/
+  `reference_id` nullable. 8 new tests across `BarcodeScannerTest.php`,
+  `BarcodeCenterTest.php`, and `ScanCenterTest.php`.
+- **Box/Location capacity limits are now enforced during moves**: `capacity_limit`
+  (Box) / `box_capacity` (Location) were stored and displayed (with over-100% danger
+  coloring) but never read at move time. `DocumentMovementService` now rejects a
+  receive/transfer/return that would exceed the target's limit (`0`/`null` still mean
+  unlimited, matching the existing display accessors). Bundled with this: every
+  `DocumentMovementService` call site in the Filament layer (6 actions/hooks) now
+  catches the resulting `InvalidArgumentException` and shows a danger notification
+  instead of a raw 500 — this also fixes the pre-existing gap where a tenant-mismatch
+  failure (`assertSameCustomer()`) had no exception handling at all. Creating a
+  record directly into an over-capacity box/location still creates the record, just
+  unboxed/unplaced (recoverable via Transfer/Return), rather than silently leaving it
+  in an unlogged, inconsistent state. 8 new tests in `DocumentOperationsTest.php` and
+  `DemoCorrectionPassTest.php`.
+
+273 tests passing (was 267); Pint and Larastan (level 5) clean. Migration verified to
+apply cleanly on both the SQLite test driver and the local dev database (MySQL/staging
+enum-widening behavior relies on Laravel 13's native cross-driver `Blueprint::change()`,
+not independently verified against a live MySQL instance in this pass).
+
 ### Fixed — box file-count drift, Location hierarchy integrity (review of a parallel Codex session's barcode work)
 
 A separate, uncommitted local session (Codex, on an older base commit) had independently

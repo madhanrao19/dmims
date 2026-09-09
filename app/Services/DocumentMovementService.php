@@ -24,7 +24,9 @@ class DocumentMovementService
 
     public function receiveInFile(DocumentFile $file, int $toBoxId, ?string $sourceOrigin = null, array $data = []): DocumentMovementLog
     {
-        $this->assertSameCustomer($file, Box::withoutGlobalScopes()->findOrFail($toBoxId));
+        $toBox = Box::withoutGlobalScopes()->findOrFail($toBoxId);
+        $this->assertSameCustomer($file, $toBox);
+        $this->assertBoxHasCapacity($toBox);
 
         return DB::transaction(function () use ($file, $toBoxId, $sourceOrigin, $data) {
             $log = $this->log($file, 'create', array_merge($data, [
@@ -42,7 +44,9 @@ class DocumentMovementService
 
     public function transferFile(DocumentFile $file, int $toBoxId, array $data = []): DocumentMovementLog
     {
-        $this->assertSameCustomer($file, Box::withoutGlobalScopes()->findOrFail($toBoxId));
+        $toBox = Box::withoutGlobalScopes()->findOrFail($toBoxId);
+        $this->assertSameCustomer($file, $toBox);
+        $this->assertBoxHasCapacity($toBox);
 
         return DB::transaction(function () use ($file, $toBoxId, $data) {
             $fromBoxId = $file->current_box_id;
@@ -92,7 +96,9 @@ class DocumentMovementService
 
     public function returnFile(DocumentFile $file, int $toBoxId, array $data = []): DocumentMovementLog
     {
-        $this->assertSameCustomer($file, Box::withoutGlobalScopes()->findOrFail($toBoxId));
+        $toBox = Box::withoutGlobalScopes()->findOrFail($toBoxId);
+        $this->assertSameCustomer($file, $toBox);
+        $this->assertBoxHasCapacity($toBox);
 
         return DB::transaction(function () use ($file, $toBoxId, $data) {
             $log = $this->log($file, 'return', array_merge($data, ['to_box_id' => $toBoxId]));
@@ -183,7 +189,9 @@ class DocumentMovementService
 
     public function receiveInBox(Box $box, int $toLocationId, ?string $sourceOrigin = null, array $data = []): DocumentMovementLog
     {
-        $this->assertSameCustomer($box, Location::withoutGlobalScopes()->findOrFail($toLocationId));
+        $toLocation = Location::withoutGlobalScopes()->findOrFail($toLocationId);
+        $this->assertSameCustomer($box, $toLocation);
+        $this->assertLocationHasCapacity($toLocation);
 
         return DB::transaction(function () use ($box, $toLocationId, $sourceOrigin, $data) {
             $log = $this->log($box, 'create', array_merge($data, [
@@ -199,7 +207,9 @@ class DocumentMovementService
 
     public function transferBox(Box $box, int $toLocationId, array $data = []): DocumentMovementLog
     {
-        $this->assertSameCustomer($box, Location::withoutGlobalScopes()->findOrFail($toLocationId));
+        $toLocation = Location::withoutGlobalScopes()->findOrFail($toLocationId);
+        $this->assertSameCustomer($box, $toLocation);
+        $this->assertLocationHasCapacity($toLocation);
 
         return DB::transaction(function () use ($box, $toLocationId, $data) {
             $log = $this->log($box, 'transfer_box', array_merge($data, [
@@ -229,7 +239,9 @@ class DocumentMovementService
 
     public function returnBox(Box $box, int $toLocationId, array $data = []): DocumentMovementLog
     {
-        $this->assertSameCustomer($box, Location::withoutGlobalScopes()->findOrFail($toLocationId));
+        $toLocation = Location::withoutGlobalScopes()->findOrFail($toLocationId);
+        $this->assertSameCustomer($box, $toLocation);
+        $this->assertLocationHasCapacity($toLocation);
 
         return DB::transaction(function () use ($box, $toLocationId, $data) {
             $log = $this->log($box, 'return', array_merge($data, ['to_location_id' => $toLocationId]));
@@ -252,6 +264,29 @@ class DocumentMovementService
     {
         if ($subject->customer_id !== $target->customer_id) {
             throw new InvalidArgumentException('Cannot move between different customers.');
+        }
+    }
+
+    /**
+     * capacity_limit is nullable/unset by default — 0 and null both mean
+     * "unlimited", matching Box::getCapacityPercentAttribute()'s existing
+     * falsy check. Only entries (receive/transfer/return) are gated; moving
+     * a file out never needs a capacity check.
+     */
+    protected function assertBoxHasCapacity(Box $box): void
+    {
+        if ($box->capacity_limit && $box->files()->count() >= $box->capacity_limit) {
+            throw new InvalidArgumentException("Box {$box->box_number} is at capacity ({$box->capacity_limit} files).");
+        }
+    }
+
+    /**
+     * Same reasoning as assertBoxHasCapacity(), for Location::box_capacity.
+     */
+    protected function assertLocationHasCapacity(Location $location): void
+    {
+        if ($location->box_capacity && $location->boxes()->count() >= $location->box_capacity) {
+            throw new InvalidArgumentException("Location {$location->ancestry_path} is at capacity ({$location->box_capacity} boxes).");
         }
     }
 

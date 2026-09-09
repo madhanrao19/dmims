@@ -10,6 +10,7 @@ use App\Models\Box;
 use App\Models\Location;
 use App\Services\DocumentMovementService;
 use App\Services\MovementTimelineService;
+use Closure;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Forms;
@@ -20,6 +21,7 @@ use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Validation\Rules\Unique;
+use InvalidArgumentException;
 
 class BoxResource extends BaseResource
 {
@@ -113,7 +115,27 @@ class BoxResource extends BaseResource
                         'missing' => 'Missing',
                     ])
                     ->default('active')
-                    ->required(),
+                    ->required()
+                    // 'active'/'moved_out' are also written by Transfer/Move
+                    // Out/Return (DocumentMovementService) and must stay in
+                    // sync with current_location_id, which is locked on edit
+                    // above — setting either directly here would desync
+                    // them. Every other value (closed/archived/damaged/
+                    // missing) has no dedicated action and must stay freely
+                    // editable here.
+                    ->rule(fn (Get $get, string $operation, ?Box $record): Closure => function (string $attribute, $value, Closure $fail) use ($get, $operation, $record): void {
+                        if ($operation !== 'edit' || $value === $record?->status) {
+                            return;
+                        }
+
+                        if ($value === 'active' && $get('current_location_id') === null) {
+                            $fail('Cannot set Active directly without a location — use Transfer or Return instead.');
+                        }
+
+                        if ($value === 'moved_out' && $get('current_location_id') !== null) {
+                            $fail('Cannot set Moved Out directly while still placed in a location — use Move Out instead.');
+                        }
+                    }),
                 Forms\Components\Select::make('tags')
                     ->relationship('tags', 'name')
                     ->multiple()
@@ -198,7 +220,13 @@ class BoxResource extends BaseResource
                 Forms\Components\Textarea::make('remarks'),
             ])
             ->action(function (Box $record, array $data): void {
-                app(DocumentMovementService::class)->transferBox($record, (int) $data['to_location_id'], $data);
+                try {
+                    app(DocumentMovementService::class)->transferBox($record, (int) $data['to_location_id'], $data);
+                } catch (InvalidArgumentException $e) {
+                    Notification::make()->title('Cannot transfer box')->body($e->getMessage())->danger()->send();
+
+                    return;
+                }
                 Notification::make()->title('Box transferred')->success()->send();
             });
     }
@@ -235,7 +263,13 @@ class BoxResource extends BaseResource
                 Forms\Components\Textarea::make('remarks'),
             ])
             ->action(function (Box $record, array $data): void {
-                app(DocumentMovementService::class)->returnBox($record, (int) $data['to_location_id'], $data);
+                try {
+                    app(DocumentMovementService::class)->returnBox($record, (int) $data['to_location_id'], $data);
+                } catch (InvalidArgumentException $e) {
+                    Notification::make()->title('Cannot return box')->body($e->getMessage())->danger()->send();
+
+                    return;
+                }
                 Notification::make()->title('Box returned')->success()->send();
             });
     }
@@ -310,7 +344,10 @@ use App\Filament\Resources\Pages\CreateRecord;
 use App\Filament\Resources\Pages\EditRecord;
 use App\Filament\Resources\Pages\ListRecords;
 use App\Models\Box;
+use App\Services\BarcodeService;
 use App\Services\DocumentMovementService;
+use Filament\Notifications\Notification;
+use InvalidArgumentException;
 
 class ListBoxes extends ListRecords
 {
@@ -328,11 +365,29 @@ class CreateBox extends CreateRecord
         /** @var Box $record */
         $record = $this->record;
 
-        app(DocumentMovementService::class)->receiveInBox(
-            $record,
-            $record->current_location_id,
-            $record->source_origin,
-        );
+        // Attach a reserved-but-unclaimed barcode if one was pre-filled —
+        // see BarcodeService::claim(). No-op for a manually-typed barcode.
+        app(BarcodeService::class)->claim($record);
+
+        try {
+            app(DocumentMovementService::class)->receiveInBox(
+                $record,
+                $record->current_location_id,
+                $record->source_origin,
+            );
+        } catch (InvalidArgumentException $e) {
+            // The box record itself is already created at this point (this
+            // hook runs post-insert) with current_location_id set from the
+            // raw create form. Since the receive was rejected, no movement
+            // log exists for that placement — clear it the same way
+            // moveOutBox() represents "exists, not currently placed
+            // anywhere" (null location + 'moved_out'), rather than leaving
+            // current_location_id pointing at a location the box was never
+            // actually logged into. Recoverable via Transfer once the
+            // destination has room.
+            $record->update(['current_location_id' => null, 'status' => 'moved_out']);
+            Notification::make()->title('Box created but not placed')->body($e->getMessage())->danger()->send();
+        }
     }
 }
 

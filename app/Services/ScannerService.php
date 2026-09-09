@@ -60,6 +60,10 @@ class ScannerService
 
         $result = match (true) {
             ! $registry => 'unknown',
+            // Distinct from 'inactive' so the caller can redirect to the
+            // matching create form (BarcodeScanner::scan()) instead of
+            // showing a dead-end "barcode is inactive" message.
+            $registry->status === 'unused' => 'unused',
             $registry->status !== 'active' => 'inactive',
             default => 'found',
         };

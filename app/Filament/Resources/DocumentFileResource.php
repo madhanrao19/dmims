@@ -10,6 +10,7 @@ use App\Models\DocumentFile;
 use App\Models\Location;
 use App\Services\DocumentMovementService;
 use App\Services\MovementTimelineService;
+use Closure;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Forms;
@@ -20,6 +21,7 @@ use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Validation\Rules\Unique;
+use InvalidArgumentException;
 
 class DocumentFileResource extends BaseResource
 {
@@ -107,7 +109,28 @@ class DocumentFileResource extends BaseResource
                         'damaged' => 'Damaged',
                         'closed' => 'Closed',
                     ])
-                    ->default('active')->required(),
+                    ->default('active')->required()
+                    // 'active'/'moved_out' are also written by Transfer/Move
+                    // Out/Return (DocumentMovementService) and must stay in
+                    // sync with current_box_id, which is locked on edit above
+                    // — setting either directly here would desync them (e.g.
+                    // 'moved_out' while current_box_id still points at a
+                    // box). Every other value (archived/missing/damaged/
+                    // closed/transferred) has no dedicated action and must
+                    // stay freely editable here.
+                    ->rule(fn (Get $get, string $operation, ?DocumentFile $record): Closure => function (string $attribute, $value, Closure $fail) use ($get, $operation, $record): void {
+                        if ($operation !== 'edit' || $value === $record?->current_status) {
+                            return;
+                        }
+
+                        if ($value === 'active' && $get('current_box_id') === null) {
+                            $fail('Cannot set Active directly without a box — use Transfer or Return instead.');
+                        }
+
+                        if ($value === 'moved_out' && $get('current_box_id') !== null) {
+                            $fail('Cannot set Moved Out directly while still boxed — use Move Out instead.');
+                        }
+                    }),
                 Forms\Components\TextInput::make('source_origin')->maxLength(255),
                 Forms\Components\TextInput::make('destination')->maxLength(255),
                 Forms\Components\DatePicker::make('received_date'),
@@ -237,7 +260,13 @@ class DocumentFileResource extends BaseResource
                 Forms\Components\Textarea::make('remarks'),
             ])
             ->action(function (DocumentFile $record, array $data): void {
-                app(DocumentMovementService::class)->transferFile($record, (int) $data['to_box_id'], $data);
+                try {
+                    app(DocumentMovementService::class)->transferFile($record, (int) $data['to_box_id'], $data);
+                } catch (InvalidArgumentException $e) {
+                    Notification::make()->title('Cannot transfer file')->body($e->getMessage())->danger()->send();
+
+                    return;
+                }
                 Notification::make()->title('File transferred')->success()->send();
             });
     }
@@ -275,7 +304,13 @@ class DocumentFileResource extends BaseResource
                 Forms\Components\Textarea::make('remarks'),
             ])
             ->action(function (DocumentFile $record, array $data): void {
-                app(DocumentMovementService::class)->returnFile($record, (int) $data['to_box_id'], $data);
+                try {
+                    app(DocumentMovementService::class)->returnFile($record, (int) $data['to_box_id'], $data);
+                } catch (InvalidArgumentException $e) {
+                    Notification::make()->title('Cannot return file')->body($e->getMessage())->danger()->send();
+
+                    return;
+                }
                 Notification::make()->title('File returned')->success()->send();
             });
     }
@@ -341,7 +376,10 @@ use App\Filament\Resources\Pages\CreateRecord;
 use App\Filament\Resources\Pages\EditRecord;
 use App\Filament\Resources\Pages\ListRecords;
 use App\Models\DocumentFile;
+use App\Services\BarcodeService;
 use App\Services\DocumentMovementService;
+use Filament\Notifications\Notification;
+use InvalidArgumentException;
 
 class ListDocumentFiles extends ListRecords
 {
@@ -363,10 +401,28 @@ class CreateDocumentFile extends CreateRecord
         /** @var DocumentFile $record */
         $record = $this->record;
 
+        // Attach a reserved-but-unclaimed barcode if one was pre-filled —
+        // see BarcodeService::claim(). No-op for a manually-typed barcode.
+        app(BarcodeService::class)->claim($record);
+
         // A file can now be registered before it's boxed (Current Box is
         // optional) — nothing to log/count until it's actually assigned.
-        if ($record->current_box_id !== null) {
+        if ($record->current_box_id === null) {
+            return;
+        }
+
+        try {
             app(DocumentMovementService::class)->receiveInFile($record, $record->current_box_id);
+        } catch (InvalidArgumentException $e) {
+            // The file record itself is already created (this hook runs
+            // post-insert) with current_box_id set from the raw create
+            // form. Since the receive was rejected, no movement log exists
+            // for that placement — clear it back to unboxed rather than
+            // leaving current_box_id pointing at a box the file was never
+            // actually logged into (the same invariant Edit's current_box_id
+            // lock protects). Recoverable via Transfer once the box has room.
+            $record->update(['current_box_id' => null]);
+            Notification::make()->title('File created but not boxed')->body($e->getMessage())->danger()->send();
         }
     }
 }

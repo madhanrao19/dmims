@@ -3,10 +3,12 @@
 namespace Tests\Feature;
 
 use App\Filament\Pages\BarcodeScanner;
+use App\Filament\Resources\DocumentFileResource;
 use App\Models\BarcodeRegistry;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\BarcodeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -58,6 +60,21 @@ class ScanCenterTest extends TestCase
             ->set('data.barcode', 'PRD-ACM-000001')
             ->call('scan')
             ->assertNoRedirect();
+    }
+
+    public function test_scanning_a_reserved_unused_barcode_redirects_to_its_create_form(): void
+    {
+        $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACM', 'status' => 'active']);
+        $reservation = app(BarcodeService::class)->reserve($customer->id, 'document_file', 1)->first();
+        $platformUser = User::factory()->create(['is_platform_user' => true, 'status' => 'active']);
+
+        Livewire::actingAs($platformUser)
+            ->test(BarcodeScanner::class)
+            ->set('data.barcode', $reservation->barcode)
+            ->call('scan')
+            ->assertRedirect(DocumentFileResource::getUrl('create', ['file_barcode' => $reservation->barcode]));
+
+        $this->assertDatabaseHas('barcode_scan_logs', ['barcode' => $reservation->barcode, 'scan_result' => 'unused']);
     }
 
     public function test_unknown_barcode_shows_smart_detection_prompt(): void

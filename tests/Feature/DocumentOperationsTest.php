@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\DocumentMovementService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use InvalidArgumentException;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -161,6 +162,75 @@ class DocumentOperationsTest extends TestCase
 
         $this->assertSame(2, $shelf->boxes_used_count);
         $this->assertSame(40, $shelf->box_capacity_percent);
+    }
+
+    public function test_receive_in_file_is_rejected_when_box_is_at_capacity(): void
+    {
+        $box = $this->box('CAP1');
+        $box->update(['capacity_limit' => 1]);
+        app(DocumentMovementService::class)->receiveInFile($this->file(), $box->id);
+
+        $secondFile = $this->file();
+        try {
+            app(DocumentMovementService::class)->receiveInFile($secondFile, $box->id);
+            $this->fail('Expected InvalidArgumentException was not thrown.');
+        } catch (InvalidArgumentException) {
+            // expected
+        }
+
+        $this->assertNull($secondFile->fresh()->current_box_id);
+        $this->assertDatabaseMissing('document_movement_logs', ['movable_type' => 'document_file', 'movable_id' => $secondFile->id]);
+    }
+
+    public function test_transfer_file_is_rejected_when_target_box_is_at_capacity(): void
+    {
+        $sourceBox = $this->box('SRC');
+        $fullBox = $this->box('CAP1');
+        $fullBox->update(['capacity_limit' => 1]);
+        app(DocumentMovementService::class)->receiveInFile($this->file(), $fullBox->id);
+
+        $file = $this->file();
+        app(DocumentMovementService::class)->receiveInFile($file, $sourceBox->id);
+
+        $this->expectException(InvalidArgumentException::class);
+        app(DocumentMovementService::class)->transferFile($file->refresh(), $fullBox->id);
+    }
+
+    public function test_receive_in_file_succeeds_when_capacity_limit_is_null_or_zero(): void
+    {
+        $unlimitedBox = $this->box('UNLIM');
+        app(DocumentMovementService::class)->receiveInFile($this->file(), $unlimitedBox->id);
+        app(DocumentMovementService::class)->receiveInFile($this->file(), $unlimitedBox->id);
+        $this->assertSame(2, $unlimitedBox->fresh()->current_file_count);
+
+        $zeroLimitBox = $this->box('ZERO');
+        $zeroLimitBox->update(['capacity_limit' => 0]);
+        app(DocumentMovementService::class)->receiveInFile($this->file(), $zeroLimitBox->id);
+        $this->assertSame(1, $zeroLimitBox->fresh()->current_file_count);
+    }
+
+    public function test_receive_in_box_is_rejected_when_location_is_at_capacity(): void
+    {
+        $shelf = $this->location('SHELF-A');
+        $shelf->update(['box_capacity' => 1]);
+        app(DocumentMovementService::class)->receiveInBox($this->box('A'), $shelf->id);
+
+        $this->expectException(InvalidArgumentException::class);
+        app(DocumentMovementService::class)->receiveInBox($this->box('B'), $shelf->id);
+    }
+
+    public function test_transfer_box_is_rejected_when_target_location_is_at_capacity(): void
+    {
+        $sourceShelf = $this->location('SRC-SHELF');
+        $fullShelf = $this->location('FULL-SHELF');
+        $fullShelf->update(['box_capacity' => 1]);
+        app(DocumentMovementService::class)->receiveInBox($this->box('A'), $fullShelf->id);
+
+        $box = $this->box('B');
+        app(DocumentMovementService::class)->receiveInBox($box, $sourceShelf->id);
+
+        $this->expectException(InvalidArgumentException::class);
+        app(DocumentMovementService::class)->transferBox($box->refresh(), $fullShelf->id);
     }
 
     public function test_move_out_with_due_date_tracks_borrow_and_overdue_state(): void

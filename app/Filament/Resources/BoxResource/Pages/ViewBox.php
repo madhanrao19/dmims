@@ -13,6 +13,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\View as ViewComponent;
 use Filament\Schemas\Schema;
+use InvalidArgumentException;
 
 /**
  * "Overview" tab of the Box detail page. No infolist() override on
@@ -121,7 +122,13 @@ class ViewBox extends ViewRecord
             return;
         }
 
-        $changed = app(DocumentMovementService::class)->assignFileToBox($file, $box);
+        try {
+            $changed = app(DocumentMovementService::class)->assignFileToBox($file, $box);
+        } catch (InvalidArgumentException $e) {
+            Notification::make()->title('Cannot assign file')->body($e->getMessage())->danger()->send();
+
+            return;
+        }
 
         Notification::make()
             ->title($changed

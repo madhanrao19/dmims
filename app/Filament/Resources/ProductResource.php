@@ -63,6 +63,11 @@ class ProductResource extends BaseResource
                     )
                     ->validationMessages(['unique' => 'This SKU is already in use for the selected customer.']),
                 Forms\Components\TextInput::make('barcode')->maxLength(150)
+                    // Carries the scanned code over from the Scan Center's
+                    // "unused barcode → create form" redirect (reserved
+                    // labels) — matches the same prefill pattern already on
+                    // Box/DocumentFile/Location's barcode fields.
+                    ->default(fn (string $operation): ?string => $operation === 'create' ? request()->query('barcode') : null)
                     ->unique(
                         ignoreRecord: true,
                         modifyRuleUsing: fn (Unique $rule, Get $get): Unique => $rule->where('customer_id', $get('customer_id')),
@@ -128,6 +133,7 @@ use App\Filament\Resources\Pages\CreateRecord;
 use App\Filament\Resources\Pages\EditRecord;
 use App\Filament\Resources\Pages\ListRecords;
 use App\Filament\Resources\ProductResource;
+use App\Services\BarcodeService;
 
 class ListProducts extends ListRecords
 {
@@ -137,6 +143,13 @@ class ListProducts extends ListRecords
 class CreateProduct extends CreateRecord
 {
     protected static string $resource = ProductResource::class;
+
+    /** Attach a reserved-but-unclaimed barcode if one was pre-filled — see
+     *  BarcodeService::claim(). No-op for a manually-typed barcode. */
+    protected function afterCreate(): void
+    {
+        app(BarcodeService::class)->claim($this->record);
+    }
 }
 
 class EditProduct extends EditRecord

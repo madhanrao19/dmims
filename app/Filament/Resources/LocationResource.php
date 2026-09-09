@@ -224,6 +224,7 @@ use App\Filament\Resources\LocationResource;
 use App\Filament\Resources\Pages\CreateRecord;
 use App\Filament\Resources\Pages\EditRecord;
 use App\Filament\Resources\Pages\ListRecords;
+use App\Services\BarcodeService;
 
 class ListLocations extends ListRecords
 {
@@ -233,6 +234,13 @@ class ListLocations extends ListRecords
 class CreateLocation extends CreateRecord
 {
     protected static string $resource = LocationResource::class;
+
+    /** Attach a reserved-but-unclaimed barcode if one was pre-filled — see
+     *  BarcodeService::claim(). No-op for a manually-typed barcode. */
+    protected function afterCreate(): void
+    {
+        app(BarcodeService::class)->claim($this->record);
+    }
 }
 
 class EditLocation extends EditRecord

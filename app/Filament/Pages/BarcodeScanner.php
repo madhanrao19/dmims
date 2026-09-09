@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Filament\Resources\BoxResource;
 use App\Filament\Resources\DocumentFileResource;
 use App\Filament\Resources\LocationResource;
+use App\Filament\Resources\ProductResource;
 use App\Models\BarcodeScanLog;
 use App\Models\Box;
 use App\Models\DocumentFile;
@@ -21,6 +22,7 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Collection;
+use InvalidArgumentException;
 
 /**
  * Universal Scan Center (production-readiness roadmap #2): scan anything,
@@ -160,6 +162,27 @@ class BarcodeScanner extends Page implements HasForms
             }
         }
 
+        // A reserved-but-unclaimed label (BarcodeService::reserve()) — its
+        // type is already known, so redirect straight to that resource's
+        // create form pre-filled with the barcode, rather than the 3-button
+        // "what are you scanning?" prompt unknown barcodes get below.
+        if ($outcome['result'] === 'unused' && $outcome['registry']) {
+            $url = match ($outcome['registry']->barcode_type) {
+                'document_file' => DocumentFileResource::getUrl('create', ['file_barcode' => $barcode]),
+                'box' => BoxResource::getUrl('create', ['box_barcode' => $barcode]),
+                'location' => LocationResource::getUrl('create', ['barcode' => $barcode]),
+                // barcode_type's DB enum only allows these 4 values — 'product'
+                // is the only one left once the others above are excluded.
+                default => ProductResource::getUrl('create', ['barcode' => $barcode]),
+            };
+
+            if ($url) {
+                $this->redirect($url);
+
+                return;
+            }
+        }
+
         if ($outcome['result'] === 'unknown') {
             Notification::make()
                 ->title('Unknown barcode')
@@ -239,7 +262,13 @@ class BarcodeScanner extends Page implements HasForms
             return;
         }
 
-        $changed = app(DocumentMovementService::class)->assignFileToBox($file, $box);
+        try {
+            $changed = app(DocumentMovementService::class)->assignFileToBox($file, $box);
+        } catch (InvalidArgumentException $e) {
+            Notification::make()->title('Cannot assign file')->body($e->getMessage())->danger()->send();
+
+            return;
+        }
 
         Notification::make()
             ->title($changed

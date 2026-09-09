@@ -75,6 +75,7 @@ class BarcodeRegistryResource extends BaseResource
                         'active' => 'Active',
                         'inactive' => 'Inactive',
                         'retired' => 'Retired',
+                        'unused' => 'Unused (reserved, unclaimed)',
                     ])
                     ->required(),
             ]);
@@ -92,6 +93,7 @@ class BarcodeRegistryResource extends BaseResource
                     ->color(fn (string $state): string => match ($state) {
                         'active' => 'success',
                         'retired' => 'danger',
+                        'unused' => 'info',
                         default => 'gray',
                     })
                     ->sortable(),
@@ -156,6 +158,50 @@ class BarcodeRegistryResource extends BaseResource
                         Notification::make()
                             ->title('Barcodes generated')
                             ->body(count($records).' record(s) now have a barcode.')
+                            ->success()
+                            ->send();
+                    }),
+                // Pre-prints/reserves labels for records that don't exist
+                // yet — unlike Batch Generate above (which only barcodes
+                // existing DB rows), these are claimed later by
+                // BarcodeService::claim() when a matching record is created
+                // (see the Scan Center's "unused barcode → create form"
+                // redirect).
+                Action::make('reserve')
+                    ->label('Reserve Labels')
+                    ->icon('heroicon-o-ticket')
+                    ->authorize(fn (): bool => static::can('create'))
+                    ->schema([
+                        Forms\Components\Select::make('customer_id')
+                            ->label('Customer')
+                            ->relationship('customer', 'company_name')
+                            ->searchable()
+                            ->preload()
+                            ->default(fn (): ?int => auth()->user()?->is_platform_user ? null : auth()->user()?->customer_id)
+                            ->required()
+                            ->visible(fn (): bool => (bool) auth()->user()?->is_platform_user),
+                        Forms\Components\Select::make('type')
+                            ->label('Record type')
+                            ->options([
+                                'product' => 'Product',
+                                'location' => 'Location',
+                                'box' => 'Box',
+                                'document_file' => 'Document File',
+                            ])
+                            ->required(),
+                        Forms\Components\TextInput::make('count')
+                            ->numeric()
+                            ->minValue(1)
+                            ->maxValue(200)
+                            ->default(10)
+                            ->required(),
+                    ])
+                    ->action(function (array $data): void {
+                        $customerId = $data['customer_id'] ?? auth()->user()?->customer_id;
+                        $reserved = app(BarcodeService::class)->reserve($customerId, $data['type'], (int) $data['count']);
+
+                        Notification::make()
+                            ->title($reserved->count().' barcode(s) reserved')
                             ->success()
                             ->send();
                     }),

@@ -7,6 +7,7 @@ use App\Filament\Resources\BoxResource\Pages\AuditLog as BoxAuditLog;
 use App\Filament\Resources\BoxResource\Pages\EditBox;
 use App\Filament\Resources\BoxResource\Pages\ViewBox;
 use App\Filament\Resources\DocumentFileResource;
+use App\Filament\Resources\DocumentFileResource\Pages\CreateDocumentFile;
 use App\Filament\Resources\DocumentFileResource\Pages\EditDocumentFile;
 use App\Filament\Resources\DocumentFileResource\Pages\ViewDocumentFile;
 use App\Filament\Resources\LocationResource\Pages\AuditLog as LocationAuditLog;
@@ -22,6 +23,7 @@ use App\Models\User;
 use App\Services\DocumentMovementService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Facades\Filament;
+use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -205,6 +207,133 @@ class DemoCorrectionPassTest extends TestCase
             ->call('save');
 
         $this->assertSame($boxA->id, $file->fresh()->current_box_id);
+    }
+
+    public function test_editing_document_file_status_to_active_without_a_box_is_rejected(): void
+    {
+        $this->platformAdmin();
+        $file = DocumentFile::create([
+            'customer_id' => $this->customer->id,
+            'file_barcode' => 'FBC-1',
+            'title' => 'Contract',
+            'current_status' => 'moved_out',
+            'current_box_id' => null,
+            'destination' => 'Client office',
+        ]);
+
+        Livewire::test(EditDocumentFile::class, ['record' => $file->id])
+            ->fillForm(['current_status' => 'active'])
+            ->call('save')
+            ->assertHasFormErrors(['current_status']);
+
+        $this->assertSame('moved_out', $file->fresh()->current_status);
+    }
+
+    public function test_editing_document_file_status_to_moved_out_while_still_boxed_is_rejected(): void
+    {
+        $this->platformAdmin();
+        $box = $this->box('B1');
+        $file = DocumentFile::create(['customer_id' => $this->customer->id, 'file_barcode' => 'FBC-1', 'title' => 'Contract', 'current_status' => 'active', 'current_box_id' => $box->id]);
+
+        Livewire::test(EditDocumentFile::class, ['record' => $file->id])
+            ->fillForm(['current_status' => 'moved_out'])
+            ->call('save')
+            ->assertHasFormErrors(['current_status']);
+
+        $this->assertSame('active', $file->fresh()->current_status);
+    }
+
+    public function test_editing_document_file_status_to_an_administrative_value_is_still_allowed(): void
+    {
+        $this->platformAdmin();
+        $box = $this->box('B1');
+        $file = DocumentFile::create(['customer_id' => $this->customer->id, 'file_barcode' => 'FBC-1', 'title' => 'Contract', 'current_status' => 'active', 'current_box_id' => $box->id]);
+
+        Livewire::test(EditDocumentFile::class, ['record' => $file->id])
+            ->fillForm(['current_status' => 'damaged'])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame('damaged', $file->fresh()->current_status);
+    }
+
+    public function test_editing_box_status_to_active_without_a_location_is_rejected(): void
+    {
+        $this->platformAdmin();
+        $box = $this->box('B1');
+        app(DocumentMovementService::class)->moveOutBox($box, 'Offsite storage');
+        $box->refresh();
+
+        Livewire::test(EditBox::class, ['record' => $box->id])
+            ->fillForm(['status' => 'active'])
+            ->call('save')
+            ->assertHasFormErrors(['status']);
+
+        $this->assertSame('moved_out', $box->fresh()->status);
+    }
+
+    public function test_editing_box_status_to_moved_out_while_still_placed_is_rejected(): void
+    {
+        $this->platformAdmin();
+        $location = $this->location('L1');
+        $box = $this->box('B1', $location->id);
+
+        Livewire::test(EditBox::class, ['record' => $box->id])
+            ->fillForm(['status' => 'moved_out'])
+            ->call('save')
+            ->assertHasFormErrors(['status']);
+
+        $this->assertSame('active', $box->fresh()->status);
+    }
+
+    public function test_editing_box_status_to_an_administrative_value_is_still_allowed(): void
+    {
+        $this->platformAdmin();
+        $location = $this->location('L1');
+        $box = $this->box('B1', $location->id);
+
+        Livewire::test(EditBox::class, ['record' => $box->id])
+            ->fillForm(['status' => 'damaged'])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame('damaged', $box->fresh()->status);
+    }
+
+    public function test_transfer_box_into_a_full_location_shows_a_notification_instead_of_500(): void
+    {
+        $this->platformAdmin();
+        $sourceLocation = $this->location('SRC');
+        $fullLocation = $this->location('FULL');
+        $fullLocation->update(['box_capacity' => 1]);
+        app(DocumentMovementService::class)->receiveInBox($this->box('OTHER'), $fullLocation->id);
+        $box = $this->box('B1', $sourceLocation->id);
+
+        Livewire::test(ViewBox::class, ['record' => $box->id])
+            ->assertOk()
+            ->callAction('transferBox', data: ['to_location_id' => $fullLocation->id]);
+
+        Notification::assertNotified('Cannot transfer box');
+        $this->assertSame($sourceLocation->id, $box->fresh()->current_location_id);
+    }
+
+    public function test_creating_a_document_file_into_a_full_box_creates_it_unboxed_with_a_notification(): void
+    {
+        $this->platformAdmin();
+        $fullBox = $this->box('FULL');
+        $fullBox->update(['capacity_limit' => 1]);
+        app(DocumentMovementService::class)->receiveInFile(
+            DocumentFile::create(['customer_id' => $this->customer->id, 'file_barcode' => 'FBC-EXISTING', 'title' => 'Existing', 'current_status' => 'active']),
+            $fullBox->id,
+        );
+
+        Livewire::test(CreateDocumentFile::class)
+            ->fillForm(['customer_id' => $this->customer->id, 'file_barcode' => 'FBC-NEW', 'title' => 'New File', 'current_box_id' => $fullBox->id])
+            ->call('create');
+
+        Notification::assertNotified('File created but not boxed');
+        $file = DocumentFile::where('file_barcode', 'FBC-NEW')->firstOrFail();
+        $this->assertNull($file->current_box_id);
     }
 
     public function test_box_audit_log_identifies_the_linked_file(): void

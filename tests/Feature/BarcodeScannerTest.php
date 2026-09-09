@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\BarcodeRegistry;
 use App\Models\Customer;
+use App\Models\DocumentFile;
 use App\Models\Product;
 use App\Models\User;
 use App\Services\BarcodeService;
@@ -101,5 +102,73 @@ class BarcodeScannerTest extends TestCase
 
         // registerFor() now sees the new active registration, not the retired one.
         $this->assertSame($replacement->id, $service->registerFor($product->fresh())->id);
+    }
+
+    public function test_reserve_creates_unused_registry_rows_without_a_reference(): void
+    {
+        $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACME', 'status' => 'active']);
+
+        $reserved = app(BarcodeService::class)->reserve($customer->id, 'document_file', 3);
+
+        $this->assertCount(3, $reserved);
+        $this->assertSame(3, BarcodeRegistry::withoutGlobalScopes()->where('status', 'unused')->count());
+        $reserved->each(function (BarcodeRegistry $registry): void {
+            $this->assertSame('unused', $registry->status);
+            $this->assertNull($registry->reference_table);
+            $this->assertNull($registry->reference_id);
+            $this->assertStringStartsWith('DOC-ACME-', $registry->barcode);
+        });
+        // Distinct barcodes, not the same value repeated.
+        $this->assertCount(3, $reserved->pluck('barcode')->unique());
+    }
+
+    public function test_claim_attaches_a_reservation_to_a_new_record(): void
+    {
+        $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACME', 'status' => 'active']);
+        $reservation = app(BarcodeService::class)->reserve($customer->id, 'document_file', 1)->first();
+
+        $file = DocumentFile::create([
+            'customer_id' => $customer->id,
+            'file_barcode' => $reservation->barcode,
+            'title' => 'Contract',
+            'current_status' => 'active',
+        ]);
+
+        $claimed = app(BarcodeService::class)->claim($file);
+
+        $this->assertNotNull($claimed);
+        $this->assertSame($reservation->id, $claimed->id);
+        $this->assertSame('active', $claimed->status);
+        $this->assertSame('document_files', $claimed->reference_table);
+        $this->assertSame($file->id, $claimed->reference_id);
+    }
+
+    public function test_claim_is_a_noop_for_a_manually_typed_barcode(): void
+    {
+        $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACME', 'status' => 'active']);
+        $file = DocumentFile::create([
+            'customer_id' => $customer->id,
+            'file_barcode' => 'CUSTOM-CODE-123',
+            'title' => 'Contract',
+            'current_status' => 'active',
+        ]);
+
+        $claimed = app(BarcodeService::class)->claim($file);
+
+        $this->assertNull($claimed);
+        $this->assertSame(0, BarcodeRegistry::withoutGlobalScopes()->count());
+    }
+
+    public function test_scan_unused_barcode_is_reported_distinctly(): void
+    {
+        $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACME', 'status' => 'active']);
+        $user = User::factory()->create(['customer_id' => $customer->id, 'is_platform_user' => false, 'status' => 'active']);
+        $reservation = app(BarcodeService::class)->reserve($customer->id, 'document_file', 1)->first();
+
+        $outcome = app(ScannerService::class)->scan($reservation->barcode, $user);
+
+        $this->assertSame('unused', $outcome['result']);
+        $this->assertNull($outcome['record']);
+        $this->assertDatabaseHas('barcode_scan_logs', ['barcode' => $reservation->barcode, 'scan_result' => 'unused']);
     }
 }

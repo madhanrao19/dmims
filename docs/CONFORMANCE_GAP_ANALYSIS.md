@@ -946,3 +946,71 @@ a maintenance risk, not ported without a safer implementation.
 
 **Regression tests:** `tests/Feature/LocationHierarchyTest.php` (2 new
 tests). Full suite: 254/254 passing; Pint and Larastan (level 5) clean.
+
+## 18. Fixing the Three Items Deferred in §17 — 9 September 2026
+
+Planned and implemented all three items §17 deferred, after a research pass
+(3 parallel Explore agents + 1 Plan agent) resolved the open decisions each
+one needed.
+
+**✅ Fixed — `current_status`/`status` desync guard:**
+`DocumentFileResource`'s `current_status` and `BoxResource`'s `status`
+Select fields gained a closure-based validation rule (same `Get $get`
+convention already used on `file_barcode`'s uniqueness rule a few lines
+above): on Edit, rejects setting the field to `'active'` when the record's
+box/location is null, or to `'moved_out'` when it isn't — only when the
+submitted value differs from the record's current value, so unrelated edits
+and no-op resaves are unaffected. Every administrative value (`archived`/
+`missing`/`damaged`/`closed`, `transferred`) stays freely editable, since no
+dedicated action exists for them. 6 new tests in `DemoCorrectionPassTest.php`.
+
+**✅ Fixed — barcode pre-printing/reservation (MVP):** Resolved the
+uniqueness-policy question by precedent rather than by new decision: this
+project already deliberately chose per-customer (not global) barcode
+uniqueness (`2026_08_18_000001_scope_barcode_uniqueness_to_customer.php`,
+"DBA review finding, Critical #2"), and `barcode_registry` already has
+`unique(customer_id, barcode)` — no change needed there. The actual missing
+capability was reservation itself: `BarcodeService::reserve()` pre-generates
+N `'unused'` registry rows (no reference) for a customer+type, reusing the
+same per-customer sequence counter and `lockForUpdate()` pattern as
+`registerFor()`; `claim()` attaches one to a newly-created record whose
+barcode was pre-filled from a reservation (no-op for a manually-typed
+barcode). `ScannerService::scan()` gained a distinct `'unused'` result;
+`BarcodeScanner::scan()` redirects it straight to the matching resource's
+Create form. New "Reserve Labels" header action on Barcode Center. New
+migration `2026_09_09_000000_add_barcode_reservation_support.php` widens
+`barcode_registry.status` and `barcode_scan_logs.scan_result` (both via
+Blueprint's native `enum()->change()`, not raw SQL, so it applies on both
+the SQLite test driver and MySQL) and makes `reference_table`/`reference_id`
+nullable; `down()` refuses to roll back while any `unused`/logged-`unused`
+rows exist. Explicitly out of scope (unchanged from §17): the Print/Retire/
+Replace action split and the scan-to-destination picker. 8 new tests across
+`BarcodeScannerTest.php`, `BarcodeCenterTest.php`, `ScanCenterTest.php`.
+
+**✅ Fixed — box/location capacity enforcement:** `DocumentMovementService`
+gained `assertBoxHasCapacity()`/`assertLocationHasCapacity()`, styled like
+the existing `assertSameCustomer()` guard (same exception type, same
+before-the-transaction placement), called in every method that places a
+file into a box or a box into a location (not the "move out" methods —
+capacity only gates entries). `0`/`null` both mean unlimited, matching the
+existing `capacity_percent`/`box_capacity_percent` accessors' falsy check —
+no new policy invented. Bundled fix: every `DocumentMovementService` call
+site in the Filament layer (`BoxResource`, `DocumentFileResource`,
+`BarcodeScanner`, `ViewBox` — 6 sites total) now catches
+`InvalidArgumentException` and shows a danger notification instead of a raw
+500 — this also closes the pre-existing gap where `assertSameCustomer()`
+failures had no handling at all (confirmed via grep: no call site anywhere
+caught it before this pass). Creating a record directly into an
+over-capacity box/location still creates the record — `current_box_id`/
+`current_location_id` are cleared back to null (Box additionally flips to
+`status = 'moved_out'`, mirroring `moveOutBox()`'s existing "exists, not
+placed" representation) rather than left pointing at a box/location the
+record was never actually logged into. 8 new tests in
+`DocumentOperationsTest.php` and `DemoCorrectionPassTest.php`.
+
+**Regression tests:** 22 new tests total across the 5 files named above.
+Full suite: 273/273 passing; Pint and Larastan (level 5) clean. Migration
+verified against both the SQLite test driver and the actual local dev
+database — MySQL/staging behavior relies on Laravel 13's native
+cross-driver `Blueprint::change()` and was not independently verified
+against a live MySQL instance.

@@ -4,10 +4,12 @@ namespace App\Services;
 
 use App\Models\BarcodeRegistry;
 use App\Models\Box;
+use App\Models\Customer;
 use App\Models\DocumentFile;
 use App\Models\Location;
 use App\Models\Product;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -90,6 +92,79 @@ class BarcodeService
             $record->forceFill([$column => $barcode])->save();
 
             return $registry;
+        });
+    }
+
+    /**
+     * Pre-generate $count unused barcode labels for a customer+type, to be
+     * claimed later when a matching record is created (reservation/
+     * pre-printing — lets a batch of labels be printed before the boxes/
+     * files they'll go on exist yet). Uses the same per-customer, per-type
+     * sequence counter as registerFor(), so reserved and directly-registered
+     * barcodes never collide.
+     *
+     * @return Collection<int, BarcodeRegistry>
+     */
+    public function reserve(int $customerId, string $type, int $count): Collection
+    {
+        if (! isset(self::PREFIXES[$type])) {
+            throw new InvalidArgumentException("Unknown barcode type: {$type}");
+        }
+
+        $companyCode = Customer::withoutGlobalScopes()->findOrFail($customerId)->company_code ?? 'DM';
+
+        return collect(range(1, $count))->map(function () use ($customerId, $type, $companyCode): BarcodeRegistry {
+            $sequence = SequenceGenerator::next("barcode:{$customerId}:{$type}");
+            $barcode = $this->generate($type, $companyCode, $sequence);
+
+            return BarcodeRegistry::create([
+                'customer_id' => $customerId,
+                'barcode' => $barcode,
+                'barcode_type' => $type,
+                'reference_table' => null,
+                'reference_id' => null,
+                'status' => 'unused',
+            ]);
+        });
+    }
+
+    /**
+     * Attach a reserved-but-unclaimed barcode to a newly-created record whose
+     * barcode column was pre-filled from that reservation (e.g. the Scan
+     * Center's "unused barcode → create form" redirect). A no-op (returns
+     * null) for a manually-typed barcode that was never reserved — that
+     * record keeps its barcode exactly as today, no registry row is created
+     * or required for it.
+     */
+    public function claim(Model $record): ?BarcodeRegistry
+    {
+        [$type, $column] = $this->resolveModel($record);
+        $barcode = $record->getAttribute($column);
+
+        if (! $barcode) {
+            return null;
+        }
+
+        return DB::transaction(function () use ($record, $type, $barcode) {
+            $reservation = BarcodeRegistry::withoutGlobalScopes()
+                ->where('customer_id', $record->getAttribute('customer_id'))
+                ->where('barcode', $barcode)
+                ->where('barcode_type', $type)
+                ->where('status', 'unused')
+                ->lockForUpdate()
+                ->first();
+
+            if (! $reservation) {
+                return null;
+            }
+
+            $reservation->update([
+                'reference_table' => $record->getTable(),
+                'reference_id' => $record->getKey(),
+                'status' => 'active',
+            ]);
+
+            return $reservation;
         });
     }
 

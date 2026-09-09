@@ -54,6 +54,24 @@ class BarcodeCenterTest extends TestCase
         $this->assertNotNull($productB->fresh()->barcode);
     }
 
+    public function test_reserve_labels_action_creates_unused_rows(): void
+    {
+        $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACM', 'status' => 'active']);
+        $admin = User::factory()->create(['is_platform_user' => true, 'status' => 'active']);
+        $admin->givePermissionTo(Permission::findOrCreate('manage barcode'));
+
+        Livewire::actingAs($admin)
+            ->test(ListBarcodeRegistries::class)
+            ->callTableAction('reserve', data: [
+                'customer_id' => $customer->id,
+                'type' => 'document_file',
+                'count' => 5,
+            ])
+            ->assertHasNoTableActionErrors();
+
+        $this->assertSame(5, BarcodeRegistry::withoutGlobalScopes()->where('status', 'unused')->where('customer_id', $customer->id)->count());
+    }
+
     public function test_platform_user_without_manage_barcode_cannot_run_mutating_actions(): void
     {
         // Regression for the gap where custom table actions had no
