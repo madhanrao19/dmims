@@ -1424,3 +1424,29 @@ Registries, and Locations. Individual row checkboxes and bulk actions (including
 Print Barcode, verified above) still work correctly — this only affects the header
 checkbox's visual indeterminate/checked state computation, not selection functionality
 itself. Out of scope for this barcode-print fix; flagged here for a future pass.
+
+## 25. Barcode Print: Page-Break-Safe Labels, Box Removed From Print Output — 11 September 2026
+
+Follow-up user feedback on the §24 fix, once printing itself worked: a multi-label batch
+print could split a single barcode's graphic across a page break, and the bordered box
+Filament rendered around each label in the batch print grid was unwanted in the printed
+output.
+
+**✅ Fixed (11 September 2026), applied system-wide (Locations, Boxes, Document Files,
+Barcode Registries; single and bulk):**
+- `app/Providers/FilamentPanelProvider.php`'s print handler now injects
+  `<style>.dmims-barcode-item{break-inside:avoid;page-break-inside:avoid}</style>` into the
+  print iframe's `<head>`, so a label always prints whole and wraps to the next page instead
+  of splitting mid-barcode.
+- `resources/views/filament/batch-barcode-labels.blade.php`'s
+  `rounded border border-gray-200 dark:border-gray-700` wrapper div around each label
+  removed entirely, replaced with a plain `dmims-barcode-item` class (the CSS hook for the
+  rule above); `barcode-label.blade.php`'s own `data-print-target` div also carries the
+  class for the single-record print path.
+
+Verified live in the browser: bulk Print Barcode modal on Boxes shows labels with no
+bordered box; Print still invokes the OS print dialog with zero console errors.
+
+**Regression tests:** unchanged — 300/300 passing (`BarcodePrintActionsTest` unaffected,
+no CSS/DOM-structure assertions); Pint clean; Larastan (level 5) clean; `npm run build`
+clean.

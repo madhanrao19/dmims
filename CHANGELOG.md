@@ -6,6 +6,16 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed — Barcode print: labels no longer split across pages, no more bordered box
+
+Two print-only follow-up fixes, applied system-wide (Locations, Boxes, Document Files,
+Barcode Registries; single and bulk): a multi-label batch print could split a single
+barcode's graphic across a page break — the print handler now injects
+`.dmims-barcode-item { break-inside/page-break-inside: avoid }` into the print iframe so a
+label always prints whole, wrapping to the next page instead. The bordered box that used to
+wrap each label in the batch print grid (`batch-barcode-labels.blade.php`) is removed
+entirely — printed output is now just the barcode graphic and its title/type/code text.
+
 ### Fixed — Barcode print buttons were still non-functional after the iframe redesign
 
 Verified live via browser automation (Claude in Chrome) that "Print Barcode" did nothing
