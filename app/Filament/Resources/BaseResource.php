@@ -4,10 +4,12 @@ namespace App\Filament\Resources;
 
 use App\Services\AccessControlService;
 use App\Services\ModuleAccessService;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\QueryException;
 use UnitEnum;
 
 abstract class BaseResource extends Resource
@@ -435,5 +437,59 @@ abstract class BaseResource extends Resource
                 $component->state(json_encode($state));
             }
         };
+    }
+
+    /**
+     * Shared bulk-delete implementation for Boxes/Document Files' bulk
+     * "Delete" action: enforces this resource's own delete authorization and
+     * any model-level guard (e.g. Box::delete()'s hasLinkedInventory() check,
+     * which returns false rather than throwing) per selected record instead
+     * of only once for the whole bulk action, and reports success/skipped/
+     * failed counts rather than a single opaque "done" — Filament's stock
+     * DeleteBulkAction does neither by default.
+     */
+    protected static function deleteSelectedWithReport(iterable $records): void
+    {
+        $deleted = 0;
+        $skipped = 0;
+        $failed = 0;
+
+        foreach ($records as $record) {
+            if (! static::can('delete', $record)) {
+                $skipped++;
+
+                continue;
+            }
+
+            try {
+                if ($record->delete() === false) {
+                    $skipped++;
+
+                    continue;
+                }
+
+                $deleted++;
+            } catch (QueryException $e) {
+                if ($e->getCode() !== '23000') {
+                    throw $e;
+                }
+
+                $failed++;
+            }
+        }
+
+        $body = "{$deleted} deleted";
+        if ($skipped > 0) {
+            $body .= ", {$skipped} skipped (not permitted, or still referenced by other records)";
+        }
+        if ($failed > 0) {
+            $body .= ", {$failed} failed (still referenced by other records)";
+        }
+
+        Notification::make()
+            ->title('Bulk delete complete')
+            ->body($body)
+            ->{($skipped > 0 || $failed > 0) ? 'warning' : 'success'}()
+            ->send();
     }
 }

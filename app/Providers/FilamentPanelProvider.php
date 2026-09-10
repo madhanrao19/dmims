@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Filament\Auth\Login;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -49,7 +50,7 @@ class FilamentPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
             ])
-            ->login()
+            ->login(Login::class)
             ->passwordReset()
             ->profile()
             // Real TOTP app-authentication (enroll, challenge, recovery codes),
@@ -89,7 +90,16 @@ class FilamentPanelProvider extends PanelProvider
             // the topbar instead of forking Filament's notification view.
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
-                fn (): string => '<style>.fi-no.fi-vertical-align-start{top:5rem}</style>',
+                fn (): string => '<style>.fi-no.fi-vertical-align-start{top:5rem}</style>'.
+                    // Login/password-reset/other auth pages all render inside
+                    // Filament's shared .fi-simple-layout wrapper — targeting
+                    // that class (rather than a per-page renderHook) applies
+                    // the background to every current and future auth page
+                    // without duplicating the rule. Dark overlay gradient
+                    // matches the reference screenshot's contrast/legibility
+                    // over the photo; the panel's own light/dark card
+                    // (.fi-simple-main) is unaffected and stays readable.
+                    '<style>.fi-simple-layout{background:linear-gradient(rgba(15,23,42,.6),rgba(15,23,42,.6)),url(\''.asset('images/login-background.jpg').'\') center/cover no-repeat fixed;min-height:100vh}</style>',
             )
             ->sidebarCollapsibleOnDesktop()
             ->maxContentWidth(Width::Full)

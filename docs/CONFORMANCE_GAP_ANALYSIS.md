@@ -1088,3 +1088,110 @@ rendered output for that role — both are now used together in
 relation-manager references in `DemoCorrectionPassTest.php` and
 `DemoReadinessFixesTest.php`); no new test files. Full suite: 282/282 passing;
 Pint and Larastan (level 5) clean.
+
+## 21. UX Feedback Pass Against the Same Reference System — 10 September 2026
+
+A second feedback round against the same reference screenshots/legacy export used in
+§19-20, this time covering login/auth, Reports, Boxes/Document Files bulk actions and
+Barcode Center — audited by direct code read against each requirement rather than
+assumption, since §19-20 had already shipped much of what a naive re-read of the
+screenshots would suggest was missing.
+
+**✅ Implemented (10 September 2026):**
+- **Login: Cloudflare Turnstile + background image.** New `App\Filament\Auth\Login`
+  (replaces Filament's stock login page), `App\Services\TurnstileVerifier` (server-side
+  `siteverify` call, fails closed on missing token/failed challenge/network error, no-op
+  when `TURNSTILE_SITE_KEY`/`SECRET_KEY` are unset). CSP widened only for
+  `challenges.cloudflare.com`. Background image applied via a `.fi-simple-layout` CSS rule
+  (covers login, password reset, and any future Filament "simple layout" auth page, not
+  just login). `tests/Feature/TurnstileLoginTest.php` (7 tests): verifier enabled/disabled
+  state, success/failure/network-error paths, and a real `Livewire::test(Login::class)`
+  authentication round-trip proving a missing/failed token actually blocks login and a
+  passing one doesn't.
+- **Department management — root cause found and fixed.** `Department` had a model,
+  migration, and `department_id` FK on `document_files`, but **no Filament resource ever
+  existed to create one** — for any customer with none seeded, the "Department" dropdown
+  on Document Files was empty with no way to populate it. This was reported as "the
+  Department dropdown doesn't work"; the actual defect was a missing CRUD screen, not a
+  query/scoping/persistence bug — `relationship('department', 'name')` was already correct
+  and already tenant-scoped via `Department`'s own `BelongsToCustomer` trait. New
+  `App\Filament\Resources\DepartmentResource` (reuses the existing `manage documents`/
+  `view documents` permission — no new permission added). `DocumentFileResource`'s
+  Department field now shows an inline link to create one when none exist. **Boxes do not
+  have a Department field in this schema at all** (confirmed against both the current
+  migration and the legacy reference export) — the original request's Boxes section
+  mentioning a "Department dropdown" does not apply; flagged as a documentation/request
+  mismatch rather than inventing a field with no underlying column.
+- **Document Reports dashboard.** `Reports` page gained a live filters (date range/
+  status/location)/KPIs (Total Documents, Dispatched Externally, Missing Documents,
+  Tracked Boxes)/status-breakdown bar/two recent-records tables (with CSV export) section
+  matching the reference screenshot, scoped to tenant users with Document Tracking access.
+  Platform users keep the existing multi-report export form (no single customer_id to
+  scope a cross-tenant dashboard's aggregates to — a deliberate scoping decision, not an
+  oversight). Inventory/Platform/Billing reports are unchanged. `tests/Feature/DocumentReportsDashboardTest.php`
+  (5 tests) — including a cross-tenant isolation regression that initially failed due to a
+  test-authoring ordering bug (fixtures for "another customer" were created while already
+  `actingAs()` the first tenant, so `BelongsToCustomer`'s `creating()` hook force-rewrote
+  their `customer_id` — fixed by building cross-tenant fixtures before `actingAs()`, the
+  same convention `DocumentTenantIsolationTest` already used), not a product defect.
+- **Boxes/Document Files list — bulk actions, Actions grouping, row-click target.** Both
+  gained row selection with bulk "Print Barcode" (new `HasBarcodeAction::bulkBarcodeAction()`)
+  and "Delete" (new `BaseResource::deleteSelectedWithReport()` — per-record `can('delete')`
+  + any model delete guard, reporting deleted/skipped/failed counts). Transfer/Move Out/
+  Return/Timeline grouped into one "Actions" dropdown. **Root cause of "clicking Box
+  Number opens Edit instead of View" found:** Filament's default `recordUrl` resolution
+  (`ListRecords.php`) only checks for a registered `view`/`edit` *table action*, in that
+  order — only `EditAction` was ever registered in `recordActions()`, so it always won.
+  Fixed with an explicit `->recordUrl()` pointing at the `view` page; `EditAction` removed
+  from the list (Edit stays reachable from inside View's header, already present from an
+  earlier pass). Location column now truncated with a hover/focus tooltip.
+- **Box delete guard.** `Box::delete()` now blocks deleting a box that still contains
+  files (`hasLinkedDocuments()`), mirroring `Location::delete()`'s existing guard (§15) —
+  same latent bug shape: `boxes` uses `SoftDeletes`, so the FK `RESTRICT` on
+  `document_files.current_box_id` never actually fires.
+- **Move Out / "Dispatch to External Party" fields.** Box and Document File Move Out
+  modals now collect Recipient/Contact Name, Company/Vendor Name, Delivery Address,
+  Courier Tracking Ref., Expected Return Date, Additional Notes. Only `destination`/
+  `borrowed_by`/`due_date` (Document Files only) have dedicated columns; the rest compose
+  into `remarks` (already flows into `DocumentMovementLog`/Timeline) rather than adding
+  schema for a UI-only request.
+- **Barcode Center.** Batch Generate/Reserve Labels record-type options now filtered to
+  the customer's enabled modules + permissions instead of a hardcoded 4-type list. Status
+  filter now includes `unused`. Batch Print's preview modal gained a working "Print
+  Barcode Labels" button (`window.print()`) — previously Submit only marked labels printed
+  with no way to actually trigger printing from the modal. Barcode labels (individual and
+  bulk) now show the record's own descriptive title above the barcode value, matching the
+  reference's "Legal Files 2026 / BOX-00001" layout.
+- **Scan Center.** "Add Document Mode — Target Box" relabeled "Bulk Scan: ON/OFF — Target
+  Box" to match requested terminology. The underlying behavior (stays on page, keeps
+  target box selected, reuses `DocumentMovementService` including the dispatched-file
+  return workflow) was already correct from §16-18 — label-only change.
+
+**⚠️ Documented conflict, not resolved by picking one side silently:** the request asked
+to "replace the nonworking Batch Generate... with Search Barcode" but also to "not remove
+shared barcode-generation logic required by valid workflows." Batch Generate was found to
+be working code (not broken), and the list's own existing search bar + type/status filters
+already satisfy "Search Barcode" as a capability (searchable `barcode` column, customer/
+permission-scoped query). Resolution: kept Batch Generate, did not build a duplicate
+"Search Barcode" screen — an earlier draft of this change added a non-functional stub
+action for this, caught and removed before shipping.
+
+**❌ Not done this pass (real, acknowledged gaps):**
+- Inventory/Platform/Billing report filters/KPIs/charts (Document Reports only, matching
+  the one screenshot actually supplied). `ReportExportService`'s 19 report definitions are
+  otherwise unchanged.
+- A full visual redesign of Boxes/Document Files Create/Edit forms beyond the Department
+  fix and a storage-location helper text on Box Assignment (Create Document File already
+  included Box Assignment from an earlier pass, per §15/§19).
+- Physical barcode printer/scanner hardware testing — not possible in this environment.
+  Code128 SVG generation was verified to run and the label view renders; not verified
+  against a real handheld scanner or label printer.
+- A visual redesign of the Boxes/Document Files list beyond the bulk-actions/grouping/
+  row-click/location-tooltip fixes above (column layout otherwise unchanged).
+
+**Verification:** `vendor/bin/pint --test` clean; `vendor/bin/phpstan analyse` (Larastan,
+level 5) clean; `php artisan test`: 296/296 passing (was 282); `npm run build` clean.
+Browser/Playwright verification was **not** run this pass (not available — see completion
+report) — the above is verified at the automated-test level only; UI claims (label text,
+tooltip behavior, print button) are verified by code/test, not by an interactive browser
+session.

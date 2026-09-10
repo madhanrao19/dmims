@@ -30,12 +30,19 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class SecurityHeaders
 {
+    // challenges.cloudflare.com additions are for the Cloudflare Turnstile
+    // widget on the login/password-reset pages (App\Filament\Auth\Login,
+    // RequestPasswordReset): its script tag, the challenge iframe it embeds
+    // (no other frame-src existed before — bare default-src 'self' would
+    // otherwise block it), and its own verification XHR all need an explicit
+    // allowance since the base policy is deliberately same-origin only.
     private const CSP = "default-src 'self'; ".
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; ".
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com; ".
         "style-src 'self' 'unsafe-inline'; ".
         "img-src 'self' data:; ".
         "font-src 'self' data:; ".
-        "connect-src 'self'; ".
+        "connect-src 'self' https://challenges.cloudflare.com; ".
+        "frame-src 'self' https://challenges.cloudflare.com; ".
         "object-src 'none'; ".
         "base-uri 'self'; ".
         "frame-ancestors 'self'";

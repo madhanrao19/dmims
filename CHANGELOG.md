@@ -6,6 +6,106 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — Cloudflare Turnstile on login, login background image, Department management, Document Reports dashboard
+
+A large feedback pass against the same reference "Document Tracking System" screenshots
+used in prior sessions (see §19-20 in `docs/CONFORMANCE_GAP_ANALYSIS.md`). Most of the
+requested Boxes/Document Files/Scan Mode/Location Chain Builder work was already shipped
+in earlier passes; this pass covers the remaining gaps found by direct code audit rather
+than assumption, plus the net-new auth/reports work.
+
+**Login / auth:** `App\Filament\Auth\Login` replaces Filament's stock login page, adding
+a Cloudflare Turnstile widget (`resources/views/filament/turnstile-widget.blade.php`) and
+server-side verification (`App\Services\TurnstileVerifier`, calling Cloudflare's
+`siteverify` endpoint) before `parent::authenticate()` runs — fails closed on a missing
+token, a failed challenge, or a network error to Cloudflare; skips the widget entirely
+when `TURNSTILE_SITE_KEY`/`TURNSTILE_SECRET_KEY` are unset (local/dev). CSP
+(`SecurityHeaders`) widened only for `challenges.cloudflare.com` (script/connect/frame-src).
+Login/password-reset pages now show the reference background photo
+(`public/images/login-background.jpg`) via a `.fi-simple-layout` CSS rule, covering every
+current and future Filament "simple layout" auth page. New
+`tests/Feature/TurnstileLoginTest.php` (7 tests).
+
+**Department management (root cause of the "Department dropdown doesn't work" report):**
+`Department` had a model/migration/`department_id` FK on Document Files, but no Filament
+resource existed to create one — a customer with none configured saw an empty, unexplained
+dropdown with no way to fix it. New `App\Filament\Resources\DepartmentResource` (gated on
+the existing `manage documents`/`view documents` permission, no new permission added).
+`DocumentFileResource`'s Department field now shows an inline "Add one" link to it when
+none exist yet. Confirmed via the legacy reference and its own schema that Boxes never had
+a Department field at all — the spec's "Edit Box... Department dropdown" bullet doesn't
+apply to Boxes; only Document Files have this field.
+
+**Document Reports dashboard:** `Reports` page gained a live filters/KPIs/tables section
+(From/To date, Status, Location/Rack; Total Documents/Dispatched Externally/Missing
+Documents/Tracked Boxes; a status breakdown bar chart; Recently Created Documents/Boxes
+tables with their own CSV export), scoped to tenant users with Document Tracking access —
+matches the reference screenshot. Platform users (no single customer_id to scope
+aggregates to) keep the existing multi-report export form, now shown alongside rather than
+replaced. Inventory/Platform/Billing reports are unchanged — still export-only; not in
+scope for this pass. New `tests/Feature/DocumentReportsDashboardTest.php` (5 tests,
+including a cross-tenant isolation regression).
+
+**Boxes/Document Files list — bulk actions, Actions grouping, View vs. Edit:** Both lists
+gained row selection with bulk "Print Barcode" (new `HasBarcodeAction::bulkBarcodeAction()`,
+reusing the existing per-record barcode registration/print view) and "Delete" (new
+`BaseResource::deleteSelectedWithReport()`, enforcing per-record `can('delete')` and any
+model-level delete guard individually and reporting deleted/skipped/failed counts, rather
+than Filament's stock all-or-nothing `DeleteBulkAction`). Transfer/Move Out/Return/Timeline
+row actions are now grouped into one "Actions" dropdown (`Filament\Actions\ActionGroup`).
+Clicking the Box Number/File Barcode now opens View (`->recordUrl()` explicitly set to the
+`view` page) instead of Edit — previously it silently opened Edit because Filament's
+default `recordUrl` resolution only checks for a registered `view`/`edit` *table action*,
+and only `EditAction` was ever registered. Edit is now reached only from inside View's
+header actions (already present from an earlier pass). The Location column is now
+truncated with a hover/focus tooltip showing the full path.
+
+**Box delete guard:** `Box::delete()` now blocks deleting a box that still contains files
+(`hasLinkedDocuments()`), mirroring the existing `Location::delete()`/`hasLinkedInventory()`
+guard — `boxes` uses `SoftDeletes`, so the `document_files.current_box_id` FK's `RESTRICT`
+constraint never actually fired, the same latent-bug shape §15 already fixed for Locations.
+
+**Move Out / "Dispatch to External Party":** Box and Document File Move Out modals now
+collect Recipient/Contact Name, Company/Vendor Name, Delivery Address, Courier Tracking
+Ref., Expected Return Date, and Additional Notes, matching the reference. Only
+`destination`/`borrowed_by`/`due_date` (Document Files) have dedicated columns; the rest
+are composed into `remarks`, which already flows into `DocumentMovementLog` and the
+Timeline action — no new columns added for a UI-only request.
+
+**Barcode Center:** "Batch Generate"/"Reserve Labels"' record-type options are now limited
+to the acting customer's enabled modules + permissions (`BarcodeRegistryResource::availableTypeOptions()`),
+not a hardcoded 4-type list. Status filter now includes `unused`. Batch Print's preview
+modal gained an actual "Print Barcode Labels" button (`window.print()`) — previously
+Submit only marked labels as printed with no way to trigger the browser print dialog from
+the modal itself. "Search Barcode" — investigated and found the list's own existing search
+bar + type/status filters (customer/permission-scoped via the resource's standard query
+scoping) already satisfy this requirement; added a `searchPlaceholder()` for clarity rather
+than building a duplicate, redundant screen. Batch Generate was **not** removed (the
+request also said not to remove barcode-generation logic valid workflows depend on) —
+flagged as a documented conflict rather than silently picking one instruction over the
+other.
+
+**Scan Center:** the "Add Document Mode — Target Box" field is relabeled "Bulk Scan:
+ON/OFF — Target Box" to match the requested terminology; the underlying continuous
+scan-to-box-assign behavior (stays on page, keeps target box selected, reuses
+`DocumentMovementService`/dispatched-file return workflow) was already correct from an
+earlier pass — label-only change.
+
+**Barcode label print:** individual and bulk print views now show the record's own
+descriptive title (e.g. a box's label, a document's title) above the barcode value,
+matching the reference's "Legal Files 2026 / BOX-00001" layout — previously only the
+generic record type ("Box") was shown.
+
+296 tests passing (was 282); Pint clean; Larastan (level 5) clean; `npm run build` clean.
+
+**Not done this pass (see completion report for detail):** Inventory/Platform/Billing
+report filters (Document Reports only, per the referenced screenshot); a full visual
+redesign of Boxes/Document Files Create/Edit forms beyond the Department fix and Box
+Assignment storage-location preview (Create Document File already included Box
+Assignment from an earlier pass); physical printer/scanner hardware testing (not
+possible in this environment — barcode SVG generation was verified programmatically,
+not against a real scanner).
+
 ### Added — Location Chain Builder and Batch Generate now available on Customer 360's Locations tab
 
 Both bulk-create actions previously only lived on the main `/admin/locations` list page's

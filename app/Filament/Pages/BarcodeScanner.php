@@ -20,6 +20,7 @@ use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
@@ -90,8 +91,9 @@ class BarcodeScanner extends Page implements HasForms
                     ->dehydrated(false)
                     ->afterStateUpdated(fn ($state) => $this->bulkMode = (bool) $state),
                 Select::make('target_box_id')
-                    ->label('Add Document Mode — Target Box')
-                    ->helperText('Set a box, then scan Document File barcodes to assign each one into it.')
+                    ->label(fn (Get $get): string => $get('target_box_id') ? 'Bulk Scan: ON — Target Box' : 'Bulk Scan: OFF — set a target box to enable')
+                    ->live()
+                    ->helperText('While a target box is set, every scanned Document File barcode is added directly into it — keep scanning without leaving this page.')
                     ->searchable(['box_number', 'box_barcode'])
                     ->getSearchResultsUsing(fn (string $search): array => Box::searchByNumberOrBarcode($search)->all())
                     ->getOptionLabelUsing(fn ($value): ?string => Box::find($value)?->box_number),

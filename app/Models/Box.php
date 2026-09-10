@@ -34,6 +34,12 @@ class Box extends Model
         return $this->belongsTo(Customer::class);
     }
 
+    /** @return BelongsTo<User, $this> */
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
     /**
      * @return BelongsTo<Location, $this>
      */
@@ -101,5 +107,26 @@ class Box extends Model
         }
 
         return "{$this->currentLocation->ancestry_path} > Box {$this->box_number}";
+    }
+
+    public function hasLinkedDocuments(): bool
+    {
+        return $this->files()->exists();
+    }
+
+    /**
+     * Same guard shape as Location::delete() (CONFORMANCE_GAP_ANALYSIS.md
+     * §15): Box uses SoftDeletes, so the files table's FK RESTRICT
+     * constraint on current_box_id never actually fires on delete() — a box
+     * still holding files could otherwise be silently soft-deleted, leaving
+     * those files pointing at a "deleted" box.
+     */
+    public function delete(): ?bool
+    {
+        if ($this->hasLinkedDocuments()) {
+            return false;
+        }
+
+        return parent::delete();
     }
 }

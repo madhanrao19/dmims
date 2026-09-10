@@ -58,6 +58,12 @@ class DocumentFile extends Model
         return $this->belongsTo(Department::class);
     }
 
+    /** @return BelongsTo<User, $this> */
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
     /**
      * @return BelongsTo<Box, $this>
      */

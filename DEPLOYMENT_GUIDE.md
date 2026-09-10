@@ -280,6 +280,23 @@ SANCTUM_TOKEN_EXPIRATION=525600
 API_RATE_LIMIT_PER_MINUTE=60
 ```
 
+**Cloudflare Turnstile (login page bot protection) — REQUIRED in production:**
+```
+# From the Cloudflare dashboard: Turnstile → Add widget, scoped to this
+# deployment's real public hostname. Leave both blank in local/dev to skip
+# the widget entirely (App\Filament\Auth\Login checks both are set before
+# rendering it) — the login form still works without them, just without
+# Turnstile. Once set, App\Services\TurnstileVerifier verifies every login
+# attempt server-side against Cloudflare's siteverify endpoint; a missing/
+# failed/unverifiable token blocks the login (fails closed).
+TURNSTILE_SITE_KEY=
+TURNSTILE_SECRET_KEY=
+```
+No further setup is needed beyond setting these two variables — the widget's
+script (`https://challenges.cloudflare.com/turnstile/v0/api.js`) and challenge
+iframe are already allowed through the app's Content-Security-Policy
+(`App\Http\Middleware\SecurityHeaders`).
+
 ### Generate application key
 ```bash
 cd /var/www/dmims

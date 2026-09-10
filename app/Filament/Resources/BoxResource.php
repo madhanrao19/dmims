@@ -13,7 +13,10 @@ use App\Services\DocumentMovementService;
 use App\Services\MovementTimelineService;
 use Closure;
 use Filament\Actions\Action;
-use Filament\Actions\EditAction;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\ViewAction;
 use Filament\Forms;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
@@ -22,6 +25,7 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\Rules\Unique;
 use InvalidArgumentException;
 
@@ -239,7 +243,11 @@ class BoxResource extends BaseResource
             ->columns([
                 Tables\Columns\TextColumn::make('box_number')->sortable()->searchable(),
                 Tables\Columns\TextColumn::make('box_barcode')->sortable()->searchable(),
-                Tables\Columns\TextColumn::make('physical_path')->label('Location')->sortable(),
+                Tables\Columns\TextColumn::make('physical_path')
+                    ->label('Location')
+                    ->limit(28)
+                    ->tooltip(fn (Box $record): string => $record->physical_path)
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
@@ -274,13 +282,30 @@ class BoxResource extends BaseResource
                     ->searchable()
                     ->preload(),
             ])
+            // Row click opens View (Edit lives inside View's own header
+            // actions) — Filament's default recordUrl only resolves to a
+            // 'view'/'edit' *table action* registered below, so this must
+            // be explicit rather than relying on getPages().
+            ->recordUrl(fn (Box $record): string => static::getUrl('view', ['record' => $record]))
             ->recordActions([
-                static::transferBoxAction(),
-                static::moveOutBoxAction(),
-                static::returnBoxAction(),
-                static::timelineAction(),
-                EditAction::make(),
+                ViewAction::make(),
+                ActionGroup::make([
+                    static::transferBoxAction(),
+                    static::moveOutBoxAction(),
+                    static::returnBoxAction(),
+                    static::timelineAction(),
+                ])
+                    ->label('Actions')
+                    ->icon('heroicon-m-ellipsis-vertical')
+                    ->button(),
                 static::barcodeAction(),
+            ])
+            ->bulkActions([
+                BulkActionGroup::make([
+                    static::bulkBarcodeAction(),
+                    DeleteBulkAction::make()
+                        ->action(fn (Collection $records) => static::deleteSelectedWithReport($records)),
+                ]),
             ])
             ->defaultSort('created_at', 'desc');
     }
@@ -315,20 +340,45 @@ class BoxResource extends BaseResource
             });
     }
 
+    /**
+     * Fields match the "Dispatch to External Party" reference. Boxes have
+     * no borrowed_by/due_date columns (unlike Document Files), so every
+     * descriptive field here is folded into `remarks` — DocumentMovementLog
+     * already surfaces `remarks` on the Timeline action, and adding new
+     * box-table columns for a UI-only request isn't warranted while no
+     * business rule reads them separately.
+     */
     public static function moveOutBoxAction(): Action
     {
         return Action::make('moveOutBox')
             ->label('Move Out')
+            ->modalHeading('Dispatch to External Party')
+            ->modalDescription('This will remove the box from its current physical location and mark it as dispatched externally.')
             ->icon('heroicon-o-arrow-up-tray')
             ->color('danger')
             ->visible(fn (Box $record): bool => $record->status !== 'moved_out')
             ->authorize(fn (Box $record): bool => static::can('update', $record))
             ->schema([
-                Forms\Components\TextInput::make('destination')->label('External destination')->required(),
-                Forms\Components\Textarea::make('remarks'),
+                Forms\Components\TextInput::make('recipient_name')->label('Recipient / Contact Name')->required(),
+                Forms\Components\TextInput::make('destination')->label('Company / Bank / Vendor Name')->required(),
+                Forms\Components\Textarea::make('delivery_address')->label('Delivery Address')->rows(2),
+                Forms\Components\TextInput::make('courier_tracking_ref')->label('Courier Tracking Ref.'),
+                Forms\Components\DatePicker::make('expected_return_date')->label('Expected Return Date'),
+                Forms\Components\Textarea::make('remarks')->label('Additional Notes'),
             ])
             ->action(function (Box $record, array $data): void {
-                app(DocumentMovementService::class)->moveOutBox($record, $data['destination'], $data);
+                $lines = array_filter([
+                    "Recipient: {$data['recipient_name']}",
+                    filled($data['delivery_address'] ?? null) ? "Delivery address: {$data['delivery_address']}" : null,
+                    filled($data['courier_tracking_ref'] ?? null) ? "Courier tracking ref: {$data['courier_tracking_ref']}" : null,
+                    filled($data['expected_return_date'] ?? null) ? "Expected return date: {$data['expected_return_date']}" : null,
+                    filled($data['remarks'] ?? null) ? $data['remarks'] : null,
+                ]);
+
+                app(DocumentMovementService::class)->moveOutBox($record, $data['destination'], [
+                    ...$data,
+                    'remarks' => implode("\n", $lines),
+                ]);
                 Notification::make()->title('Box moved out')->success()->send();
             });
     }

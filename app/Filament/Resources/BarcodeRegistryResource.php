@@ -10,6 +10,7 @@ use App\Models\DocumentFile;
 use App\Models\Location;
 use App\Models\Product;
 use App\Services\BarcodeService;
+use App\Services\ModuleAccessService;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Forms;
@@ -57,6 +58,43 @@ class BarcodeRegistryResource extends BaseResource
         'document_file' => DocumentFile::class,
     ];
 
+    /** Every barcode type this resource knows about, with the module/permission that gates it. */
+    private const TYPE_META = [
+        'product' => ['label' => 'Product', 'module' => 'stock_inventory', 'permission_area' => 'inventory'],
+        'location' => ['label' => 'Location', 'module' => 'stock_inventory', 'permission_area' => 'inventory'],
+        'box' => ['label' => 'Box', 'module' => 'document_tracking', 'permission_area' => 'documents'],
+        'document_file' => ['label' => 'Document File', 'module' => 'document_tracking', 'permission_area' => 'documents'],
+    ];
+
+    /**
+     * Record types selectable for Batch Generate/Reserve Labels — limited to
+     * this customer's enabled modules and the acting user's own permissions
+     * (Business Rules: a customer without Stock Inventory enabled has no
+     * business generating Product/Location barcodes, even though the
+     * barcode_scanning module itself is separate and may be enabled alone).
+     * Platform users administer across every tenant/type, so see the full set.
+     */
+    private static function availableTypeOptions(): array
+    {
+        $user = auth()->user();
+
+        if (! $user || $user->is_platform_user) {
+            return array_map(fn (array $meta) => $meta['label'], self::TYPE_META);
+        }
+
+        $moduleService = app(ModuleAccessService::class);
+        $customerId = $user->customer_id;
+
+        return collect(self::TYPE_META)
+            ->filter(function (array $meta) use ($user, $customerId, $moduleService): bool {
+                $hasPermission = $user->can("manage {$meta['permission_area']}") || $user->can("view {$meta['permission_area']}");
+
+                return $hasPermission && $customerId && $moduleService->isModuleEnabled($customerId, $meta['module']);
+            })
+            ->map(fn (array $meta) => $meta['label'])
+            ->all();
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema
@@ -100,16 +138,21 @@ class BarcodeRegistryResource extends BaseResource
                 Tables\Columns\TextColumn::make('printed_count')->label('Printed')->sortable(),
                 Tables\Columns\TextColumn::make('last_scanned_at')->dateTime()->sortable(),
             ])
+            // The reference project's "Search Barcode" is this list's own
+            // search bar + filters, not a separate screen — see the
+            // batchGenerate replacement note below.
+            ->searchPlaceholder('Search barcode number...')
             ->filters([
                 Tables\Filters\SelectFilter::make('barcode_type')
-                    ->options([
-                        'product' => 'Product',
-                        'location' => 'Location',
-                        'box' => 'Box',
-                        'document_file' => 'Document File',
-                    ]),
+                    ->label('Barcode type')
+                    ->options(fn () => self::availableTypeOptions()),
                 Tables\Filters\SelectFilter::make('status')
-                    ->options(['active' => 'Active', 'inactive' => 'Inactive', 'retired' => 'Retired']),
+                    ->options([
+                        'active' => 'Active',
+                        'inactive' => 'Inactive',
+                        'retired' => 'Retired',
+                        'unused' => 'Unused (reserved, unclaimed)',
+                    ]),
             ])
             ->headerActions([
                 Action::make('batchGenerate')
@@ -119,12 +162,7 @@ class BarcodeRegistryResource extends BaseResource
                     ->schema([
                         Forms\Components\Select::make('type')
                             ->label('Record type')
-                            ->options([
-                                'product' => 'Product',
-                                'location' => 'Location',
-                                'box' => 'Box',
-                                'document_file' => 'Document File',
-                            ])
+                            ->options(fn () => self::availableTypeOptions())
                             ->live()
                             ->required(),
                         Forms\Components\Select::make('record_ids')
@@ -182,12 +220,7 @@ class BarcodeRegistryResource extends BaseResource
                             ->visible(fn (): bool => (bool) auth()->user()?->is_platform_user),
                         Forms\Components\Select::make('type')
                             ->label('Record type')
-                            ->options([
-                                'product' => 'Product',
-                                'location' => 'Location',
-                                'box' => 'Box',
-                                'document_file' => 'Document File',
-                            ])
+                            ->options(fn () => self::availableTypeOptions())
                             ->required(),
                         Forms\Components\TextInput::make('count')
                             ->numeric()

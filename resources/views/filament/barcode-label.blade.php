@@ -3,6 +3,7 @@
     // (picqer/php-barcode-generator on the PHP 8.4 production target); otherwise
     // show the human-readable value, which can still be entered in the scanner.
     $size ??= 'medium';
+    $title ??= null;
     [$width, $height, $fontSize] = match ($size) {
         'small' => [1.5, 40, 'text-lg'],
         'large' => [3, 90, 'text-3xl'],
@@ -16,6 +17,9 @@
 @endphp
 
 <div class="flex flex-col items-center gap-3 py-4 text-center print:break-inside-avoid">
+    @if (! empty($title))
+        <div class="font-semibold">{{ $title }}</div>
+    @endif
     <div class="text-xs uppercase tracking-wide text-gray-500">{{ str($type)->headline() }}</div>
 
     @if ($svg)

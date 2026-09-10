@@ -6,13 +6,17 @@ use App\Filament\Concerns\HasBarcodeAction;
 use App\Filament\Resources\DocumentFileResource\Pages;
 use App\Http\Middleware\EnsureModuleEnabled;
 use App\Models\Box;
+use App\Models\Department;
 use App\Models\DocumentFile;
 use App\Models\Location;
 use App\Services\DocumentMovementService;
 use App\Services\MovementTimelineService;
 use Closure;
 use Filament\Actions\Action;
-use Filament\Actions\EditAction;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\ViewAction;
 use Filament\Forms;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Page;
@@ -20,6 +24,8 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\HtmlString;
 use Illuminate\Validation\Rules\Unique;
 use InvalidArgumentException;
 
@@ -80,13 +86,23 @@ class DocumentFileResource extends BaseResource
                     ->label('Department')
                     ->relationship('department', 'name')
                     ->searchable()
-                    ->preload(),
+                    ->preload()
+                    // Department has no seed data — a customer with none
+                    // configured yet previously saw an empty, unexplained
+                    // dropdown with no way to fix it (the actual root cause
+                    // reported as "the Department dropdown doesn't work").
+                    ->helperText(fn (): ?string => Department::query()->exists()
+                        ? null
+                        : (DepartmentResource::canAccess()
+                            ? new HtmlString('No departments configured yet. <a href="'.e(DepartmentResource::getUrl('create')).'" class="underline text-primary-600">Add one</a> first.')
+                            : 'No departments configured yet. Ask an administrator to set one up.')),
                 Forms\Components\TextInput::make('owner_name')->maxLength(255),
                 Forms\Components\Select::make('current_box_id')
-                    ->label('Current Box')
+                    ->label('Box Assignment')
                     ->relationship('currentBox', 'box_number')
                     ->searchable(['box_number', 'box_barcode'])
                     ->preload()
+                    ->live()
                     // Editing this directly here would change the file's
                     // box without going through transferFileAction()/
                     // moveOutFileAction()/returnFileAction() — silently
@@ -96,9 +112,18 @@ class DocumentFileResource extends BaseResource
                     // through Transfer/Move Out/Return instead.
                     ->disabled(fn (string $operation): bool => $operation === 'edit')
                     ->dehydrated(fn (string $operation): bool => $operation !== 'edit')
-                    ->helperText(fn (string $operation): string => $operation === 'edit'
-                        ? 'Use Transfer, Move Out, or Return to change this — keeps movement history accurate.'
-                        : 'Optional — files can be registered before being boxed.'),
+                    ->helperText(function (string $operation, Get $get): string {
+                        if ($operation === 'edit') {
+                            return 'Use Transfer, Move Out, or Return to change this — keeps movement history accurate.';
+                        }
+
+                        $boxId = $get('current_box_id');
+                        $location = $boxId ? Box::find($boxId)?->currentLocation?->ancestry_path : null;
+
+                        return $location
+                            ? "Storage location: {$location}"
+                            : 'Optional — files can be registered before being boxed.';
+                    }),
                 Forms\Components\Select::make('current_status')
                     ->options([
                         'active' => 'Active',
@@ -156,7 +181,11 @@ class DocumentFileResource extends BaseResource
                 Tables\Columns\TextColumn::make('title')->sortable()->searchable(),
                 Tables\Columns\TextColumn::make('owner_name')->label('Owner')->sortable()->searchable()->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('currentBox.box_number')->label('Box')->sortable()->searchable(),
-                Tables\Columns\TextColumn::make('physical_path')->label('Location')->toggleable(),
+                Tables\Columns\TextColumn::make('physical_path')
+                    ->label('Location')
+                    ->limit(28)
+                    ->tooltip(fn (DocumentFile $record): string => $record->physical_path)
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('current_status')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
@@ -231,13 +260,30 @@ class DocumentFileResource extends BaseResource
                             ->when($data['until'] ?? null, fn ($q, $date) => $q->whereDate('received_date', '<=', $date));
                     }),
             ])
+            // Row click opens View (Edit lives inside View's own header
+            // actions, matching Boxes) — Filament's default recordUrl only
+            // resolves to a 'view'/'edit' *table action* registered below,
+            // so this must be explicit rather than relying on getPages().
+            ->recordUrl(fn (DocumentFile $record): string => static::getUrl('view', ['record' => $record]))
             ->recordActions([
-                static::transferFileAction(),
-                static::moveOutFileAction(),
-                static::returnFileAction(),
-                static::timelineAction(),
-                EditAction::make(),
+                ViewAction::make(),
+                ActionGroup::make([
+                    static::transferFileAction(),
+                    static::moveOutFileAction(),
+                    static::returnFileAction(),
+                    static::timelineAction(),
+                ])
+                    ->label('Actions')
+                    ->icon('heroicon-m-ellipsis-vertical')
+                    ->button(),
                 static::barcodeAction(),
+            ])
+            ->bulkActions([
+                BulkActionGroup::make([
+                    static::bulkBarcodeAction(),
+                    DeleteBulkAction::make()
+                        ->action(fn (Collection $records) => static::deleteSelectedWithReport($records)),
+                ]),
             ])
             ->defaultSort('created_at', 'desc');
     }
@@ -271,24 +317,54 @@ class DocumentFileResource extends BaseResource
             });
     }
 
+    /**
+     * Fields match the "Dispatch to External Party" reference exactly
+     * (Recipient/Contact Name, Company/Vendor, Delivery Address, Courier
+     * Tracking Ref, Expected Return Date, Additional Notes). Only
+     * `destination`/`borrowed_by`/`due_date` have dedicated document_files
+     * columns; the rest have no schema home of their own, so they're folded
+     * into `remarks` (already flows into DocumentMovementLog and shows on
+     * the Timeline action) rather than adding new columns for a UI-only
+     * request — no movement/return business rule needs them as separate
+     * fields today.
+     */
     public static function moveOutFileAction(): Action
     {
         return Action::make('moveOutFile')
             ->label('Move Out')
+            ->modalHeading('Dispatch to External Party')
+            ->modalDescription('This will remove the file from its current box and mark it as dispatched externally.')
             ->icon('heroicon-o-arrow-up-tray')
             ->color('danger')
             ->visible(fn (DocumentFile $record): bool => $record->current_status !== 'moved_out')
             ->authorize(fn (DocumentFile $record): bool => static::can('update', $record))
             ->schema([
-                Forms\Components\TextInput::make('destination')->label('External destination')->required(),
-                Forms\Components\TextInput::make('borrowed_by')->label('Receiver'),
-                Forms\Components\DatePicker::make('due_date')->label('Due back'),
-                Forms\Components\Textarea::make('remarks'),
+                Forms\Components\TextInput::make('borrowed_by')->label('Recipient / Contact Name')->required(),
+                Forms\Components\TextInput::make('destination')->label('Company / Bank / Vendor Name')->required(),
+                Forms\Components\Textarea::make('delivery_address')->label('Delivery Address')->rows(2),
+                Forms\Components\TextInput::make('courier_tracking_ref')->label('Courier Tracking Ref.'),
+                Forms\Components\DatePicker::make('due_date')->label('Expected Return Date'),
+                Forms\Components\Textarea::make('remarks')->label('Additional Notes'),
             ])
             ->action(function (DocumentFile $record, array $data): void {
-                app(DocumentMovementService::class)->moveOutFile($record, $data['destination'], $data);
+                app(DocumentMovementService::class)->moveOutFile($record, $data['destination'], [
+                    ...$data,
+                    'remarks' => static::composeDispatchRemarks($data),
+                ]);
                 Notification::make()->title('File moved out')->success()->send();
             });
+    }
+
+    /** @param array<string, mixed> $data */
+    protected static function composeDispatchRemarks(array $data): ?string
+    {
+        $lines = array_filter([
+            filled($data['delivery_address'] ?? null) ? "Delivery address: {$data['delivery_address']}" : null,
+            filled($data['courier_tracking_ref'] ?? null) ? "Courier tracking ref: {$data['courier_tracking_ref']}" : null,
+            filled($data['remarks'] ?? null) ? $data['remarks'] : null,
+        ]);
+
+        return $lines === [] ? null : implode("\n", $lines);
     }
 
     public static function returnFileAction(): Action
