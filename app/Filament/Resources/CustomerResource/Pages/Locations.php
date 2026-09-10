@@ -41,9 +41,14 @@ class Locations extends Page implements HasTable
     {
         $customerId = $this->getRecord()->getKey();
 
+        // "Add Location" and "Location Chain Builder" used to be two
+        // separate buttons; createChainAction() (labeled "Add Location")
+        // now serves as the single create entry point — a chain of one row
+        // with no starting parent behaves exactly like the old plain
+        // single-location create, and a deeper chain builds a full
+        // hierarchy in one submit.
         return $this->customerScopedResourceTable($table)
             ->headerActions([
-                $this->customerScopedCreateAction('Add Location'),
                 LocationResource::createChainAction($customerId),
                 LocationResource::batchGenerateAction($customerId),
             ]);

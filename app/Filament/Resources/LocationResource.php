@@ -9,7 +9,10 @@ use App\Models\Location;
 use App\Models\LocationType;
 use Closure;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
 use Filament\Forms;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Page;
@@ -17,6 +20,7 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -95,8 +99,9 @@ class LocationResource extends BaseResource
                     ->validationMessages(['unique' => 'This location code is already in use for the selected customer.']),
                 Forms\Components\TextInput::make('location_name')->required()->maxLength(255),
                 Forms\Components\TextInput::make('barcode')->maxLength(100)
-                    // Carries the scanned code over from the Scan Center's
-                    // "unknown barcode → New Location" quick-create link.
+                    // Pre-fills from a ?barcode= query param, if present
+                    // (e.g. a reserved-but-unclaimed barcode from Barcode
+                    // Center's "Reserve Labels" — see BarcodeService::claim()).
                     ->default(fn (string $operation): ?string => $operation === 'create' ? request()->query('barcode') : null)
                     ->unique(
                         ignoreRecord: true,
@@ -140,58 +145,71 @@ class LocationResource extends BaseResource
                     ->color(fn (string $state): string => $state === 'active' ? 'success' : 'gray'),
             ])
             ->recordActions([
-                // A plain EditAction navigates to the standalone
-                // /locations/{id}/edit page, which is jarring when this
-                // table is embedded in Customer 360's Locations tab — edit
-                // in place instead, mirroring the in-modal action pattern
-                // already used by DocumentFileResource's Transfer/Return.
-                Action::make('edit')
-                    ->label('Edit')
-                    ->icon('heroicon-o-pencil-square')
-                    ->authorize(fn (Location $record): bool => static::can('update', $record))
-                    ->fillForm(fn (Location $record): array => $record->toArray())
-                    ->schema(fn (Schema $schema): Schema => static::form($schema))
-                    ->action(function (Location $record, array $data): void {
-                        // Every other edit path forces customer_id back to
-                        // the actor's own tenant server-side (see
-                        // ForcesOwnCustomerId) — this in-modal action is a
-                        // plain $record->update($data), not an EditRecord
-                        // page, so it would otherwise be the one edit path
-                        // in the app that skips that second layer.
-                        $user = auth()->user();
-                        if ($user && ! $user->is_platform_user && $user->customer_id) {
-                            $data['customer_id'] = $user->customer_id;
-                        }
-
-                        $record->update($data);
-                        Notification::make()->title('Location updated')->success()->send();
-                    }),
-                DeleteAction::make()
-                    ->authorize(fn (Location $record): bool => static::can('delete', $record))
-                    ->failureNotificationTitle('Cannot delete')
-                    ->failureNotificationMessage('This location still has boxes, sub-locations, or stock linked to it and cannot be deleted while those exist.')
-                    ->action(function (DeleteAction $action): void {
-                        try {
-                            $result = $action->process(static fn (Model $record): ?bool => $record->delete());
-                        } catch (QueryException $e) {
-                            if ($e->getCode() !== '23000') {
-                                throw $e;
+                ActionGroup::make([
+                    // A plain EditAction navigates to the standalone
+                    // /locations/{id}/edit page, which is jarring when this
+                    // table is embedded in Customer 360's Locations tab —
+                    // edit in place instead, mirroring the in-modal action
+                    // pattern already used by DocumentFileResource's
+                    // Transfer/Return.
+                    Action::make('edit')
+                        ->label('Edit')
+                        ->icon('heroicon-o-pencil-square')
+                        ->authorize(fn (Location $record): bool => static::can('update', $record))
+                        ->fillForm(fn (Location $record): array => $record->toArray())
+                        ->schema(fn (Schema $schema): Schema => static::form($schema))
+                        ->action(function (Location $record, array $data): void {
+                            // Every other edit path forces customer_id back to
+                            // the actor's own tenant server-side (see
+                            // ForcesOwnCustomerId) — this in-modal action is a
+                            // plain $record->update($data), not an EditRecord
+                            // page, so it would otherwise be the one edit path
+                            // in the app that skips that second layer.
+                            $user = auth()->user();
+                            if ($user && ! $user->is_platform_user && $user->customer_id) {
+                                $data['customer_id'] = $user->customer_id;
                             }
 
-                            $action->failure();
+                            $record->update($data);
+                            Notification::make()->title('Location updated')->success()->send();
+                        }),
+                    static::barcodeAction(),
+                    DeleteAction::make()
+                        ->authorize(fn (Location $record): bool => static::can('delete', $record))
+                        ->failureNotificationTitle('Cannot delete')
+                        ->failureNotificationMessage('This location still has boxes, sub-locations, or stock linked to it and cannot be deleted while those exist.')
+                        ->action(function (DeleteAction $action): void {
+                            try {
+                                $result = $action->process(static fn (Model $record): ?bool => $record->delete());
+                            } catch (QueryException $e) {
+                                if ($e->getCode() !== '23000') {
+                                    throw $e;
+                                }
 
-                            return;
-                        }
+                                $action->failure();
 
-                        if (! $result) {
-                            $action->failure();
+                                return;
+                            }
 
-                            return;
-                        }
+                            if (! $result) {
+                                $action->failure();
 
-                        $action->success();
-                    }),
-                static::barcodeAction(),
+                                return;
+                            }
+
+                            $action->success();
+                        }),
+                ])
+                    ->label('Actions')
+                    ->icon('heroicon-m-ellipsis-vertical')
+                    ->button(),
+            ])
+            ->bulkActions([
+                BulkActionGroup::make([
+                    static::bulkBarcodeAction(),
+                    DeleteBulkAction::make()
+                        ->action(fn (Collection $records) => static::deleteSelectedWithReport($records)),
+                ]),
             ])
             ->headerActions([
                 static::createChainAction(),
@@ -216,12 +234,20 @@ class LocationResource extends BaseResource
      * pattern as HasCustomerScopedEmbeddedTable::customerScopedCreateAction(),
      * so this bulk action can't be used to create locations under a
      * different, browser-selected customer.
+     *
+     * Labeled "Add Location" (not "Location Chain Builder") — this is now
+     * the single create entry point for Locations, replacing what used to
+     * be two separate buttons (a plain single-row create + this chain
+     * builder). "Starting Parent" left blank and a chain of exactly one row
+     * behaves exactly like the old plain single-location create; a deeper
+     * chain builds the full hierarchy in one submit. No separate simple
+     * create action remains.
      */
     public static function createChainAction(?int $lockedCustomerId = null): Action
     {
         return Action::make('createChain')
-            ->label('Location Chain Builder')
-            ->icon('heroicon-o-squares-2x2')
+            ->label('Add Location')
+            ->icon('heroicon-o-plus')
             ->authorize(fn (): bool => static::can('create'))
             ->slideOver()
             ->schema([
@@ -430,6 +456,19 @@ use App\Services\BarcodeService;
 class ListLocations extends ListRecords
 {
     protected static string $resource = LocationResource::class;
+
+    /**
+     * Suppress the app-wide base ListRecords' default page-navigating
+     * "Create" button — table()'s own headerActions() already supplies
+     * "Add Location" (createChainAction()) and "Batch Generate", so a third
+     * plain-create button here would be a redundant, differently-behaved
+     * duplicate. The standalone /locations/create route/page itself is left
+     * in place (unused today, harmless to keep) rather than deleted.
+     */
+    protected function getHeaderActions(): array
+    {
+        return [];
+    }
 }
 
 class CreateLocation extends CreateRecord

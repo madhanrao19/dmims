@@ -43,15 +43,13 @@ class ViewBox extends ViewRecord
     public string $scannedFileBarcode = '';
 
     /**
-     * Scanning a box's barcode lands here (ScannerService::recordUrl()) —
-     * without these, an operator has to go back to the Boxes list to
-     * transfer/dispatch/return the very box they just scanned.
+     * Keeps Transfer/Move Out/Return/Timeline reachable from the box's own
+     * detail page, not only from the Boxes list row.
      */
     protected function getHeaderActions(): array
     {
         return [
             $this->scanModeToggleAction(),
-            BoxResource::scanDocumentsInAction(),
             BoxResource::transferBoxAction(),
             BoxResource::moveOutBoxAction(),
             BoxResource::returnBoxAction(),
@@ -89,9 +87,11 @@ class ViewBox extends ViewRecord
     }
 
     /**
-     * Mirrors BarcodeScanner::assignScannedFileToBox() but scoped to this
-     * box, so an operator can run the whole "toggle on, scan each file,
-     * toggle off" step of the demo script without leaving this page.
+     * The single, scoped entry point for scanning a Document File barcode
+     * directly into this box — Document File barcodes only (checked below);
+     * an operator can toggle Scan Mode on, scan repeatedly, and toggle off
+     * without ever leaving this page (Scan Center, which used to offer a
+     * generic version of this, has been removed).
      */
     public function scanDocument(): void
     {
@@ -113,6 +113,10 @@ class ViewBox extends ViewRecord
         $barcode = trim($this->scannedFileBarcode);
         $outcome = app(ScannerService::class)->scan($barcode, auth()->user());
         $this->scannedFileBarcode = '';
+        // Refocus the scan input after every attempt (success or reject) so
+        // an operator can keep firing a handheld scanner without touching
+        // the mouse/keyboard between scans.
+        $this->dispatch('barcode-scanned');
 
         if ($outcome['result'] !== 'found' || ! $outcome['record'] instanceof DocumentFile) {
             Notification::make()
@@ -162,5 +166,16 @@ class ViewBox extends ViewRecord
             ->send();
 
         $this->record->refresh();
+
+        // $this->record->refresh() only updates this page's own $record
+        // property (the infolist's Contents counts re-read it on render
+        // regardless), but the "Documents in this Box" tab below is a
+        // separate child Livewire component (RelationManager) with its own
+        // table query — it does not re-query just because the parent
+        // refreshed. '$refresh' is Livewire's special event name that
+        // re-renders every component on the page, parent and children
+        // alike, so the new file shows up in that list immediately without
+        // a manual page reload.
+        $this->dispatch('$refresh');
     }
 }

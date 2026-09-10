@@ -203,8 +203,9 @@ class BarcodeRegistryResource extends BaseResource
                 // yet — unlike Batch Generate above (which only barcodes
                 // existing DB rows), these are claimed later by
                 // BarcodeService::claim() when a matching record is created
-                // (see the Scan Center's "unused barcode → create form"
-                // redirect).
+                // with the same barcode value (typed manually, or carried
+                // over via a ?barcode= query param on that resource's own
+                // Create form).
                 Action::make('reserve')
                     ->label('Reserve Labels')
                     ->icon('heroicon-o-ticket')
@@ -252,15 +253,16 @@ class BarcodeRegistryResource extends BaseResource
                             ->default('medium')
                             ->live(),
                     ])
-                    ->modalContent(fn (BarcodeRegistry $record, array $data) => view('filament.barcode-label', [
-                        'barcode' => $record->barcode,
-                        'type' => $record->barcode_type,
-                        'size' => $data['size'] ?? 'medium',
-                    ]))
-                    ->modalSubmitActionLabel('Mark as printed')
-                    ->action(function (BarcodeRegistry $record): void {
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Close')
+                    ->modalContent(function (BarcodeRegistry $record, array $data) {
                         app(BarcodeService::class)->incrementPrinted($record);
-                        Notification::make()->title("Reprinted: {$record->barcode}")->success()->send();
+
+                        return view('filament.barcode-label', [
+                            'barcode' => $record->barcode,
+                            'type' => $record->barcode_type,
+                            'size' => $data['size'] ?? 'medium',
+                        ]);
                     }),
                 Action::make('replace')
                     ->label('Lost/Damaged')
@@ -291,14 +293,16 @@ class BarcodeRegistryResource extends BaseResource
                             ->default('small'),
                     ])
                     ->modalHeading('Batch print preview')
-                    ->modalContent(fn (Collection $records, array $data) => view('filament.batch-barcode-labels', [
-                        'registries' => $records,
-                        'size' => $data['size'] ?? 'small',
-                    ]))
-                    ->action(function (Collection $records): void {
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Close')
+                    ->modalContent(function (Collection $records, array $data) {
                         /** @var Collection<int, BarcodeRegistry> $records */
                         $records->each(fn (BarcodeRegistry $record) => app(BarcodeService::class)->incrementPrinted($record));
-                        Notification::make()->title('Batch marked as printed')->success()->send();
+
+                        return view('filament.batch-barcode-labels', [
+                            'registries' => $records,
+                            'size' => $data['size'] ?? 'small',
+                        ]);
                     }),
             ])
             ->defaultSort('barcode');

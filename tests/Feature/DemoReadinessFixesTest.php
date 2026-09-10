@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Filament\Pages\BarcodeScanner;
 use App\Filament\Resources\BoxResource\Pages\ViewBox;
 use App\Filament\Resources\BoxResource\RelationManagers\AuditLogRelationManager;
 use App\Filament\Resources\BoxResource\RelationManagers\DocumentFilesRelationManager;
@@ -147,34 +146,19 @@ class DemoReadinessFixesTest extends TestCase
         Livewire::test(DocumentAuditLog::class, ['record' => $file->id])->assertOk();
     }
 
-    public function test_scanning_a_file_barcode_with_a_target_box_assigns_it(): void
-    {
-        $platformUser = $this->platformAdmin();
-        $box = $this->box();
-        $file = DocumentFile::create(['customer_id' => $this->customer->id, 'file_barcode' => 'FBC-SCAN', 'title' => 'Contract', 'current_status' => 'active']);
-        BarcodeRegistry::create([
-            'customer_id' => $this->customer->id,
-            'barcode' => 'FBC-SCAN',
-            'barcode_type' => 'document_file',
-            'reference_table' => 'document_files',
-            'reference_id' => $file->id,
-            'status' => 'active',
-        ]);
-
-        Livewire::actingAs($platformUser)
-            ->test(BarcodeScanner::class)
-            ->set('data.target_box_id', $box->id)
-            ->set('data.barcode', 'FBC-SCAN')
-            ->call('scan')
-            ->assertNoRedirect();
-
-        $this->assertSame($box->id, $file->fresh()->current_box_id);
-        $this->assertDatabaseHas('document_movement_logs', ['movable_type' => 'document_file', 'movable_id' => $file->id, 'to_box_id' => $box->id]);
-    }
-
+    /**
+     * Scan Center was removed (its "scan a Document File into a target box"
+     * mode was redundant with View Box's own Scan Mode, which uses the same
+     * ScannerService/DocumentMovementService underneath) — this cross-
+     * customer guard is still exercised, just via ViewBox::scanDocument()
+     * instead of the now-deleted BarcodeScanner page. The basic
+     * assign-via-scan and permission-gating cases are already covered by
+     * DemoCorrectionPassTest's test_add_document_mode_assigns_an_unboxed_file
+     * and test_viewer_cannot_use_add_document_mode_toggle.
+     */
     public function test_platform_user_cannot_scan_assign_a_file_into_another_customers_box(): void
     {
-        $platformUser = $this->platformAdmin();
+        $this->platformAdmin();
         $otherCustomer = Customer::create(['company_name' => 'Globex', 'company_code' => 'GLX', 'status' => 'active']);
         $otherBox = Box::create(['customer_id' => $otherCustomer->id, 'box_number' => 'GB1', 'box_barcode' => 'BC-GB1', 'status' => 'active']);
         $file = DocumentFile::create(['customer_id' => $this->customer->id, 'file_barcode' => 'FBC-XT', 'title' => 'Contract', 'current_status' => 'active']);
@@ -187,44 +171,13 @@ class DemoReadinessFixesTest extends TestCase
             'status' => 'active',
         ]);
 
-        Livewire::actingAs($platformUser)
-            ->test(BarcodeScanner::class)
-            ->set('data.target_box_id', $otherBox->id)
-            ->set('data.barcode', 'FBC-XT')
-            ->call('scan')
-            ->assertNoRedirect();
+        Livewire::test(ViewBox::class, ['record' => $otherBox->id])
+            ->set('addDocumentMode', true)
+            ->set('scannedFileBarcode', 'FBC-XT')
+            ->call('scanDocument');
 
         $this->assertNull($file->fresh()->current_box_id);
         $this->assertDatabaseMissing('document_movement_logs', ['movable_type' => 'document_file', 'movable_id' => $file->id]);
-    }
-
-    public function test_stock_inventory_user_cannot_use_add_document_mode(): void
-    {
-        // Stock Inventory User has 'manage inventory' + 'manage barcode' but
-        // NOT 'manage documents' — canAccess() alone (checked by
-        // BarcodeScanner::canAccess()) is not enough to permit writing to
-        // Document Files, or the module/license gates on that write get
-        // skipped too.
-        $user = $this->tenantUser('Stock Inventory User', ['stock_inventory', 'document_tracking', 'barcode_scanning']);
-        $box = $this->box();
-        $file = DocumentFile::create(['customer_id' => $this->customer->id, 'file_barcode' => 'FBC-PERM', 'title' => 'Contract', 'current_status' => 'active']);
-        BarcodeRegistry::create([
-            'customer_id' => $this->customer->id,
-            'barcode' => 'FBC-PERM',
-            'barcode_type' => 'document_file',
-            'reference_table' => 'document_files',
-            'reference_id' => $file->id,
-            'status' => 'active',
-        ]);
-
-        Livewire::actingAs($user)
-            ->test(BarcodeScanner::class)
-            ->set('data.target_box_id', $box->id)
-            ->set('data.barcode', 'FBC-PERM')
-            ->call('scan')
-            ->assertNoRedirect();
-
-        $this->assertNull($file->fresh()->current_box_id);
     }
 
     public function test_viewer_cannot_access_box_audit_log_tab(): void

@@ -1267,3 +1267,98 @@ test database (round-trip confirmed) — not independently verified against a li
 MySQL/MariaDB instance before this release, consistent with this project's existing
 migration-verification caveats (see §18's closing note for precedent). Full suite:
 299/299 passing (was 296); Pint and Larastan (level 5) clean; `npm run build` clean.
+
+## 23. UI Feedback Pass 3: Actions Grouping, Barcode Print Redesign, Scan Center Removal — 10 September 2026
+
+Third feedback round against the same reference screenshots. Cloudflare Turnstile was
+already implemented (§21) — real Site/Secret keys were added to `.env` this pass, not
+re-implemented. Scope: Locations create-flow consolidation, Actions-dropdown grouping and
+bulk actions across Boxes/Document Files/Locations, a barcode-print redesign (remove "Mark
+as printed", add a real Print trigger + label-size select + print-only-the-label CSS), and
+full removal of the Scan Center page per an explicit user decision (documented tradeoff:
+loses the generic "scan any barcode → jump to that record" lookup; View Box's own Scan Mode
+already covers the "scan Document Files into a box" use case this removal was justified by).
+
+**✅ Implemented (10 September 2026):**
+- **Locations: "Add Location" + "Location Chain Builder" combined into one button.**
+  `LocationResource::createChainAction()` relabeled "Add Location" (was "Location Chain
+  Builder") — a chain of one row with no starting parent behaves exactly like the old plain
+  single-location create; a deeper chain builds a full hierarchy in one submit. The
+  separate plain `customerScopedCreateAction('Add Location')` removed from Customer 360's
+  Locations tab; the standalone `/locations` list's default page-level Create button
+  suppressed (`ListLocations::getHeaderActions()` returns `[]`) so it doesn't duplicate
+  `table()`'s own header actions. "Batch Generate" unchanged, still separate.
+- **Actions grouped into one dropdown, per resource:**
+  - Locations: Edit, Print Barcode, Delete now one `ActionGroup` (was three separate
+    buttons).
+  - Boxes: View, Transfer, Move Out, Return, Timeline, Print Barcode now one `ActionGroup`
+    (was a standalone View button + a partial group + a standalone Print Barcode button).
+  - Document Files: same consolidation as Boxes.
+- **Bulk actions added to Locations** (`bulkBarcodeAction()` + `deleteSelectedWithReport()`
+  via `BulkActionGroup`), matching the existing Box/Document File pattern exactly — no new
+  code, reused `HasBarcodeAction`/`BaseResource` as-is.
+- **Barcode print redesign** (`App\Filament\Concerns\HasBarcodeAction`, plus
+  `BarcodeRegistryResource`'s `preview`/`batchPrint` actions for consistency, since they
+  share the same views): "Mark as printed" submit-then-confirm step removed
+  (`modalSubmitAction(false)`); a label-size `Select` added to the single-record action
+  (previously only the bulk/registry actions had one); a "Print" button inside the modal
+  content triggers `window.print()` directly, client-side, no server round-trip.
+  `printed_count` now increments the moment the label modal is opened (there is no longer a
+  submit click to hang it on) rather than on a separate confirmation.
+  `resources/views/filament/barcode-label.blade.php` /
+  `batch-barcode-labels.blade.php` gained print-only-the-label CSS (the standard
+  `body * { visibility: hidden }` / `.dmims-print-label, .dmims-print-label * { visibility:
+  visible }` technique) so printing shows only the title/barcode graphic/code value, not the
+  modal heading, size selector, or Print/Close buttons.
+- **Scan Center removed entirely** — `App\Filament\Pages\BarcodeScanner`,
+  `resources/views/filament/pages/barcode-scanner.blade.php`, and `tests/Feature/
+  ScanCenterTest.php` deleted. `ScannerService::recordUrl()` (its only caller) removed as
+  now-dead code. `BoxResource::scanDocumentsInAction()` ("Scan Documents In", the only
+  other link to the page) removed from the Boxes list, `EditBox`, and `ViewBox`. Three test
+  methods in `DemoReadinessFixesTest.php`/`DemoCorrectionPassTest.php` that exercised
+  Scan-Center-specific behavior already redundant with existing `ViewBox`-based "Add
+  Document Mode" tests were removed without porting (confirmed equivalent coverage exists);
+  the one genuinely unique case (`test_platform_user_cannot_scan_assign_a_file_into_another_customers_box`)
+  was ported to exercise the same guard via `ViewBox::scanDocument()` instead.
+- **View Box's Scan Mode: refresh + continuous-focus fixed.** Previously
+  `$this->record->refresh()` only updated the page's own `$record` property — the
+  "Documents in this Box" tab is a separate child Livewire `RelationManager` component with
+  its own table query, which does not re-query just because its parent refreshed. Now also
+  dispatches Livewire's special `'$refresh'` event (re-renders every component on the page,
+  parent and children) after a successful assignment, so the new file appears in the list
+  immediately. The scan input also refocuses after every scan attempt (success or reject)
+  via a dispatched `'barcode-scanned'` browser event + an Alpine listener, so an operator
+  can keep firing a handheld scanner without touching the mouse between scans.
+- **Stale comments/docs updated:** every "Carries the scanned code over from the Scan
+  Center's ... quick-create link" comment on Box/Document File/Location/Product's barcode
+  field default (`request()->query('...')`) reworded — the underlying pre-fill-from-query-
+  param behavior is left in place (harmless, still useful for a reserved-but-unclaimed
+  barcode's URL), only the now-inaccurate "via Scan Center" framing was removed.
+  `docs/DEMO_SCENARIO_DATA.md`'s demo script updated (Scenario 1: "Box Center → Add
+  Document Mode" → "Boxes → View → Scan Mode: ON"; Scenario 5: Scan Center quick-create →
+  plain "Add Location").
+
+**Not done this pass — explicit user decision, documented tradeoff:** Scan Center's
+general-purpose "scan any barcode type → jump to that record" lookup (Product/Location/Box/
+Document File) has no replacement. Anything needing that now goes through each resource's
+own list/search page instead.
+
+**Regression tests:** new `tests/Feature/BarcodePrintActionsTest.php` (6 tests) — the exact
+"change the live label-size select inside the modal" interaction that crashed this app's
+BarcodeRegistryResource before (§14) is re-exercised for Boxes, Document Files, Locations
+(single + bulk), and BarcodeRegistryResource's own preview/batchPrint, confirming the
+`array $data`-typed `modalContent()` closures (not `Get $get`) don't regress. One test file
+edited in place (`CustomerProfileTest.php`'s generic Customer 360 tamper-resistance loop
+dropped its now-mismatched `Locations` case — `createChain` already has its own dedicated
+tamper-resistance test). 298/298 passing (was 292 immediately after Scan Center removal,
+299 before it — net change: -1 for the file explicitly removed, ScanCenterTest's 4 tests
+and DemoReadinessFixesTest/DemoCorrectionPassTest's redundant BarcodeScanner-based tests
+removed without porting once confirmed redundant, +6 for the new print-action regression
+coverage). Pint clean; Larastan (level 5) clean; `npm run build` clean (theme.css shrank
+slightly — fewer Blade files for Tailwind's JIT scanner to scan, consistent with the
+removed view).
+
+**⚠️ Not independently verified this pass:** browser/Playwright verification (unavailable
+this session, as in §21) — the print-only-the-label CSS, the Alpine refocus behavior, and
+the actual visual layout of the grouped Actions dropdowns are verified at the code/
+automated-test level only, not by an interactive browser session.

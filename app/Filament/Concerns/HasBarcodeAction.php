@@ -5,14 +5,18 @@ namespace App\Filament\Concerns;
 use App\Services\BarcodeService;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
-use Filament\Notifications\Notification;
+use Filament\Forms\Components\Select;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Adds a "Barcode" table action to a resource: it generates and registers the
- * record's barcode on first use (idempotent), shows a printable label, and
- * records each print.
+ * Adds a "Print Barcode" table action to a resource: it generates and
+ * registers the record's barcode on first use (idempotent), shows a
+ * printable label with a label-size choice, and prints directly from the
+ * browser (window.print(), triggered client-side from inside the modal —
+ * no "mark as printed" confirmation step). printed_count is incremented the
+ * moment the label is opened for viewing/printing, since there is no longer
+ * a server round-trip on the print click itself to hang it off.
  */
 trait HasBarcodeAction
 {
@@ -23,24 +27,25 @@ trait HasBarcodeAction
             ->icon('heroicon-o-qr-code')
             ->authorize(fn (Model $record): bool => static::can('update', $record))
             ->modalHeading('Barcode label')
-            ->modalSubmitActionLabel('Mark as printed')
-            ->modalContent(function (Model $record) {
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel('Close')
+            ->schema([
+                Select::make('size')
+                    ->label('Label size')
+                    ->options(['small' => 'Small', 'medium' => 'Medium', 'large' => 'Large'])
+                    ->default('medium')
+                    ->live(),
+            ])
+            ->modalContent(function (Model $record, array $data) {
                 $registry = app(BarcodeService::class)->registerFor($record);
+                app(BarcodeService::class)->incrementPrinted($registry);
 
                 return view('filament.barcode-label', [
                     'barcode' => $registry->barcode,
                     'type' => $registry->barcode_type,
                     'title' => static::barcodeLabelTitle($record),
+                    'size' => $data['size'] ?? 'medium',
                 ]);
-            })
-            ->action(function (Model $record): void {
-                $registry = app(BarcodeService::class)->registerFor($record);
-                app(BarcodeService::class)->incrementPrinted($registry);
-
-                Notification::make()
-                    ->title("Barcode printed: {$registry->barcode}")
-                    ->success()
-                    ->send();
             });
     }
 
@@ -60,28 +65,30 @@ trait HasBarcodeAction
             ->icon('heroicon-o-qr-code')
             ->authorize(fn (): bool => static::can('update'))
             ->modalHeading('Barcode labels')
-            ->modalSubmitActionLabel('Mark as printed')
-            ->modalContent(function (Collection $records) {
-                $registries = $records->map(fn (Model $record) => [
-                    'registry' => app(BarcodeService::class)->registerFor($record),
-                    'title' => static::barcodeLabelTitle($record),
-                ]);
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel('Close')
+            ->schema([
+                Select::make('size')
+                    ->label('Label size')
+                    ->options(['small' => 'Small', 'medium' => 'Medium', 'large' => 'Large'])
+                    ->default('small')
+                    ->live(),
+            ])
+            ->modalContent(function (Collection $records, array $data) {
+                $registries = $records->map(function (Model $record) {
+                    $registry = app(BarcodeService::class)->registerFor($record);
+                    app(BarcodeService::class)->incrementPrinted($registry);
+
+                    return [
+                        'registry' => $registry,
+                        'title' => static::barcodeLabelTitle($record),
+                    ];
+                });
 
                 return view('filament.batch-barcode-labels', [
                     'registries' => $registries,
-                    'size' => 'medium',
+                    'size' => $data['size'] ?? 'small',
                 ]);
-            })
-            ->action(function (Collection $records): void {
-                $records->each(function (Model $record): void {
-                    $registry = app(BarcodeService::class)->registerFor($record);
-                    app(BarcodeService::class)->incrementPrinted($registry);
-                });
-
-                Notification::make()
-                    ->title($records->count().' barcode(s) printed')
-                    ->success()
-                    ->send();
             });
     }
 

@@ -117,11 +117,11 @@ class DocumentMovementService
 
     /**
      * Assign a scanned/selected Document File into a Box, choosing
-     * return/receive/transfer by the file's current state. Shared by the
-     * Scan Center's Add Document Mode and the Box view page's inline
-     * toggle so this decision logic (including the dispatched-file nuance
-     * — moveOutFile() clears current_box_id, identical to a never-boxed
-     * file, so current_status is checked first) lives in one place.
+     * return/receive/transfer by the file's current state — used by the Box
+     * view page's Scan Mode, keeping this decision logic (including the
+     * dispatched-file nuance — moveOutFile() clears current_box_id,
+     * identical to a never-boxed file, so current_status is checked first)
+     * in one place rather than duplicated at the call site.
      *
      * @return bool whether anything actually changed (false = already in this box)
      */

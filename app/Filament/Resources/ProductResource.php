@@ -63,10 +63,11 @@ class ProductResource extends BaseResource
                     )
                     ->validationMessages(['unique' => 'This SKU is already in use for the selected customer.']),
                 Forms\Components\TextInput::make('barcode')->maxLength(150)
-                    // Carries the scanned code over from the Scan Center's
-                    // "unused barcode → create form" redirect (reserved
-                    // labels) — matches the same prefill pattern already on
-                    // Box/DocumentFile/Location's barcode fields.
+                    // Pre-fills from a ?barcode= query param, if present
+                    // (e.g. a reserved-but-unclaimed barcode from Barcode
+                    // Center's "Reserve Labels" — see BarcodeService::claim()) —
+                    // matches the same prefill pattern on Box/DocumentFile/
+                    // Location's barcode fields.
                     ->default(fn (string $operation): ?string => $operation === 'create' ? request()->query('barcode') : null)
                     ->unique(
                         ignoreRecord: true,

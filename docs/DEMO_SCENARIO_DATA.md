@@ -23,16 +23,16 @@ before the demo, or scan straight from the printed label.
 
 ## Suggested 5-scenario script
 
-1. **Register a file into a box** — Box Center → `DEMO-BOX-B` → Add Document
-   Mode → scan any barcode not already registered (resolves as "unknown" /
-   new intake).
+1. **Register a file into a box** — Boxes → View `DEMO-BOX-B` → toggle
+   "Scan Mode: ON" → scan any Document File barcode not already registered
+   (resolves as "unknown" / new intake, added directly into this box).
 2. **Transfer a file** — move one of the three seeded files from
    `DEMO-BOX-A` to `DEMO-BOX-B`.
 3. **Dispatch a file** — Move Out a seeded file, then Return it to show the
    round trip logs correctly.
 4. **Transfer a box** — move `DEMO-BOX-A` from Shelf A to Shelf B.
-5. **Add a new location** — Scan Center → scan an unused barcode → quick-create
-   a location under Demo Warehouse.
+5. **Add a new location** — Locations → "Add Location" (single row, or a
+   full chain in one submit) under Demo Warehouse.
 
 Re-running the seeder is safe (idempotent) if a demo run needs a clean reset
 of anything not already touched.

@@ -1,5 +1,5 @@
 <x-filament::section heading="Scan Document">
-    <div class="space-y-4">
+    <div class="space-y-4" x-data x-on:barcode-scanned.window="$nextTick(() => $refs.scanInput?.focus())">
         <p class="text-sm font-medium">Scan Mode is ON — scan each Document File barcode to add it to this box.</p>
 
         <form wire:submit="scanDocument" class="flex items-end gap-3">
@@ -8,6 +8,7 @@
                     <x-filament::input
                         type="text"
                         wire:model="scannedFileBarcode"
+                        x-ref="scanInput"
                         autofocus
                         autocomplete="off"
                         placeholder="Scan or enter a Document File barcode"

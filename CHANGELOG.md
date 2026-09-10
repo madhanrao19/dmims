@@ -6,6 +6,24 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed — Actions grouping, barcode print redesign, Scan Center removed
+
+Locations' "Add Location" and "Location Chain Builder" buttons combined into one "Add
+Location" button (single-row or full chain in one submit). Row actions grouped into a
+single "Actions" dropdown on Locations (Edit/Print Barcode/Delete) and Boxes/Document Files
+(View/Transfer/Move Out/Return/Timeline/Print Barcode); bulk Print Barcode + Delete added to
+Locations, matching the existing Boxes/Document Files pattern. Barcode printing no longer
+has a "Mark as printed" confirmation step — a "Print" button triggers the browser print
+dialog directly, a label-size selector was added to the single-record print action, and
+print output now shows only the label itself (title/barcode graphic/code), not the modal
+chrome around it. **Scan Center removed entirely** (explicit decision, documented tradeoff:
+loses the general "scan any barcode → jump to that record" lookup) — View Box's own Scan
+Mode already covers scanning Document Files into a box, which was Scan Center's other
+purpose; its refresh (the "Documents in this Box" tab now updates live after a scan) and
+continuous-focus (the scan input refocuses after every scan) behavior was also fixed. 298
+tests passing (was 292 right after Scan Center's removal); Pint and Larastan (level 5)
+clean; `npm run build` clean. See `docs/CONFORMANCE_GAP_ANALYSIS.md` §23.
+
 ### Removed — Dead License technical debt (License/Subscription separation confirmed, not merged)
 
 Investigated whether Customer License and Customer Subscription should be combined into one

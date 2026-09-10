@@ -2,10 +2,6 @@
 
 namespace App\Services;
 
-use App\Filament\Resources\BoxResource;
-use App\Filament\Resources\DocumentFileResource;
-use App\Filament\Resources\LocationResource;
-use App\Filament\Resources\ProductResource;
 use App\Models\BarcodeRegistry;
 use App\Models\BarcodeScanLog;
 use App\Models\Box;
@@ -60,8 +56,8 @@ class ScannerService
 
         $result = match (true) {
             ! $registry => 'unknown',
-            // Distinct from 'inactive' so the caller can redirect to the
-            // matching create form (BarcodeScanner::scan()) instead of
+            // Distinct from 'inactive' so a caller can offer a reserved-
+            // but-unclaimed barcode's matching create form instead of
             // showing a dead-end "barcode is inactive" message.
             $registry->status === 'unused' => 'unused',
             $registry->status !== 'active' => 'inactive',
@@ -89,31 +85,5 @@ class ScannerService
         }
 
         return ['result' => $result, 'registry' => $registry, 'record' => $record];
-    }
-
-    /**
-     * The Filament resource URL for a resolved record, if one maps to it.
-     */
-    public function recordUrl(BarcodeRegistry $registry): ?string
-    {
-        $resource = match ($registry->reference_table) {
-            'products' => ProductResource::class,
-            'locations' => LocationResource::class,
-            'boxes' => BoxResource::class,
-            'document_files' => DocumentFileResource::class,
-            default => null,
-        };
-
-        if (! $resource) {
-            return null;
-        }
-
-        // Prefer the detail view (Overview + Movement/Audit Log tabs, plus
-        // Transfer/Move Out/Return header actions) over the plain edit form
-        // where one exists, so scanning a box/file lands somewhere the
-        // operator can actually act on it, not just edit its fields.
-        $page = $resource::hasPage('view') ? 'view' : 'edit';
-
-        return $resource::getUrl($page, ['record' => $registry->reference_id]);
     }
 }

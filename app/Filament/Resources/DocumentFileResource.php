@@ -67,8 +67,9 @@ class DocumentFileResource extends BaseResource
                     ->required()
                     ->visible(fn (): bool => (bool) auth()->user()?->is_platform_user),
                 Forms\Components\TextInput::make('file_barcode')->required()->maxLength(150)
-                    // Carries the scanned code over from the Scan Center's
-                    // "unknown barcode → New Document" quick-create link.
+                    // Pre-fills from a ?file_barcode= query param, if present
+                    // (e.g. a reserved-but-unclaimed barcode from Barcode
+                    // Center's "Reserve Labels" — see BarcodeService::claim()).
                     ->default(fn (string $operation): ?string => $operation === 'create' ? request()->query('file_barcode') : null)
                     ->unique(
                         ignoreRecord: true,
@@ -266,17 +267,17 @@ class DocumentFileResource extends BaseResource
             // so this must be explicit rather than relying on getPages().
             ->recordUrl(fn (DocumentFile $record): string => static::getUrl('view', ['record' => $record]))
             ->recordActions([
-                ViewAction::make(),
                 ActionGroup::make([
+                    ViewAction::make(),
                     static::transferFileAction(),
                     static::moveOutFileAction(),
                     static::returnFileAction(),
                     static::timelineAction(),
+                    static::barcodeAction(),
                 ])
                     ->label('Actions')
                     ->icon('heroicon-m-ellipsis-vertical')
                     ->button(),
-                static::barcodeAction(),
             ])
             ->bulkActions([
                 BulkActionGroup::make([

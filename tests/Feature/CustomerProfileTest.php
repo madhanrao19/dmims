@@ -215,9 +215,13 @@ class CustomerProfileTest extends TestCase
                 // form only shows it ->visibleOn('edit')) — look up by notes.
                 'invoice_date' => now()->toDateString(), 'notes' => 'BILL-NEW-MARKER',
             ], 'notes', 'BILL-NEW-MARKER'],
-            [Locations::class, Location::class, [
-                'location_code' => 'LOC-NEW', 'location_name' => 'New Warehouse',
-            ], 'location_code', 'LOC-NEW'],
+            // Locations is deliberately not in this generic loop: its single
+            // create entry point is now LocationResource::createChainAction()
+            // (action name 'createChain', not the generic 'create'), and its
+            // own tamper-resistance is already covered directly by
+            // test_customer_360_bulk_location_actions_lock_the_customer()
+            // below, which asserts the same "submitted customer_id is
+            // ignored" guarantee for both createChain and batchGenerate.
         ];
 
         foreach ($cases as [$page, $modelClass, $data, $lookupField, $lookupValue]) {

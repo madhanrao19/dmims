@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Filament\Pages\BarcodeScanner;
 use App\Filament\Resources\BoxResource\Pages\EditBox;
 use App\Filament\Resources\BoxResource\Pages\ViewBox;
 use App\Filament\Resources\BoxResource\RelationManagers\AuditLogRelationManager;
@@ -92,55 +91,12 @@ class DemoCorrectionPassTest extends TestCase
         return $user;
     }
 
-    public function test_scanning_a_dispatched_file_into_a_box_uses_the_return_workflow(): void
-    {
-        $platformUser = $this->platformAdmin();
-        $originalBox = $this->box('B1');
-        $newBox = $this->box('B2');
-        $file = DocumentFile::create([
-            'customer_id' => $this->customer->id,
-            'file_barcode' => 'FBC-DISPATCHED',
-            'title' => 'Contract',
-            'current_status' => 'active',
-            'current_box_id' => $originalBox->id,
-        ]);
-        app(DocumentMovementService::class)->moveOutFile($file, 'Client office', ['borrowed_by' => 'Jane']);
-        $file->refresh();
-        $this->assertSame('moved_out', $file->current_status);
-        $this->assertNull($file->current_box_id);
-
-        BarcodeRegistry::create([
-            'customer_id' => $this->customer->id,
-            'barcode' => 'FBC-DISPATCHED',
-            'barcode_type' => 'document_file',
-            'reference_table' => 'document_files',
-            'reference_id' => $file->id,
-            'status' => 'active',
-        ]);
-
-        Livewire::actingAs($platformUser)
-            ->test(BarcodeScanner::class)
-            ->set('data.target_box_id', $newBox->id)
-            ->set('data.barcode', 'FBC-DISPATCHED')
-            ->call('scan')
-            ->assertNoRedirect();
-
-        $file->refresh();
-        $this->assertSame($newBox->id, $file->current_box_id);
-        $this->assertSame('active', $file->current_status);
-        $this->assertNotNull($file->returned_at);
-        $this->assertDatabaseHas('document_movement_logs', [
-            'movable_type' => 'document_file',
-            'movable_id' => $file->id,
-            'action_type' => 'return',
-            'to_box_id' => $newBox->id,
-        ]);
-        $this->assertDatabaseMissing('document_movement_logs', [
-            'movable_type' => 'document_file',
-            'movable_id' => $file->id,
-            'action_type' => 'create',
-        ]);
-    }
+    // test_scanning_a_dispatched_file_into_a_box_uses_the_return_workflow
+    // removed with Scan Center (App\Filament\Pages\BarcodeScanner, deleted):
+    // this exact dispatched-file-return-via-scan scenario is already
+    // covered via View Box's own Scan Mode by
+    // test_add_document_mode_returns_a_dispatched_file() below, which uses
+    // the same DocumentMovementService::assignFileToBox() code path.
 
     public function test_box_view_page_has_a_working_transfer_action(): void
     {

@@ -3,7 +3,6 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Concerns\HasBarcodeAction;
-use App\Filament\Pages\BarcodeScanner;
 use App\Filament\Resources\BoxResource\Pages;
 use App\Filament\Resources\BoxResource\RelationManagers;
 use App\Http\Middleware\EnsureModuleEnabled;
@@ -71,8 +70,9 @@ class BoxResource extends BaseResource
                     ->required()
                     ->visible(fn (): bool => (bool) auth()->user()?->is_platform_user),
                 Forms\Components\TextInput::make('box_barcode')->required()->maxLength(150)
-                    // Carries the scanned code over from the Scan Center's
-                    // "unknown barcode → New Box" quick-create link.
+                    // Pre-fills from a ?box_barcode= query param, if present
+                    // (e.g. a reserved-but-unclaimed barcode from Barcode
+                    // Center's "Reserve Labels" — see BarcodeService::claim()).
                     ->default(fn (string $operation): ?string => $operation === 'create' ? request()->query('box_barcode') : null)
                     ->unique(
                         ignoreRecord: true,
@@ -288,17 +288,17 @@ class BoxResource extends BaseResource
             // be explicit rather than relying on getPages().
             ->recordUrl(fn (Box $record): string => static::getUrl('view', ['record' => $record]))
             ->recordActions([
-                ViewAction::make(),
                 ActionGroup::make([
+                    ViewAction::make(),
                     static::transferBoxAction(),
                     static::moveOutBoxAction(),
                     static::returnBoxAction(),
                     static::timelineAction(),
+                    static::barcodeAction(),
                 ])
                     ->label('Actions')
                     ->icon('heroicon-m-ellipsis-vertical')
                     ->button(),
-                static::barcodeAction(),
             ])
             ->bulkActions([
                 BulkActionGroup::make([
@@ -422,21 +422,6 @@ class BoxResource extends BaseResource
     }
 
     /**
-     * Deep-links to the Scan Center with this box pre-selected as the
-     * "Add Document Mode" target, so an operator can start "create a box,
-     * then scan files into it" from the box itself rather than navigating
-     * to Scan Center and searching for the box again.
-     */
-    public static function scanDocumentsInAction(): Action
-    {
-        return Action::make('scanDocumentsIn')
-            ->label('Scan Documents In')
-            ->icon('heroicon-o-qr-code')
-            ->authorize(fn (Box $record): bool => static::can('update', $record))
-            ->url(fn (Box $record): string => BarcodeScanner::getUrl(['target_box_id' => $record->id]));
-    }
-
-    /**
      * Box View tabs — Documents in this Box / Physical Movement History /
      * System Activity Log render inline on the same page (Filament's
      * standard RelationManager tab strip), not as separate sub-navigation
@@ -529,7 +514,6 @@ class EditBox extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            BoxResource::scanDocumentsInAction(),
             BoxResource::transferBoxAction(),
             BoxResource::moveOutBoxAction(),
             BoxResource::returnBoxAction(),

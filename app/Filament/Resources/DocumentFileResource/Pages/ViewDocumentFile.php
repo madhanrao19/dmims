@@ -17,9 +17,8 @@ class ViewDocumentFile extends ViewRecord
     protected static ?string $navigationLabel = 'Overview';
 
     /**
-     * Scanning a file's barcode lands here (ScannerService::recordUrl()) —
-     * without these, an operator has to go back to the Document Files list
-     * to transfer/dispatch/return the very file they just scanned.
+     * Keeps Transfer/Move Out/Return/Timeline reachable from the file's own
+     * detail page, not only from the Document Files list row.
      */
     protected function getHeaderActions(): array
     {
