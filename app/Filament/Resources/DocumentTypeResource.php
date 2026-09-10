@@ -25,7 +25,7 @@ class DocumentTypeResource extends BaseResource
 
     protected static ?string $permission = 'manage documents';
 
-    protected static string|\BackedEnum|null $navigationIcon = null;
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-document-duplicate';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Document Tracking';
 

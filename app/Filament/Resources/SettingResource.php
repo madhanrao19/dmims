@@ -26,7 +26,7 @@ class SettingResource extends BaseResource
 
     protected static ?string $permission = 'manage settings';
 
-    protected static string|\BackedEnum|null $navigationIcon = null;
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-cog-6-tooth';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Platform';
 

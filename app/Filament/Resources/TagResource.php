@@ -22,7 +22,7 @@ class TagResource extends BaseResource
 
     protected static ?string $permission = 'manage documents';
 
-    protected static string|\BackedEnum|null $navigationIcon = null;
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-hashtag';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Document Tracking';
 

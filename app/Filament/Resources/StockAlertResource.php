@@ -22,6 +22,8 @@ class StockAlertResource extends BaseResource
 
     protected static ?string $permission = 'manage inventory';
 
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-exclamation-triangle';
+
     protected static string|\UnitEnum|null $navigationGroup = 'Platform';
 
     public static function form(Schema $schema): Schema

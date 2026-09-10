@@ -32,6 +32,18 @@ abstract class EditRecord extends BaseEditRecord
         return $this->forceOwnCustomerId($data);
     }
 
+    /** After saving, return to View (e.g. Edit Box -> View Box) instead of
+     *  Filament's default List redirect — falls back to List for the few
+     *  resources with no View page. */
+    protected function getRedirectUrl(): string
+    {
+        $resource = static::getResource();
+
+        return $resource::hasPage('view')
+            ? $resource::getUrl('view', ['record' => $this->getRecord()])
+            : $resource::getUrl('index');
+    }
+
     protected function getHeaderActions(): array
     {
         return [

@@ -19,4 +19,16 @@ abstract class CreateRecord extends BaseCreateRecord
     {
         return $this->forceOwnCustomerId($data);
     }
+
+    /** After creating, go straight to the new record's View page instead of
+     *  Filament's default List redirect — falls back to List for the few
+     *  resources with no View page. */
+    protected function getRedirectUrl(): string
+    {
+        $resource = static::getResource();
+
+        return $resource::hasPage('view')
+            ? $resource::getUrl('view', ['record' => $this->getRecord()])
+            : $resource::getUrl('index');
+    }
 }

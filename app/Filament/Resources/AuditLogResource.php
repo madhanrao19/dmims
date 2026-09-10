@@ -24,7 +24,7 @@ class AuditLogResource extends BaseResource
     // the My Company > Audit Logs tab instead of a standalone nav entry.
     protected static bool $customerFacingViaMyCompany = true;
 
-    protected static string|\BackedEnum|null $navigationIcon = null;
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-clipboard-document-list';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Platform';
 

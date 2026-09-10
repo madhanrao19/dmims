@@ -46,7 +46,7 @@ class BoxResource extends BaseResource
 
     protected static ?string $usageLimitKey = 'max_boxes';
 
-    protected static string|\BackedEnum|null $navigationIcon = null;
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-archive-box';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Document Tracking';
 

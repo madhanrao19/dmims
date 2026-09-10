@@ -27,7 +27,7 @@ class CustomerResource extends BaseResource
     // Supervisor, who both hold `view customers`).
     protected static bool $customerFacingViaMyCompany = true;
 
-    protected static string|\BackedEnum|null $navigationIcon = null;
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-building-office';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Platform';
 

@@ -20,7 +20,7 @@ class DocumentMovementLogResource extends BaseResource
 
     protected static ?string $permission = 'manage documents';
 
-    protected static string|\BackedEnum|null $navigationIcon = null;
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-arrows-right-left';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Document Tracking';
 

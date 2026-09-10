@@ -31,7 +31,7 @@ class LocationTypeResource extends BaseResource
 
     protected static ?string $permission = 'manage inventory';
 
-    protected static string|\BackedEnum|null $navigationIcon = null;
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-squares-2x2';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Locations';
 

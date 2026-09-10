@@ -170,12 +170,13 @@ class ViewBox extends ViewRecord
         // $this->record->refresh() only updates this page's own $record
         // property (the infolist's Contents counts re-read it on render
         // regardless), but the "Documents in this Box" tab below is a
-        // separate child Livewire component (RelationManager) with its own
-        // table query — it does not re-query just because the parent
-        // refreshed. '$refresh' is Livewire's special event name that
-        // re-renders every component on the page, parent and children
-        // alike, so the new file shows up in that list immediately without
-        // a manual page reload.
-        $this->dispatch('$refresh');
+        // separate child Livewire component (DocumentFilesRelationManager)
+        // with its own table query — it does not re-query just because the
+        // parent refreshed. Dispatching a named event that the relation
+        // manager listens for (#[On(...)]) is the correct Livewire 3
+        // cross-component refresh mechanism — a bare '$refresh' event name
+        // (an earlier, unverified attempt at this fix) has no special
+        // meaning to Livewire and does nothing.
+        $this->dispatch('box-documents-updated');
     }
 }

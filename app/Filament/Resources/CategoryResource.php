@@ -26,7 +26,7 @@ class CategoryResource extends BaseResource
     // split must cover Categories too, not just Products.
     protected static ?string $deletePermission = 'delete inventory';
 
-    protected static string|\BackedEnum|null $navigationIcon = null;
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-tag';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Stock Inventory';
 

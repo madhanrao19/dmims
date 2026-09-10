@@ -28,7 +28,7 @@ class LicenseResource extends BaseResource
 
     protected static ?string $permission = 'manage licensing';
 
-    protected static string|\BackedEnum|null $navigationIcon = null;
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-key';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Subscription';
 

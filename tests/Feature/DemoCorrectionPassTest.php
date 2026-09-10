@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Filament\Resources\BoxResource\Pages\EditBox;
 use App\Filament\Resources\BoxResource\Pages\ViewBox;
 use App\Filament\Resources\BoxResource\RelationManagers\AuditLogRelationManager;
+use App\Filament\Resources\BoxResource\RelationManagers\DocumentFilesRelationManager;
 use App\Filament\Resources\DocumentFileResource;
 use App\Filament\Resources\DocumentFileResource\Pages\CreateDocumentFile;
 use App\Filament\Resources\DocumentFileResource\Pages\EditDocumentFile;
@@ -442,6 +443,30 @@ class DemoCorrectionPassTest extends TestCase
             'action_type' => 'create',
             'to_box_id' => $box->id,
         ]);
+    }
+
+    /**
+     * DocumentFilesRelationManager's own #[On('box-documents-updated')]
+     * listener is what makes ViewBox::scanDocument()'s dispatch() actually
+     * refresh the "Documents in this Box" tab — a bare '$refresh' event
+     * (tried before this fix) has no special meaning to Livewire and does
+     * nothing, so a scanned file only showed up after a manual page reload.
+     */
+    public function test_box_documents_updated_event_refreshes_the_relation_manager(): void
+    {
+        $this->platformAdmin();
+        $box = $this->box('B1');
+        $file = DocumentFile::create(['customer_id' => $this->customer->id, 'file_barcode' => 'FBC-LIVE', 'title' => 'Contract', 'current_status' => 'active']);
+
+        $component = Livewire::test(DocumentFilesRelationManager::class, ['ownerRecord' => $box, 'pageClass' => ViewBox::class])
+            ->assertDontSee('FBC-LIVE');
+
+        // Assign the file the same way DocumentMovementService does — this
+        // one already-mounted component instance has no knowledge of the
+        // write below until the dispatched event forces it to re-render.
+        $file->update(['current_box_id' => $box->id]);
+
+        $component->dispatch('box-documents-updated')->assertSee('FBC-LIVE');
     }
 
     public function test_add_document_mode_transfers_a_file_from_another_box(): void

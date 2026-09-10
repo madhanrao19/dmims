@@ -21,7 +21,7 @@ class SubscriptionPlanResource extends BaseResource
 
     protected static ?string $permission = 'manage subscriptions';
 
-    protected static string|\BackedEnum|null $navigationIcon = null;
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-rectangle-stack';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Subscription';
 

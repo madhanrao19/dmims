@@ -9,6 +9,7 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
+use Livewire\Attributes\On;
 
 /**
  * Box View tab: files currently stored in this box. Custom columns rather
@@ -22,6 +23,18 @@ class DocumentFilesRelationManager extends RelationManager
     protected static string $relationship = 'files';
 
     protected static ?string $title = 'Documents in this Box';
+
+    /**
+     * ViewBox::scanDocument() dispatches 'box-documents-updated' after
+     * assigning a scanned file into this box — this listener is what
+     * actually makes that refresh this table (Livewire re-renders a
+     * component on any caught event, even one whose handler does nothing).
+     */
+    #[On('box-documents-updated')]
+    public function refreshAfterScan(): void
+    {
+        //
+    }
 
     public function table(Table $table): Table
     {
