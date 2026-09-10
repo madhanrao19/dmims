@@ -49,37 +49,9 @@
     @endif
 </div>
 
-@if ($standalone)
-    <script>
-        // Prints the label via a hidden same-page iframe carrying the app's
-        // own compiled stylesheets, so the printed page matches this
-        // on-screen preview exactly. Deliberately not window.open(): a
-        // popup can be silently blocked by the browser with no visible
-        // error, which is the most likely cause of "clicking Print does
-        // nothing" — an iframe appended to the current page has no such
-        // blocker to fight. A short timeout backs up the iframe's load
-        // event in case it fires before the linked stylesheet finishes
-        // applying (fonts/table layout still render fine either way; this
-        // just avoids ever silently not printing at all).
-        function dmimsPrintLabel(btn) {
-            var target = btn.closest('[data-print-root]').querySelector('[data-print-target]');
-            var styles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style')).map(function (n) { return n.outerHTML; }).join('');
-            var iframe = document.createElement('iframe');
-            iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
-            document.body.appendChild(iframe);
-            iframe.contentDocument.open();
-            iframe.contentDocument.write('<html><head><title>Print</title>' + styles + '</head><body style="padding:24px">' + target.outerHTML + '</body></html>');
-            iframe.contentDocument.close();
-            var printed = false;
-            var doPrint = function () {
-                if (printed) return;
-                printed = true;
-                iframe.contentWindow.focus();
-                iframe.contentWindow.print();
-                setTimeout(function () { iframe.remove(); }, 1000);
-            };
-            iframe.onload = doPrint;
-            setTimeout(doPrint, 500);
-        }
-    </script>
-@endif
+{{-- dmimsPrintLabel() is defined once, globally, by FilamentPanelProvider's
+     BODY_END render hook — not here. This modal's content (including any
+     <script> tag placed in this file) is injected into the DOM after the
+     page's initial load, and browsers never execute a <script> that arrives
+     that way, so a per-modal copy of this function was dead code that never
+     ran: the button's onclick called an undefined function. --}}

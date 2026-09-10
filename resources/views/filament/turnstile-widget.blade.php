@@ -7,6 +7,14 @@
     widget needed several page refreshes to "stick" and then vanished the
     moment it was checked. wire:ignore tells Livewire to never touch this
     subtree, so Turnstile fully owns its own DOM across re-renders.
+
+    min-height on the container reserves the widget's standard rendered size
+    (Cloudflare's own recommended fix for this) — without it, the container
+    is 0px tall until the iframe loads in asynchronously, which visibly
+    shifts every field below it (and the Sign in button) down the moment it
+    appears. A click/type aimed at pre-shift coordinates then lands on the
+    wrong element — this is what looked like "needs several refreshes to
+    load".
 --}}
 <div
     wire:ignore
@@ -15,6 +23,7 @@
         window.onDmimsTurnstileVerified = (token) => { $wire.set('data.turnstile_token', token, false); };
         window.onDmimsTurnstileExpired = () => { $wire.set('data.turnstile_token', null, false); };
     "
+    style="min-height: 65px"
 >
     <div
         class="cf-turnstile"
