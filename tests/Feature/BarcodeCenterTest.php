@@ -34,35 +34,21 @@ class BarcodeCenterTest extends TestCase
         $this->assertSame(2, BarcodeRegistry::withoutGlobalScopes()->count());
     }
 
-    public function test_batch_generate_issues_barcodes_for_selected_products(): void
+    /**
+     * "Batch Generate" (renamed from "Reserve Labels" — the previous,
+     * separate "Batch Generate" action that barcoded existing un-barcoded
+     * DB rows was removed; this reservation-based action is now the only
+     * one, under the name the user expects).
+     */
+    public function test_batch_generate_action_creates_unused_reserved_rows(): void
     {
         $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACM', 'status' => 'active']);
-        $productA = Product::create(['customer_id' => $customer->id, 'sku' => 'SKU1', 'product_name' => 'Widget A', 'status' => 'active']);
-        $productB = Product::create(['customer_id' => $customer->id, 'sku' => 'SKU2', 'product_name' => 'Widget B', 'status' => 'active']);
         $admin = User::factory()->create(['is_platform_user' => true, 'status' => 'active']);
         $admin->givePermissionTo(Permission::findOrCreate('manage barcode'));
 
         Livewire::actingAs($admin)
             ->test(ListBarcodeRegistries::class)
             ->callTableAction('batchGenerate', data: [
-                'type' => 'product',
-                'record_ids' => [$productA->id, $productB->id],
-            ])
-            ->assertHasNoTableActionErrors();
-
-        $this->assertNotNull($productA->fresh()->barcode);
-        $this->assertNotNull($productB->fresh()->barcode);
-    }
-
-    public function test_reserve_labels_action_creates_unused_rows(): void
-    {
-        $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACM', 'status' => 'active']);
-        $admin = User::factory()->create(['is_platform_user' => true, 'status' => 'active']);
-        $admin->givePermissionTo(Permission::findOrCreate('manage barcode'));
-
-        Livewire::actingAs($admin)
-            ->test(ListBarcodeRegistries::class)
-            ->callTableAction('reserve', data: [
                 'customer_id' => $customer->id,
                 'type' => 'document_file',
                 'count' => 5,

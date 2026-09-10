@@ -6,10 +6,10 @@ use App\Filament\Resources\BoxResource\Pages\ViewBox;
 use App\Filament\Resources\BoxResource\RelationManagers\AuditLogRelationManager;
 use App\Filament\Resources\BoxResource\RelationManagers\DocumentFilesRelationManager;
 use App\Filament\Resources\BoxResource\RelationManagers\MovementLogRelationManager;
-use App\Filament\Resources\DocumentFileResource\Pages\AuditLog as DocumentAuditLog;
 use App\Filament\Resources\DocumentFileResource\Pages\CreateDocumentFile;
-use App\Filament\Resources\DocumentFileResource\Pages\MovementLog as DocumentMovementLog;
 use App\Filament\Resources\DocumentFileResource\Pages\ViewDocumentFile;
+use App\Filament\Resources\DocumentFileResource\RelationManagers\AuditLogRelationManager as DocumentAuditLogRelationManager;
+use App\Filament\Resources\DocumentFileResource\RelationManagers\MovementLogRelationManager as DocumentMovementLogRelationManager;
 use App\Filament\Resources\LocationResource;
 use App\Models\BarcodeRegistry;
 use App\Models\Box;
@@ -142,8 +142,8 @@ class DemoReadinessFixesTest extends TestCase
         $file = DocumentFile::create(['customer_id' => $this->customer->id, 'file_barcode' => 'FBC-1', 'title' => 'Contract', 'current_status' => 'active']);
 
         Livewire::test(ViewDocumentFile::class, ['record' => $file->id])->assertOk();
-        Livewire::test(DocumentMovementLog::class, ['record' => $file->id])->assertOk();
-        Livewire::test(DocumentAuditLog::class, ['record' => $file->id])->assertOk();
+        Livewire::test(DocumentMovementLogRelationManager::class, ['ownerRecord' => $file, 'pageClass' => ViewDocumentFile::class])->assertOk();
+        Livewire::test(DocumentAuditLogRelationManager::class, ['ownerRecord' => $file, 'pageClass' => ViewDocumentFile::class])->assertOk();
     }
 
     /**

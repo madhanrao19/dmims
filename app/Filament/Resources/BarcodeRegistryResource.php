@@ -5,17 +5,12 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\BarcodeRegistryResource\Pages;
 use App\Http\Middleware\EnsureModuleEnabled;
 use App\Models\BarcodeRegistry;
-use App\Models\Box;
-use App\Models\DocumentFile;
-use App\Models\Location;
-use App\Models\Product;
 use App\Services\BarcodeService;
 use App\Services\ModuleAccessService;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Forms;
 use Filament\Notifications\Notification;
-use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -49,14 +44,6 @@ class BarcodeRegistryResource extends BaseResource
     protected static string|\UnitEnum|null $navigationGroup = 'Shared Services';
 
     protected static ?int $navigationSort = 1;
-
-    /** Types selectable for batch generation, mapped to their model. */
-    private const BATCH_TYPES = [
-        'product' => Product::class,
-        'location' => Location::class,
-        'box' => Box::class,
-        'document_file' => DocumentFile::class,
-    ];
 
     /** Every barcode type this resource knows about, with the module/permission that gates it. */
     private const TYPE_META = [
@@ -155,59 +142,17 @@ class BarcodeRegistryResource extends BaseResource
                     ]),
             ])
             ->headerActions([
+                // Pre-prints/reserves labels for records that don't exist
+                // yet — these are claimed later by BarcodeService::claim()
+                // when a matching record is created with the same barcode
+                // value (typed manually, or carried over via a ?barcode=
+                // query param on that resource's own Create form). Labeled
+                // "Batch Generate" (was "Reserve Labels") — the previous,
+                // separate "Batch Generate" action (assigning barcodes to
+                // existing un-barcoded DB rows) was removed; this is now
+                // the only batch barcode action.
                 Action::make('batchGenerate')
                     ->label('Batch Generate')
-                    ->icon('heroicon-o-squares-plus')
-                    ->authorize(fn (): bool => static::can('create'))
-                    ->schema([
-                        Forms\Components\Select::make('type')
-                            ->label('Record type')
-                            ->options(fn () => self::availableTypeOptions())
-                            ->live()
-                            ->required(),
-                        Forms\Components\Select::make('record_ids')
-                            ->label('Records without a barcode yet')
-                            ->multiple()
-                            ->searchable()
-                            ->preload()
-                            ->required()
-                            ->options(function (Get $get) {
-                                $type = $get('type');
-                                if (! $type || ! isset(self::BATCH_TYPES[$type])) {
-                                    return [];
-                                }
-
-                                [$column] = self::unbarcodedColumn($type);
-
-                                return self::BATCH_TYPES[$type]::query()
-                                    ->whereNull($column)
-                                    ->limit(200)
-                                    ->pluck(self::labelColumn($type), 'id');
-                            }),
-                    ])
-                    ->action(function (array $data): void {
-                        $modelClass = self::BATCH_TYPES[$data['type']];
-                        $records = $modelClass::query()->whereIn('id', $data['record_ids'])->get();
-
-                        foreach ($records as $record) {
-                            app(BarcodeService::class)->registerFor($record);
-                        }
-
-                        Notification::make()
-                            ->title('Barcodes generated')
-                            ->body(count($records).' record(s) now have a barcode.')
-                            ->success()
-                            ->send();
-                    }),
-                // Pre-prints/reserves labels for records that don't exist
-                // yet — unlike Batch Generate above (which only barcodes
-                // existing DB rows), these are claimed later by
-                // BarcodeService::claim() when a matching record is created
-                // with the same barcode value (typed manually, or carried
-                // over via a ?barcode= query param on that resource's own
-                // Create form).
-                Action::make('reserve')
-                    ->label('Reserve Labels')
                     ->icon('heroicon-o-ticket')
                     ->authorize(fn (): bool => static::can('create'))
                     ->schema([
@@ -314,29 +259,6 @@ class BarcodeRegistryResource extends BaseResource
             'index' => Pages\ListBarcodeRegistries::route('/'),
             'edit' => Pages\EditBarcodeRegistry::route('/{record}/edit'),
         ];
-    }
-
-    /**
-     * @return array{0: string} the model column that is null until a barcode is generated
-     */
-    private static function unbarcodedColumn(string $type): array
-    {
-        return match ($type) {
-            'box' => ['box_barcode'],
-            'document_file' => ['file_barcode'],
-            default => ['barcode'],
-        };
-    }
-
-    private static function labelColumn(string $type): string
-    {
-        return match ($type) {
-            'product' => 'sku',
-            'location' => 'location_name',
-            'box' => 'box_number',
-            'document_file' => 'title',
-            default => 'id',
-        };
     }
 }
 

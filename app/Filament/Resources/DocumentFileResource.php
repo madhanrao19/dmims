@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Concerns\HasBarcodeAction;
 use App\Filament\Resources\DocumentFileResource\Pages;
+use App\Filament\Resources\DocumentFileResource\RelationManagers;
 use App\Http\Middleware\EnsureModuleEnabled;
 use App\Models\Box;
 use App\Models\Department;
@@ -18,8 +19,9 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
-use Filament\Resources\Pages\Page;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables;
@@ -172,6 +174,64 @@ class DocumentFileResource extends BaseResource
                     ]),
                 Forms\Components\Textarea::make('remarks')->rows(3),
             ]);
+    }
+
+    /**
+     * Matches the reference screenshot's "Document Details"/"Physical
+     * Location"/"Notes" card layout — same scoped exception to this app's
+     * "no infolist() override" convention as BoxResource::infolist() (see
+     * that method's own doc-comment). ViewDocumentFile needs no change for
+     * this to take effect.
+     */
+    public static function infolist(Schema $schema): Schema
+    {
+        return $schema->components([
+            Section::make('Document Details')
+                ->columns(3)
+                ->schema([
+                    TextEntry::make('file_barcode')->label('Barcode')->fontFamily('mono')->copyable(),
+                    TextEntry::make('title')->label('Title'),
+                    TextEntry::make('current_status')
+                        ->label('Status')
+                        ->badge()
+                        ->color(fn (string $state): string => match ($state) {
+                            'active' => 'success',
+                            'transferred' => 'info',
+                            'moved_out' => 'warning',
+                            'archived', 'closed' => 'gray',
+                            'missing', 'damaged' => 'danger',
+                            default => 'gray',
+                        }),
+                    TextEntry::make('file_reference_no')->label('Reference')->placeholder('—'),
+                    TextEntry::make('received_date')->label('Doc Date')->date()->placeholder('—'),
+                    TextEntry::make('source_origin')->label('Origin')->placeholder('—'),
+                    TextEntry::make('creator.name')->label('Created By')->placeholder('—'),
+                    TextEntry::make('created_at')->label('Created')->dateTime(),
+                ]),
+            Section::make('Physical Location')
+                ->columns(2)
+                ->schema([
+                    TextEntry::make('currentBox.box_barcode')->label('Box Barcode')->placeholder('—'),
+                    TextEntry::make('currentBox.status')
+                        ->label('Box Status')
+                        ->badge()
+                        ->placeholder('—')
+                        ->color(fn (?string $state): string => match ($state) {
+                            'active' => 'success',
+                            'closed', 'archived' => 'gray',
+                            'moved_out' => 'info',
+                            'damaged', 'missing' => 'danger',
+                            default => 'gray',
+                        }),
+                    TextEntry::make('physical_path')
+                        ->label('Rack Location (Full Path)')
+                        ->columnSpanFull(),
+                ]),
+            Section::make('Notes')
+                ->schema([
+                    TextEntry::make('remarks')->hiddenLabel()->placeholder('No remarks.'),
+                ]),
+        ]);
     }
 
     public static function table(Table $table): Table
@@ -406,17 +466,17 @@ class DocumentFileResource extends BaseResource
     }
 
     /**
-     * Document File detail page tab bar — Movement Log / Audit Log,
-     * requested by the demo-readiness review (Sep 2026). Same shape as
-     * BoxResource::getRecordSubNavigation().
+     * Document File View tabs — Physical Movement History / System Activity
+     * Log render inline on the same page (Filament's native RelationManager
+     * tab strip), not as separate sub-navigation pages. Mirrors
+     * BoxResource::getRelations() exactly.
      */
-    public static function getRecordSubNavigation(Page $page): array
+    public static function getRelations(): array
     {
-        return $page->generateNavigationItems([
-            Pages\ViewDocumentFile::class,
-            Pages\MovementLog::class,
-            Pages\AuditLog::class,
-        ]);
+        return [
+            RelationManagers\MovementLogRelationManager::class,
+            RelationManagers\AuditLogRelationManager::class,
+        ];
     }
 
     public static function getPages(): array
@@ -426,8 +486,6 @@ class DocumentFileResource extends BaseResource
             'create' => Pages\CreateDocumentFile::route('/create'),
             'view' => Pages\ViewDocumentFile::route('/{record}'),
             'edit' => Pages\EditDocumentFile::route('/{record}/edit'),
-            'movements' => Pages\MovementLog::route('/{record}/movements'),
-            'audit-log' => Pages\AuditLog::route('/{record}/audit-log'),
         ];
     }
 

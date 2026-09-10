@@ -22,17 +22,27 @@
 </div>
 
 <script>
-    {{-- Same print-in-a-separate-window approach as barcode-label.blade.php's
-         own standalone Print button (see that file's comment) — printing
-         the grid exactly as shown here, not a stripped-down/repositioned
-         version fighting the live page's DOM with print-only CSS. --}}
+    {{-- Same hidden-iframe print approach as barcode-label.blade.php's own
+         standalone Print button (see that file's comment for why not
+         window.open) — printing the grid exactly as shown here. --}}
     function dmimsPrintLabel(btn) {
         var target = btn.closest('[data-print-root]').querySelector('[data-print-target]');
         var styles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style')).map(function (n) { return n.outerHTML; }).join('');
-        var w = window.open('', '_blank');
-        w.document.write('<html><head><title>Print</title>' + styles + '</head><body style="padding:24px">' + target.outerHTML + '</body></html>');
-        w.document.close();
-        w.onload = function () { w.focus(); w.print(); };
-        w.onafterprint = function () { w.close(); };
+        var iframe = document.createElement('iframe');
+        iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+        document.body.appendChild(iframe);
+        iframe.contentDocument.open();
+        iframe.contentDocument.write('<html><head><title>Print</title>' + styles + '</head><body style="padding:24px">' + target.outerHTML + '</body></html>');
+        iframe.contentDocument.close();
+        var printed = false;
+        var doPrint = function () {
+            if (printed) return;
+            printed = true;
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+            setTimeout(function () { iframe.remove(); }, 1000);
+        };
+        iframe.onload = doPrint;
+        setTimeout(doPrint, 500);
     }
 </script>

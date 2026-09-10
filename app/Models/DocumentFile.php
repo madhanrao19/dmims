@@ -73,6 +73,26 @@ class DocumentFile extends Model
     }
 
     /**
+     * movable_type/movable_id are plain string/int columns (not a Laravel
+     * morph map), so this is a manually-scoped hasMany rather than
+     * morphMany — matches Box::movementLogs()/DocumentMovementService::log()'s
+     * 'box'/'document_file' string convention.
+     */
+    public function movementLogs()
+    {
+        return $this->hasMany(DocumentMovementLog::class, 'movable_id')->where('movable_type', 'document_file');
+    }
+
+    /**
+     * Same reasoning as movementLogs() — auditable_type stores the model's
+     * FQCN, not a morph map.
+     */
+    public function auditLogs()
+    {
+        return $this->hasMany(AuditLog::class, 'auditable_id')->where('auditable_type', self::class);
+    }
+
+    /**
      * Full physical chain, e.g. "Warehouse A > Rack B > Shelf S02 > Box BX-008 > HR001".
      */
     public function getPhysicalPathAttribute(): string

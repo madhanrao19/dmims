@@ -6,6 +6,20 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed — Barcode print delivery, Barcode Registries actions, Document File view
+
+Barcode printing (Locations/Boxes/Document Files/Barcode Registries, single and bulk) now
+prints via a hidden iframe instead of `window.open()` — a popup can be silently blocked
+with no visible error, which was the likely cause of "Print does nothing." Barcode
+Registries: removed the "Batch Generate" action that assigned barcodes to existing
+un-barcoded rows; "Reserve Labels" renamed to "Batch Generate" (same reservation
+functionality). Document File View now has a matching Document Details/Physical
+Location/Notes card layout (previously a plain field-by-field form embed) with Movement
+Log/Audit Log rendering as inline tabs at the bottom, mirroring Box View's existing
+pattern (new `DocumentFile::movementLogs()`/`auditLogs()` relations +
+`DocumentFileResource/RelationManagers/*`, replacing the old separate sub-navigation
+pages). 300 tests passing; Pint and Larastan (level 5) clean; `npm run build` clean.
+
 ### Changed — Actions grouping, barcode print redesign, Scan Center removed
 
 Locations' "Add Location" and "Location Chain Builder" buttons combined into one "Add
