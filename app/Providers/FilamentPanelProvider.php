@@ -133,15 +133,15 @@ class FilamentPanelProvider extends PanelProvider
                                 var iframe = document.createElement('iframe');
                                 iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
                                 document.body.appendChild(iframe);
-                                // The closing tags below are deliberately built via string
-                                // concatenation ('<' + '/head>', etc.) rather than written as
-                                // literal '</head>'/'</body>' substrings: App\Http\Middleware\
-                                // InjectPwaScript naively regex-matches those substrings anywhere
-                                // in the full HTML response (not just real tags) to splice in PWA
-                                // assets. A literal '</head>'/'</body>' inside this JS string was
-                                // being matched instead of the page's real closing tags, splicing
-                                // unrelated HTML into the middle of this script and corrupting it
-                                // into invalid JavaScript — which silently broke every print click.
+                                // The head- and body-closing tags below are built via string
+                                // concatenation ("<" + "/" + "head>", etc.), never written whole:
+                                // App Http Middleware InjectPwaScript regex-matches those two
+                                // closing-tag substrings anywhere in the full HTML response, not
+                                // just real tags, to splice in PWA link/meta/script tags. Writing
+                                // them whole here got matched instead of the page's own closing
+                                // tags, splicing unrelated HTML into the middle of this script and
+                                // corrupting it into invalid JavaScript, which silently broke every
+                                // print click.
                                 iframe.contentDocument.open();
                                 iframe.contentDocument.write('<html><head><title>Print</title>' + styles + '<' + '/head><body style="padding:24px">' + target.outerHTML + '<' + '/body></html>');
                                 iframe.contentDocument.close();
