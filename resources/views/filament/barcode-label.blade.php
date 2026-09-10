@@ -21,7 +21,7 @@
 @endphp
 
 <div @if ($standalone) data-print-root @endif>
-    <div data-print-target class="flex flex-col items-center gap-3 py-4 text-center">
+    <div data-print-target class="dmims-barcode-item flex flex-col items-center gap-3 py-4 text-center">
         @if (! empty($title))
             <div class="font-semibold">{{ $title }}</div>
         @endif

@@ -14,7 +14,11 @@
                 $registry = $item['registry'] ?? $item;
                 $itemTitle = $item['title'] ?? null;
             @endphp
-            <div class="rounded border border-gray-200 dark:border-gray-700">
+            {{-- No border/box around the label: printed output should be just the
+                 barcode graphic and its text labels. dmims-barcode-item is targeted
+                 by the print handler's injected CSS to keep one label from being
+                 split across a page break in a multi-page print. --}}
+            <div class="dmims-barcode-item">
                 @include('filament.barcode-label', ['barcode' => $registry->barcode, 'type' => $registry->barcode_type, 'size' => $size ?? 'small', 'title' => $itemTitle, 'standalone' => false])
             </div>
         @endforeach

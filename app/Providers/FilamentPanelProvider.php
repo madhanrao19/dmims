@@ -130,6 +130,9 @@ class FilamentPanelProvider extends PanelProvider
                                 if (!btn) return;
                                 var target = btn.closest('[data-print-root]').querySelector('[data-print-target]');
                                 var styles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style')).map(function (n) { return n.outerHTML; }).join('');
+                                // Keeps a single label from being split across a page break when
+                                // a multi-page batch print wraps to more than one sheet.
+                                var printCss = '<style>.dmims-barcode-item{break-inside:avoid;page-break-inside:avoid}</style>';
                                 var iframe = document.createElement('iframe');
                                 iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
                                 document.body.appendChild(iframe);
@@ -143,7 +146,7 @@ class FilamentPanelProvider extends PanelProvider
                                 // corrupting it into invalid JavaScript, which silently broke every
                                 // print click.
                                 iframe.contentDocument.open();
-                                iframe.contentDocument.write('<html><head><title>Print</title>' + styles + '<' + '/head><body style="padding:24px">' + target.outerHTML + '<' + '/body></html>');
+                                iframe.contentDocument.write('<html><head><title>Print</title>' + styles + printCss + '<' + '/head><body style="padding:24px">' + target.outerHTML + '<' + '/body></html>');
                                 iframe.contentDocument.close();
                                 var printed = false;
                                 var doPrint = function () {
