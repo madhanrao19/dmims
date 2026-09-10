@@ -42,16 +42,16 @@
 
     @if ($standalone)
         <div class="flex justify-end gap-2 mt-2">
-            <button type="button" onclick="dmimsPrintLabel(this)" class="fi-btn fi-btn-size-md inline-flex items-center gap-1 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-500">
+            <button type="button" data-dmims-print class="fi-btn fi-btn-size-md inline-flex items-center gap-1 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-500">
                 Print
             </button>
         </div>
     @endif
 </div>
 
-{{-- dmimsPrintLabel() is defined once, globally, by FilamentPanelProvider's
-     BODY_END render hook — not here. This modal's content (including any
-     <script> tag placed in this file) is injected into the DOM after the
-     page's initial load, and browsers never execute a <script> that arrives
-     that way, so a per-modal copy of this function was dead code that never
-     ran: the button's onclick called an undefined function. --}}
+{{-- The print click is handled by a single delegated listener bound once,
+     globally, by FilamentPanelProvider's BODY_END render hook — see that
+     file for why (both this modal's own content and Filament's page
+     navigation inject HTML without executing any <script> inside it, so
+     neither an inline onclick handler nor a per-modal <script> tag here
+     can ever run). --}}

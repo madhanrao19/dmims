@@ -1,6 +1,6 @@
 <div data-print-root>
     <div class="flex justify-end mb-2">
-        <button type="button" onclick="dmimsPrintLabel(this)" class="fi-btn fi-btn-size-sm inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-500">
+        <button type="button" data-dmims-print class="fi-btn fi-btn-size-sm inline-flex items-center gap-1 rounded-lg bg-primary-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-500">
             Print
         </button>
     </div>

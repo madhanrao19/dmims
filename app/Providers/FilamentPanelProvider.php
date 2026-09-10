@@ -104,36 +104,49 @@ class FilamentPanelProvider extends PanelProvider
             // Barcode label print buttons (barcode-label.blade.php,
             // batch-barcode-labels.blade.php) live inside Filament action
             // modals, whose content is injected into the DOM after the
-            // initial page load (opened on demand, not present in the HTML
-            // the browser first parses). Browsers never execute <script>
-            // tags that arrive that way, so a per-modal <script> defining
-            // this function was silently dead — the button's onclick called
-            // an undefined function every time. Defining it once here, in a
-            // render hook that's part of every page's real initial load,
-            // makes it exist before any modal ever opens.
+            // page loads (opened on demand). Browsers never execute a
+            // <script> tag that arrives that way, so a per-modal <script>
+            // defining a print function was silently dead. Moving the
+            // function to a render hook isn't enough on its own either:
+            // Filament navigates between pages via Livewire's wire:navigate
+            // (an SPA-style body swap over AJAX), which — same as the modal
+            // case — injects the new body's HTML without executing any
+            // <script> tag inside it, so a BODY_END hook only ran on the
+            // very first hard page load of a visit, not after clicking to
+            // any other page. The fix that survives both: bind a single
+            // delegated click listener on `document` (which wire:navigate
+            // never replaces, only the body's *content*) once, guarded so
+            // it can't double-bind if this hook's script tag ever does run
+            // again, and target buttons by a data attribute instead of an
+            // inline onclick.
             ->renderHook(
                 PanelsRenderHook::BODY_END,
                 fn (): string => <<<'HTML'
                     <script>
-                        function dmimsPrintLabel(btn) {
-                            var target = btn.closest('[data-print-root]').querySelector('[data-print-target]');
-                            var styles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style')).map(function (n) { return n.outerHTML; }).join('');
-                            var iframe = document.createElement('iframe');
-                            iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
-                            document.body.appendChild(iframe);
-                            iframe.contentDocument.open();
-                            iframe.contentDocument.write('<html><head><title>Print</title>' + styles + '</head><body style="padding:24px">' + target.outerHTML + '</body></html>');
-                            iframe.contentDocument.close();
-                            var printed = false;
-                            var doPrint = function () {
-                                if (printed) return;
-                                printed = true;
-                                iframe.contentWindow.focus();
-                                iframe.contentWindow.print();
-                                setTimeout(function () { iframe.remove(); }, 1000);
-                            };
-                            iframe.onload = doPrint;
-                            setTimeout(doPrint, 500);
+                        if (!window.__dmimsPrintLabelBound) {
+                            window.__dmimsPrintLabelBound = true;
+                            document.addEventListener('click', function (event) {
+                                var btn = event.target.closest('[data-dmims-print]');
+                                if (!btn) return;
+                                var target = btn.closest('[data-print-root]').querySelector('[data-print-target]');
+                                var styles = Array.from(document.querySelectorAll('link[rel="stylesheet"], style')).map(function (n) { return n.outerHTML; }).join('');
+                                var iframe = document.createElement('iframe');
+                                iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+                                document.body.appendChild(iframe);
+                                iframe.contentDocument.open();
+                                iframe.contentDocument.write('<html><head><title>Print</title>' + styles + '</head><body style="padding:24px">' + target.outerHTML + '</body></html>');
+                                iframe.contentDocument.close();
+                                var printed = false;
+                                var doPrint = function () {
+                                    if (printed) return;
+                                    printed = true;
+                                    iframe.contentWindow.focus();
+                                    iframe.contentWindow.print();
+                                    setTimeout(function () { iframe.remove(); }, 1000);
+                                };
+                                iframe.onload = doPrint;
+                                setTimeout(doPrint, 500);
+                            });
                         }
                     </script>
                     HTML,
