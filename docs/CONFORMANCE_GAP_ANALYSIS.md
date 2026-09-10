@@ -877,11 +877,16 @@ generic `current_file_count` entry; it just didn't identify which file).
 separate Field/Old/New columns); unboxed file creation logging no
 movement event (correct — nothing moved).
 
-**⚠️ Still open:** the "Location edit malfunction" ticket wording remains
-unreproduced from source across two review passes — needs a live
-reproduction with the exact error. Reserving barcode labels for
-not-yet-existing records (pre-printing) remains deferred as a larger,
-separate feature.
+**✅ Closed (10 September 2026):** the "Location edit malfunction" ticket item
+— live-reproduced in the browser against Customer 360's Locations tab
+(`/admin/customers/{id}/locations`): opened Edit on an existing location, the
+modal pre-populated every field correctly, changed `location_name`, submitted,
+got a "Location updated" success notification, the table reflected the new
+name immediately, and re-opening Edit showed the change persisted. No defect
+found — the in-modal edit UX shipped in this pass (replacing navigation to a
+standalone page) is confirmed to fully resolve the reported symptom. Reserving
+barcode labels for not-yet-existing records (pre-printing) remains deferred as
+a larger, separate feature.
 
 **Regression tests:** `tests/Feature/DemoCorrectionPassTest.php` (12
 tests) — the dispatched-file return-workflow fix, working Transfer actions
