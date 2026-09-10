@@ -134,10 +134,10 @@ class AccessControlService
 
     private function modeFromLicense(?License $license): string
     {
-        // No license issued yet: LicenseService::isLicenseValid() already treats
-        // this as invalid. Degrade to view-only (same as Suspended/Expired in
-        // Business Rules §8) rather than granting unrestricted full access —
-        // full access must be earned by an actual license, not its absence.
+        // No license issued yet: degrade to view-only (same as Suspended/
+        // Expired in Business Rules §8) rather than granting unrestricted
+        // full access — full access must be earned by an actual license,
+        // not its absence.
         if (! $license) {
             return self::MODE_VIEW_ONLY;
         }
@@ -152,7 +152,7 @@ class AccessControlService
         // automatically flips status to `expired`, so gating this on status
         // would let an unmaintained, still-"active" license keep full access
         // after it has actually lapsed. `valid_to` is inclusive (valid through
-        // the end of that day + grace), matching LicenseService::isLicenseValid.
+        // the end of that day + grace).
         if (Carbon::parse($license->valid_to)
             ->addDays((int) $license->grace_period_days)->endOfDay()->isPast()) {
             return self::MODE_VIEW_ONLY;

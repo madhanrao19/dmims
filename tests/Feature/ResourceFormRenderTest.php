@@ -46,11 +46,10 @@ class ResourceFormRenderTest extends TestCase
             }
         }
 
-        // DocumentMovementLog, LicenseLog, StockAdjustmentApproval,
-        // ProductLocationStock, and StockMovement are intentionally
-        // list-only (system/observer-written, no manual create/edit) — see
-        // their getPages(). 19 is the current count of resources that still
-        // expose a create page.
+        // DocumentMovementLog, StockAdjustmentApproval, ProductLocationStock,
+        // and StockMovement are intentionally list-only (system/observer-
+        // written, no manual create/edit) — see their getPages(). 19 is the
+        // current count of resources that still expose a create page.
         $this->assertGreaterThan(15, $checked, 'Expected to render most resources');
         $this->assertSame([], $failures, "Resource create pages failed to render:\n".implode("\n", $failures));
     }

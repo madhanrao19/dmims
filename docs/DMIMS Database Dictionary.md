@@ -122,6 +122,15 @@ Customer 360 full License administration uses selected customer.
 
 Customer-facing License Status remains limited presentation.
 
+**10 September 2026:** `max_users`, `max_products`, `max_document_files`,
+`max_boxes`, `enabled_modules`, and `allowed_reports` were removed from
+`licenses` — they duplicated `customer_subscriptions`' identically-named
+columns but were never read by any enforcement code (usage caps and module
+access are driven exclusively by `CustomerSubscription`; License's role is
+technical access control via `technical_access_mode`/`status`/`valid_to`,
+per ADR-005 — that separation is unchanged). See
+`docs/CONFORMANCE_GAP_ANALYSIS.md` §22.
+
 ---
 
 # 9. Billing Records

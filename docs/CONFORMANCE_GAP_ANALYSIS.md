@@ -1195,3 +1195,75 @@ Browser/Playwright verification was **not** run this pass (not available — see
 report) — the above is verified at the automated-test level only; UI claims (label text,
 tooltip behavior, print button) are verified by code/test, not by an interactive browser
 session.
+
+## 22. License/Subscription Separation Confirmed; License Technical Debt Cleanup — 10 September 2026
+
+User asked whether Customer License and Customer Subscription are the same concept and
+could be combined. Investigated via two parallel research passes plus direct code
+verification.
+
+**Finding: they must stay separate.** `docs/DMIMS Architecture Decision Records (ADR).md`
+ADR-005 ("Separate Subscription and License", Accepted) rules this explicitly:
+"Subscription controls commercial entitlement. License controls technical access." The code
+genuinely implements that split as two independent gates in `AccessControlService`: License
+(`getEffectiveAccessMode()`/`modeFromLicense()`) drives real request-blocking
+(`EnsureLicenseAllowsAccess` middleware) and view-only mode from `technical_access_mode` +
+expiry/grace period; Subscription (`getEffectiveLimits()` + `CustomerSubscriptionObserver`)
+drives usage caps and `CustomerModule` sync, plus a separate `EnsureSubscriptionActive`
+existence gate. Merging them would conflate two intentionally independent lifecycles (e.g.
+a license can be blocked during a billing dispute while the subscription itself stays
+active). **No merge was made — this section documents technical debt found while confirming
+that, not an architecture change.**
+
+**✅ Fixed (10 September 2026):**
+- **Deleted `app/Services/LicenseService.php`** — confirmed via repo-wide grep to have zero
+  callers anywhere in `app/`, `routes/`, `tests/`, `database/` (only two stale comments in
+  `AccessControlService.php` referenced it). It duplicated validity logic that
+  `AccessControlService::modeFromLicense()` already implements and actually uses. The two
+  stale comments were reworded to drop the reference.
+- **Removed dead `license_logs` infrastructure** (`App\Models\LicenseLog`,
+  `App\Filament\Resources\LicenseLogResource`, and the `license_logs` table via new
+  migration `2026_09_10_000000_drop_license_logs_table.php`). Root cause: `License` already
+  uses the `Auditable` trait (`app/Models/Concerns/Auditable.php`), which records every
+  create/update/delete with old/new diffs into the platform-wide `audit_logs` table,
+  visible via the existing `AuditLogResource` — "the authoritative audit trail for the
+  platform" per that trait's own doc comment. `license_logs` was modeled scaffolding no
+  observer ever wrote to (confirmed via grep — zero `LicenseLog::create` calls anywhere),
+  unlike its sibling `subscription_logs`, which `CustomerSubscriptionObserver` populates on
+  every change. Confirmed not protected by `2026_08_18_000010_enforce_immutable_log_tables`'s
+  DB triggers (those only guard `stock_movements`/`document_movement_logs`/`audit_logs`).
+- **Removed License's dead duplicate fields** — `max_users`, `max_products`,
+  `max_document_files`, `max_boxes`, `enabled_modules`, `allowed_reports` dropped from the
+  `licenses` table (new migration
+  `2026_09_10_000001_drop_dead_limit_and_module_columns_from_licenses_table.php`),
+  `App\Models\License`'s fillable/casts, and the corresponding `LicenseResource` form
+  fields. These duplicated `CustomerSubscription`'s identically-named columns, but only
+  `CustomerSubscription`'s copies were ever read (`AccessControlService::getEffectiveLimits()`
+  reads `CustomerSubscription` exclusively; module access is synced from
+  `CustomerSubscription` via `CustomerSubscriptionObserver`, never from `License`). Keeping
+  them on the admin form was actively misleading — an admin filling in License's
+  `max_users` would reasonably assume it does something, when nothing ever read it.
+  **⚠️ Data-loss note:** the migration's `down()` restores column structure only, not data —
+  any historical values in these 6 columns are permanently lost once `up()` runs. Confirmed
+  low-risk in this codebase specifically (no `License` factory exists; `ReportExportService`'s
+  License Summary export only touches `license_no`/`customer`/`status`/
+  `technical_access_mode`/`valid_to`; `DemoScenariosSeeder`'s `License::firstOrCreate(...)`
+  call doesn't set any of the 6 fields) — flagged here so this isn't run against an
+  environment with real license data without confirming that first.
+- **Repointed `tests/Feature/JsonRuleValidationTest.php`** from `LicenseResource`'s (now
+  removed) `enabled_modules` field to `CustomerSubscriptionResource`'s identical field —
+  the test guards a real, previously-fixed Filament bug (`->rule(static::jsonRule())`
+  throwing a 500 via Filament's closure dependency-injection), not something specific to
+  License; `CustomerSubscriptionResource` uses the exact same `BaseResource::jsonRule()`
+  mechanism on its own `enabled_modules`/`allowed_reports` fields, so the regression stays
+  covered.
+
+**Regression tests:** new `tests/Feature/LicenseResourceFieldsTest.php` (2 tests: the 6
+columns are confirmed gone from the schema; a `License` still creates successfully without
+them). `tests/Feature/JsonRuleValidationTest.php` rewritten in place (2 tests, same count,
+now targeting `CustomerSubscriptionResource`). Both new migrations verified via
+`migrate --pretend`, applied, rolled back, and re-applied cleanly against the local SQLite
+test database (round-trip confirmed) — not independently verified against a live
+MySQL/MariaDB instance before this release, consistent with this project's existing
+migration-verification caveats (see §18's closing note for precedent). Full suite:
+299/299 passing (was 296); Pint and Larastan (level 5) clean; `npm run build` clean.

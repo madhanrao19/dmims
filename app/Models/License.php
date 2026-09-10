@@ -21,12 +21,6 @@ class License extends Model
         'valid_from',
         'valid_to',
         'grace_period_days',
-        'max_users',
-        'max_products',
-        'max_document_files',
-        'max_boxes',
-        'enabled_modules',
-        'allowed_reports',
         'status',
         'technical_access_mode',
         'signature',
@@ -35,8 +29,6 @@ class License extends Model
     ];
 
     protected $casts = [
-        'enabled_modules' => 'array',
-        'allowed_reports' => 'array',
         'valid_from' => 'date',
         'valid_to' => 'date',
     ];

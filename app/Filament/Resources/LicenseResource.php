@@ -54,20 +54,6 @@ class LicenseResource extends BaseResource
                 Forms\Components\DatePicker::make('valid_from')->required(),
                 Forms\Components\DatePicker::make('valid_to')->required(),
                 Forms\Components\TextInput::make('grace_period_days')->numeric()->default(0),
-                Forms\Components\TextInput::make('max_users')->numeric(),
-                Forms\Components\TextInput::make('max_products')->numeric(),
-                Forms\Components\TextInput::make('max_document_files')->numeric(),
-                Forms\Components\TextInput::make('max_boxes')->numeric(),
-                Forms\Components\Textarea::make('enabled_modules')
-                    ->helperText('Enter JSON array of enabled module codes.')
-                    ->rule(static::jsonRule())
-                    ->afterStateHydrated(static::jsonTextareaHydrate())
-                    ->dehydrateStateUsing(static::jsonTextareaDehydrate()),
-                Forms\Components\Textarea::make('allowed_reports')
-                    ->helperText('Enter JSON array of allowed reports.')
-                    ->rule(static::jsonRule())
-                    ->afterStateHydrated(static::jsonTextareaHydrate())
-                    ->dehydrateStateUsing(static::jsonTextareaDehydrate()),
                 Forms\Components\Select::make('status')
                     ->options([
                         'trial' => 'Trial',

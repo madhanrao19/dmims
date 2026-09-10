@@ -6,6 +6,24 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Removed — Dead License technical debt (License/Subscription separation confirmed, not merged)
+
+Investigated whether Customer License and Customer Subscription should be combined into one
+concept — they must stay separate (`docs/DMIMS Architecture Decision Records (ADR).md`
+ADR-005: "Subscription controls commercial entitlement. License controls technical access.",
+implemented as two independent gates in `AccessControlService`). No merge was made; three
+unrelated pieces of dead/duplicate License-side code found during that investigation were
+removed instead: the unused `App\Services\LicenseService` (zero callers anywhere, confirmed
+by repo-wide grep — duplicated `AccessControlService::modeFromLicense()`); the never-written
+`license_logs` table/`LicenseLog` model/`LicenseLogResource` (License is already fully
+audited via the `Auditable` trait into the platform-wide `audit_logs` table, unlike its
+active `subscription_logs` sibling); and License's 6 dead duplicate columns
+(`max_users`/`max_products`/`max_document_files`/`max_boxes`/`enabled_modules`/
+`allowed_reports`, confirmed unread by any enforcement code — only `CustomerSubscription`'s
+identically-named columns are ever consulted). See `docs/CONFORMANCE_GAP_ANALYSIS.md` §22
+for full detail, including the data-loss caveat on the column-drop migration. 299 tests
+passing (was 296); Pint and Larastan (level 5) clean; `npm run build` clean.
+
 ### Added — Cloudflare Turnstile on login, login background image, Department management, Document Reports dashboard
 
 A large feedback pass against the same reference "Document Tracking System" screenshots
