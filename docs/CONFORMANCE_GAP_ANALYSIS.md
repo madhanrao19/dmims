@@ -1362,3 +1362,65 @@ removed view).
 this session, as in §21) — the print-only-the-label CSS, the Alpine refocus behavior, and
 the actual visual layout of the grouped Actions dropdowns are verified at the code/
 automated-test level only, not by an interactive browser session.
+
+## 24. Barcode Print Buttons Still Silently Broken After §23 — Root-Caused via Live Browser — 11 September 2026
+
+§23's browser verification gap turned out to be load-bearing: despite the iframe redesign
+and passing automated tests, "Print Barcode" did nothing in a real browser on every surface
+(Locations, Boxes, Document Files, Barcode Registries; single and bulk) — the automated
+tests exercise the Livewire component's server-side action, not whether the client-side
+`window.print()` call actually fires, so they couldn't catch this. Found and fixed via
+Claude in Chrome browser automation (`http://dmims.test/admin`, Super Admin session).
+
+**✅ Fixed (11 September 2026), two independent stacked bugs:**
+- **`dmimsPrintLabel()` never executed.** It was defined by a `<script>` tag inside
+  `barcode-label.blade.php`/`batch-barcode-labels.blade.php`, both rendered as Filament
+  action-modal content. Modal content is injected into the DOM after the page has already
+  loaded (opened on demand), and separately, Filament navigates between pages via
+  Livewire's `wire:navigate` (an SPA-style body swap over AJAX) — neither path executes a
+  `<script>` tag that arrives that way. Console showed
+  `ReferenceError: dmimsPrintLabel is not defined` on every click, on both a fresh hard
+  page load's modal and a `wire:navigate`'d page. Fixed by binding one delegated `click`
+  listener on `document` (which `wire:navigate` never replaces, only the body's content)
+  from a new `FilamentPanelProvider::renderHook(PanelsRenderHook::BODY_END, ...)`, guarded
+  by `window.__dmimsPrintLabelBound` against double-binding; buttons now carry a
+  `data-dmims-print` attribute instead of an inline `onclick`.
+- **The fix above then collided with `App\Http\Middleware\InjectPwaScript`.** That
+  middleware regex-matches the literal substrings `</head>` and `</body>` anywhere in the
+  full HTML response body (not just real tags) to splice in PWA link/meta/script tags. The
+  print handler's own JS string — which builds an iframe document via
+  `iframe.contentDocument.write(...)` — contained those exact substrings as plain text
+  (both in the string literal and, on a second miss, in an explanatory code comment),
+  so the middleware spliced unrelated HTML (manifest link, `sw-register.js`, Livewire's own
+  injected styles/scripts) into the middle of the script, corrupting it into invalid
+  JavaScript (`SyntaxError: Invalid or unexpected token`). Fixed by building those closing
+  tags via string concatenation (`'<' + '/head>'`, etc.) so the literal substring never
+  appears in the response for the middleware to match — and rewording the comment to
+  describe the tags without quoting them whole, for the same reason.
+
+**Verified live, in the actual browser, on every named surface:** single-record print
+(Locations, Boxes, Document Files, Barcode Registries) and bulk print (Locations, Boxes)
+each opened the modal, rendered the correct label(s), and — on clicking Print — genuinely
+invoked `window.print()` (observed as the OS print dialog opening, which never happened
+before this fix), with zero `dmimsPrintLabel`/`SyntaxError` console errors afterward,
+including through a true `wire:navigate` transition (not just a hard page load).
+
+**Files:** `app/Providers/FilamentPanelProvider.php` (new render hook),
+`resources/views/filament/barcode-label.blade.php`,
+`resources/views/filament/batch-barcode-labels.blade.php` (dead per-modal `<script>` tags
+removed, buttons switched to `data-dmims-print`). No test changes — this bug was invisible
+to the existing automated coverage by nature (client-side script execution timing and a
+cross-cutting middleware interaction), which is exactly why §23 flagged the missing browser
+verification as a real gap rather than a formality.
+
+**Regression tests:** unchanged — 300/300 passing; Pint clean; Larastan (level 5) clean;
+`npm run build` clean.
+
+**⚠️ Known pre-existing, unrelated bug noticed during this verification, not fixed:** every
+table page's "select all" header checkbox throws
+`ReferenceError: areRecordsPartiallySelected is not defined` in the console (Filament's own
+Alpine-generated indeterminate-state expression) on Boxes, Document Files, Barcode
+Registries, and Locations. Individual row checkboxes and bulk actions (including bulk
+Print Barcode, verified above) still work correctly — this only affects the header
+checkbox's visual indeterminate/checked state computation, not selection functionality
+itself. Out of scope for this barcode-print fix; flagged here for a future pass.

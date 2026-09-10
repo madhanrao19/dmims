@@ -6,6 +6,34 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed — Barcode print buttons were still non-functional after the iframe redesign
+
+Verified live via browser automation (Claude in Chrome) that "Print Barcode" did nothing
+on every surface (Locations, Boxes, Document Files, Barcode Registries; single and bulk),
+despite the prior iframe-based redesign. Found two independent, stacked bugs, both fixed:
+
+1. `dmimsPrintLabel()` was defined by a `<script>` tag inside the modal's own Blade
+   partial. Filament injects modal content into the DOM after the page has already
+   loaded, and separately navigates between pages via Livewire's `wire:navigate` (an
+   SPA-style body swap over AJAX) — neither path executes a `<script>` tag that arrives
+   that way, so the function was never defined; every click threw
+   `ReferenceError: dmimsPrintLabel is not defined`. Fixed by binding one delegated
+   click listener on `document` (which `wire:navigate` never replaces) from a
+   `FilamentPanelProvider` `BODY_END` render hook, guarded against double-binding,
+   targeting a `data-dmims-print` attribute instead of an inline `onclick`.
+2. `App\Http\Middleware\InjectPwaScript` naively regex-matches the literal substrings
+   `</head>` and `</body>` anywhere in the full HTML response (not just real tags) to
+   splice in PWA link/meta/script tags. The print handler's own JS string, which builds
+   an iframe document, contained those exact substrings as plain text — so the
+   middleware spliced unrelated HTML into the middle of the script, corrupting it into
+   invalid JavaScript (`SyntaxError: Invalid or unexpected token`). Fixed by building
+   those closing tags via string concatenation instead of writing them out whole.
+
+Confirmed fixed end-to-end in a real browser across every surface: single and bulk print
+on Locations, Boxes, Document Files, and Barcode Registries, including a true
+`wire:navigate`'d page (not just a hard page load). 300 tests passing; Pint and Larastan
+(level 5) clean; `npm run build` clean.
+
 ### Fixed — Barcode print delivery, Barcode Registries actions, Document File view
 
 Barcode printing (Locations/Boxes/Document Files/Barcode Registries, single and bulk) now
