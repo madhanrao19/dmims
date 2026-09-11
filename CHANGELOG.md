@@ -6,6 +6,19 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed — Box/Document File tab renames + foreign-key values humanized
+
+Box View: "Documents in this Box" → "Documents Inside", "Physical Movement
+History" → "Box Movement Log", "System Activity Log" → "Box Audit Log".
+Document File View: "Physical Movement History" → "Document Movement Log",
+"System Activity Log" → "Document Audit Log". `AuditLog::changesSummary()`
+also now resolves the foreign-key columns these two models' audit trails
+actually produce (`current_location_id`, `current_box_id`,
+`document_type_id`, `department_id`, `customer_id`, `user_id`) to the related
+record's name/number instead of a raw id, and drops the "_id" suffix from
+field labels (`Current Location`, not `Current Location Id`) — "Current
+Location: 28 → 27" is exactly the database jargon this was meant to hide.
+
 ### Changed — Human-readable Audit Logs system-wide
 
 Every Audit Log view (platform-wide Audit Logs list, Box and Document File

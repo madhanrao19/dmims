@@ -469,8 +469,8 @@ class DocumentFileResource extends BaseResource
     }
 
     /**
-     * Document File View tabs — Physical Movement History / System Activity
-     * Log render inline on the same page (Filament's native RelationManager
+     * Document File View tabs — Document Movement Log / Document Audit Log
+     * render inline on the same page (Filament's native RelationManager
      * tab strip), not as separate sub-navigation pages. Mirrors
      * BoxResource::getRelations() exactly.
      */

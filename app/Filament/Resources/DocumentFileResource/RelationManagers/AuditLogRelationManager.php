@@ -21,7 +21,7 @@ class AuditLogRelationManager extends RelationManager
 {
     protected static string $relationship = 'auditLogs';
 
-    protected static ?string $title = 'System Activity Log';
+    protected static ?string $title = 'Document Audit Log';
 
     /**
      * Security & Access Control Matrix §14: audit logs are restricted to
