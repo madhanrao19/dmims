@@ -303,7 +303,7 @@ class DemoCorrectionPassTest extends TestCase
 
         Livewire::test(AuditLogRelationManager::class, ['ownerRecord' => $box, 'pageClass' => ViewBox::class])
             ->assertOk()
-            ->assertSee('file_linked')
+            ->assertSee('File Linked')
             ->assertSee('FBC-LINK');
     }
 

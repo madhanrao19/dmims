@@ -125,7 +125,7 @@ class CustomerProfileTest extends TestCase
             [LicensePage::class, LicenseResource::class, 'LIC-A', 'LIC-B'],
             [BillingAndPayments::class, BillingRecordResource::class, 'INV-A', 'INV-B'],
             [Locations::class, LocationResource::class, 'Alpha Warehouse', 'Beta Warehouse'],
-            [AuditLogs::class, AuditLogResource::class, 'ACTION-A', 'ACTION-B'],
+            [AuditLogs::class, AuditLogResource::class, 'Action A', 'Action B'],
         ];
 
         foreach ($cases as [$page, $resource, $expectedNeedle, $forbiddenNeedle]) {

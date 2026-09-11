@@ -7,6 +7,7 @@ use App\Models\AuditLog;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Support\Str;
 
 class AuditLogResource extends BaseResource
 {
@@ -39,12 +40,16 @@ class AuditLogResource extends BaseResource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('id')->sortable(),
+                Tables\Columns\TextColumn::make('created_at')->label('Date & Time')->dateTime()->sortable(),
                 Tables\Columns\TextColumn::make('customer.company_name')->label('Customer')->sortable()->searchable(),
-                Tables\Columns\TextColumn::make('user_id')->label('User ID')->sortable(),
-                Tables\Columns\TextColumn::make('module')->sortable()->searchable(),
-                Tables\Columns\TextColumn::make('action')->limit(40)->searchable(),
-                Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable(),
+                Tables\Columns\TextColumn::make('user.name')->label('Performed By')->sortable()->placeholder('System'),
+                Tables\Columns\TextColumn::make('module')->sortable()->searchable()->formatStateUsing(fn (string $state): string => Str::headline(Str::lower($state))),
+                Tables\Columns\TextColumn::make('action')->badge()->searchable()->formatStateUsing(fn (string $state): string => Str::headline(Str::lower($state))),
+                Tables\Columns\TextColumn::make('changes')
+                    ->label('Changes')
+                    ->wrap()
+                    ->toggleable()
+                    ->state(fn (AuditLog $record): string => $record->changesSummary()),
             ])
             ->filters([
                 // Security review finding (24 August 2026): AuditLog::query()
@@ -54,8 +59,11 @@ class AuditLogResource extends BaseResource
                 // or the filter's own option list leaks which modules every
                 // other tenant on the platform uses.
                 Tables\Filters\SelectFilter::make('module')
-                    ->options(static::getEloquentQuery()->distinct()->pluck('module', 'module')->toArray()),
-            ]);
+                    ->options(static::getEloquentQuery()->distinct()->pluck('module', 'module')
+                        ->map(fn (string $module): string => Str::headline($module))
+                        ->toArray()),
+            ])
+            ->defaultSort('created_at', 'desc');
     }
 
     public static function getPages(): array

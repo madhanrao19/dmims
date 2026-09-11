@@ -6,7 +6,20 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Fixed — Critical: cross-tenant location/box leak in barcode search helpers
+### Changed — Human-readable Audit Logs system-wide
+
+Every Audit Log view (platform-wide Audit Logs list, Box and Document File
+"System Activity Log" tabs, My Company and Customer 360 Audit Logs tabs — all
+of these render `AuditLogResource::table()` or the same relation-manager
+pattern) previously showed raw data: `user_id` instead of the actor's name,
+un-cased `action`/`module` strings, and — on the platform-wide list only — no
+per-field change summary at all. `AuditLog::changesSummary()` (new) is now the
+single, shared source for the "Field Name: old → new" per-field diff (values
+humanized: booleans as Yes/No, null as —), replacing three copies of the same
+closure across the Box/Document File relation managers and the previously
+absent column on the platform-wide list. `action`/`module` now render
+Title Case via `Str::headline()`. The Customer 360 "Audit Logs" sidebar tab
+(`CustomerResource\Pages\AuditLogs`) already existed and needed no change.
 
 A background security review of the commit below caught a cross-tenant data leak:
 `Location::searchByNameOrBarcode()`'s `->where(...)->orWhere(...)` chained directly
