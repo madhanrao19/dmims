@@ -21,10 +21,9 @@ use InvalidArgumentException;
  * cards via BoxResource::infolist() (a deliberate, scoped exception to this
  * app's "no infolist() override" convention — see that method's own
  * doc-comment), plus a "Scan Mode" header toggle for the inline
- * scan-to-assign form. Documents in this Box / Physical Movement History /
- * System Activity Log render as inline RelationManager tabs below this
- * page's content (BoxResource::getRelations()), not as separate
- * sub-navigation pages.
+ * scan-to-assign form. Documents Inside / Box Movement Log / Box Audit Log
+ * render as inline RelationManager tabs below this page's content
+ * (BoxResource::getRelations()), not as separate sub-navigation pages.
  */
 class ViewBox extends ViewRecord
 {
@@ -169,7 +168,7 @@ class ViewBox extends ViewRecord
 
         // $this->record->refresh() only updates this page's own $record
         // property (the infolist's Contents counts re-read it on render
-        // regardless), but the "Documents in this Box" tab below is a
+        // regardless), but the "Documents Inside" tab below is a
         // separate child Livewire component (DocumentFilesRelationManager)
         // with its own table query — it does not re-query just because the
         // parent refreshed. Dispatching a named event that the relation

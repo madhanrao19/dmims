@@ -22,7 +22,7 @@ class DocumentFilesRelationManager extends RelationManager
 {
     protected static string $relationship = 'files';
 
-    protected static ?string $title = 'Documents in this Box';
+    protected static ?string $title = 'Documents Inside';
 
     /**
      * ViewBox::scanDocument() dispatches 'box-documents-updated' after

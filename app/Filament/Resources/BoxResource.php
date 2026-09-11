@@ -463,8 +463,8 @@ class BoxResource extends BaseResource
     }
 
     /**
-     * Box View tabs — Documents in this Box / Physical Movement History /
-     * System Activity Log render inline on the same page (Filament's
+     * Box View tabs — Documents Inside / Box Movement Log / Box Audit Log
+     * render inline on the same page (Filament's
      * standard RelationManager tab strip), not as separate sub-navigation
      * pages — matches the demo-readiness UI/UX request (Sep 2026).
      */

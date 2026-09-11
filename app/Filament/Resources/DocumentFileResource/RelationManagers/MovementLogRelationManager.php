@@ -18,7 +18,7 @@ class MovementLogRelationManager extends RelationManager
 {
     protected static string $relationship = 'movementLogs';
 
-    protected static ?string $title = 'Physical Movement History';
+    protected static ?string $title = 'Document Movement Log';
 
     public function table(Table $table): Table
     {

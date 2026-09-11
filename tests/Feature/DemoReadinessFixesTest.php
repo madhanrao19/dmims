@@ -201,7 +201,7 @@ class DemoReadinessFixesTest extends TestCase
         // this role, not just fail a direct hit against the tab component.
         Livewire::test(ViewBox::class, ['record' => $box->id])
             ->assertOk()
-            ->assertDontSee('System Activity Log');
+            ->assertDontSee('Box Audit Log');
     }
 
     public function test_document_movement_service_rejects_cross_customer_transfer(): void
