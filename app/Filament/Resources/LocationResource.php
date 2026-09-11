@@ -91,13 +91,13 @@ class LocationResource extends BaseResource
                     ->relationship('locationType', 'type_name')
                     ->searchable()
                     ->preload(),
-                Forms\Components\TextInput::make('location_code')->required()->maxLength(100)
+                Forms\Components\TextInput::make('location_code')->maxLength(100)
                     ->unique(
                         ignoreRecord: true,
                         modifyRuleUsing: fn (Unique $rule, Get $get): Unique => $rule->where('customer_id', $get('customer_id')),
                     )
                     ->validationMessages(['unique' => 'This location code is already in use for the selected customer.']),
-                Forms\Components\TextInput::make('location_name')->required()->maxLength(255),
+                Forms\Components\TextInput::make('location_name')->maxLength(255),
                 Forms\Components\TextInput::make('barcode')->maxLength(100)
                     // Pre-fills from a ?barcode= query param, if present
                     // (e.g. a reserved-but-unclaimed barcode from Barcode

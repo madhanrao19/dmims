@@ -6,6 +6,51 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — Global barcode scan: quick-create shortcuts and jump-to-record from any page
+
+Reinstates and extends the "Scan Center" behaviour removed in `19a6e74` — a handheld
+scanner can now be used from anywhere in the app, not just a dedicated page.
+`App\Livewire\BarcodeScannerListener` is mounted globally (via a `FilamentPanelProvider`
+render hook) and listens for fast scanner-gun keystrokes (ignored while any form field
+has focus, so it never competes with normal typing or Box's own "Add Document Mode"
+scan field):
+
+- Scanning a **registered** barcode redirects straight to that record's View page
+  (Box, Document File, Location, Product), restoring `ScannerService::recordUrl()`.
+- Scanning a **reserved-but-unclaimed** barcode redirects to the matching resource's
+  Create form, barcode prefilled.
+- Scanning an **unregistered** barcode shows a persistent "Unregistered Barcode
+  Scanned" toast with **New Box / New Document / New Rack / Cancel** actions, each
+  opening the matching Create form with the scanned barcode prefilled (New Rack also
+  pre-selects the "Rack" location type where seeded).
+- Document File's Received Date now auto-fills to today when arriving via this
+  scan-to-create flow.
+- The listener guards against unauthenticated calls (it mounts on the login page too),
+  clamps scanned input to 150 characters, and HTML-escapes the barcode in its
+  notifications.
+
+### Changed — Document File / Box / Location "Create" forms: all fields now optional
+
+Barcode, Title, Box Number, Location Code/Name, and every other previously-required
+field on these three Create forms can now be left blank and filled in later — matches
+the scan-to-create flow above, where an operator may only have a barcode to hand.
+Required a migration (`2026_09_11_000000_make_identity_fields_optional`) dropping
+`NOT NULL` on `document_files.file_barcode`/`title`, `boxes.box_barcode`/`box_number`,
+and `locations.location_code`/`location_name`; existing per-customer uniqueness rules
+are unaffected (multiple `NULL`s are permitted in a unique index). `CreateBox::afterCreate()`
+now skips its movement-logging call when Current Location is left blank, matching
+`CreateDocumentFile`'s existing handling of an optional Current Box.
+
+### Added — Structured external-dispatch details on Box "Move Out"
+
+`BoxResource::moveOutBoxAction()`'s recipient/company/delivery-address/tracking-ref/
+expected-return-date fields were previously flattened into one free-text `remarks`
+string. They're now stored as structured data in a new
+`document_movement_logs.metadata` JSON column and surfaced in a dedicated "External
+Dispatch Details" section on the Box View page (visible while `status = moved_out`) —
+matching the equivalent feature in the legacy DMOIS system. `remarks` still holds the
+operator's own free-text notes only.
+
 ### Fixed — Barcode print: labels no longer split across pages, no more bordered box
 
 Two print-only follow-up fixes, applied system-wide (Locations, Boxes, Document Files,

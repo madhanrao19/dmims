@@ -1449,4 +1449,79 @@ bordered box; Print still invokes the OS print dialog with zero console errors.
 
 **Regression tests:** unchanged — 300/300 passing (`BarcodePrintActionsTest` unaffected,
 no CSS/DOM-structure assertions); Pint clean; Larastan (level 5) clean; `npm run build`
+
+## 26. Global Barcode Scan Reinstated (Scoped Beyond §23's Removal) + Optional Create Fields + Structured External Dispatch — 11 September 2026
+
+User request, informed by a reference legacy system (DMOIS) screenshot: scanning an
+unregistered barcode from any page should offer quick-create shortcuts (New Box/New
+Document/New Rack), scanning a registered one should jump straight to its record, the
+resulting Create forms should treat every field (including the barcode) as optional,
+and Box "Move Out"'s external-dispatch details should be individually queryable, not
+buried in one `remarks` blob — mirroring a feature already in DMOIS.
+
+Investigation found DMIMS had exactly this scan/toast/redirect behaviour before — a
+dedicated "Scan Center" page — **deliberately removed** in §23 (19a6e74) on the
+reasoning that Box's own Scan Mode covered scanning files into boxes. That reasoning
+doesn't cover the "any page, any barcode type" case the user is asking for, so this
+reinstates the behaviour globally instead of as a page, on top of the barcode
+infrastructure §23/§25 already left in place (`ScannerService`, `BarcodeRegistry`,
+`BarcodeScanLog`).
+
+**✅ Implemented (11 September 2026):**
+- `App\Livewire\BarcodeScannerListener` + `resources/views/livewire/barcode-scanner-listener.blade.php`,
+  mounted globally via a new `FilamentPanelProvider` `PanelsRenderHook::BODY_END` hook
+  (same slot as the existing print-label script, so it survives `wire:navigate`).
+  Alpine buffers scanner-gun keystrokes only while no form field has focus (so it never
+  competes with typing anywhere, including Box's own "Add Document Mode" scan input).
+- `ScannerService::recordUrl()` (deleted in §23) restored — maps a resolved barcode to
+  its resource's View URL (Product falls back to Edit — it has no View page).
+- `file_barcode`/`title`/`current_status` (Document File), `box_barcode`/`box_number`/
+  `current_location_id`/`status` (Box), `location_code`/`location_name` (Location) all
+  lost their `->required()`. New migration
+  `2026_09_11_000000_make_identity_fields_optional.php` drops the matching `NOT NULL`
+  DB constraints (per-customer `unique()` rules unaffected — multiple `NULL`s are
+  permitted in a unique index). `current_location_id`/`current_box_id` were already
+  nullable from an earlier migration.
+- Document File's `received_date` auto-fills to today when arriving via the
+  scan-to-create redirect (`?file_barcode=` present).
+- `BoxResource::moveOutBoxAction()`'s recipient/address/tracking-ref/expected-return
+  fields now write to a new `document_movement_logs.metadata` JSON column (migration
+  `2026_09_11_000001_add_metadata_to_document_movement_logs_table.php`) instead of a
+  concatenated `remarks` string; a new "External Dispatch Details" infolist section on
+  Box View reads them back individually. `remarks` still holds free-text notes only.
+
+**Bugs caught by the qa-tester/security-reviewer subagent pass and fixed before
+shipping:**
+- `CreateBox::afterCreate()` unconditionally called
+  `DocumentMovementService::receiveInBox($record, $record->current_location_id, ...)`,
+  whose second parameter is non-nullable — since `current_location_id` is no longer
+  required, an empty-shell Box create threw an uncaught `TypeError` instead of the
+  `InvalidArgumentException` the surrounding `try/catch` expected. Fixed with the same
+  early-return guard `CreateDocumentFile::afterCreate()` already had for its equivalent
+  optional `current_box_id` case.
+- `BarcodeScannerListener` is mounted on every panel page, including the guest-facing
+  login/password-reset layout — a scan there would have hit `ScannerService::scan()`'s
+  non-nullable `User $user` parameter. Added an `auth()->check()` guard, plus a 150-char
+  clamp on the scanned string (matching `ViewBox`'s own scan input limit) and `e()`
+  escaping on the two notification bodies that interpolate the raw barcode (Filament
+  sanitizes notification HTML already, so this wasn't exploitable as XSS, but a
+  hand-typed barcode containing markup rendered as a live, unescaped element).
+- **Noted, not fixed (pre-existing, broader than this change):** the security review
+  found the panel's `business-access` middleware group (subscription/license/user-active
+  gates, `FilamentPanelProvider.php`) isn't registered as `isPersistent: true`, so it
+  doesn't re-run on Livewire's own update route — a session whose access should have
+  just been revoked can keep calling any Livewire action, this new scanner included,
+  until its next full page load. This predates this change and affects every Filament
+  action in the app, not just barcode scanning; flagged for a separate fix rather than
+  folded into this diff.
+
+**Regression tests:** 308/308 passing, plus 10 new (`BarcodeScannerListenerTest` —
+found/unknown/blank-scan/logged-out-scan/optional-create-save for both Document File
+and Box; `BarcodeScannerTest::test_record_url_maps_a_found_registry_to_its_view_route`;
+`BoxViewInfolistTest::test_box_view_shows_structured_external_dispatch_details_after_move_out`).
+Pint clean; PHPStan (project baseline level) clean on all changed files.
+
+**Deliberately not ported from DMOIS:** its unfinished "barcode pool pre-generation"
+page (labelled "soon" in its own nav) — DMIMS's lazier `BarcodeService::registerFor()`
+register-on-first-print already covers the need without pre-generating unused stock.
 clean.

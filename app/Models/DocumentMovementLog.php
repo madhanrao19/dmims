@@ -25,12 +25,14 @@ class DocumentMovementLog extends Model
         'destination',
         'scanned_barcode',
         'remarks',
+        'metadata',
         'performed_by',
         'performed_at',
     ];
 
     protected $casts = [
         'performed_at' => 'datetime',
+        'metadata' => 'array',
     ];
 
     public function customer()

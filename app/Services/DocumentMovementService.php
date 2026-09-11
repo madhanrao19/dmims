@@ -311,6 +311,7 @@ class DocumentMovementService
             'destination' => $data['destination'] ?? null,
             'scanned_barcode' => $data['scanned_barcode'] ?? null,
             'remarks' => $data['remarks'] ?? null,
+            'metadata' => $data['metadata'] ?? null,
             'performed_by' => auth()->id(),
             'performed_at' => $data['performed_at'] ?? now(),
         ]);

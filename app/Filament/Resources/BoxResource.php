@@ -69,7 +69,7 @@ class BoxResource extends BaseResource
                     ->default(fn (): ?int => auth()->user()?->is_platform_user ? null : auth()->user()?->customer_id)
                     ->required()
                     ->visible(fn (): bool => (bool) auth()->user()?->is_platform_user),
-                Forms\Components\TextInput::make('box_barcode')->required()->maxLength(150)
+                Forms\Components\TextInput::make('box_barcode')->maxLength(150)
                     // Pre-fills from a ?box_barcode= query param, if present
                     // (e.g. a reserved-but-unclaimed barcode from Barcode
                     // Center's "Reserve Labels" — see BarcodeService::claim()).
@@ -79,7 +79,7 @@ class BoxResource extends BaseResource
                         modifyRuleUsing: fn (Unique $rule, Get $get): Unique => $rule->where('customer_id', $get('customer_id')),
                     )
                     ->validationMessages(['unique' => 'This box barcode is already in use for the selected customer.']),
-                Forms\Components\TextInput::make('box_number')->required()->maxLength(100)
+                Forms\Components\TextInput::make('box_number')->maxLength(100)
                     ->unique(
                         ignoreRecord: true,
                         modifyRuleUsing: fn (Unique $rule, Get $get): Unique => $rule->where('customer_id', $get('customer_id')),
@@ -91,7 +91,6 @@ class BoxResource extends BaseResource
                     ->getOptionLabelFromRecordUsing(fn (Location $record): string => $record->ancestry_path)
                     ->searchable()
                     ->preload()
-                    ->required()
                     // Editing this directly here would change the box's
                     // location without going through transferBoxAction()/
                     // moveOutBoxAction()/returnBoxAction() — silently
@@ -121,7 +120,6 @@ class BoxResource extends BaseResource
                         'missing' => 'Missing',
                     ])
                     ->default('active')
-                    ->required()
                     // 'active'/'moved_out' are also written by Transfer/Move
                     // Out/Return (DocumentMovementService) and must stay in
                     // sync with current_location_id, which is locked on edit
@@ -220,6 +218,31 @@ class BoxResource extends BaseResource
                         ->html(),
                     TextEntry::make('currentLocation.barcode')->label('Assigned Node Barcode')->badge()->placeholder('—'),
                 ]),
+            Section::make('External Dispatch Details')
+                ->columns(2)
+                ->visible(fn (Box $record): bool => $record->status === 'moved_out')
+                ->schema([
+                    TextEntry::make('dispatch_recipient_name')->label('Recipient / Contact Name')
+                        ->getStateUsing(fn (Box $record) => static::latestMoveOutMetadata($record)['recipient_name'] ?? null)
+                        ->placeholder('—'),
+                    TextEntry::make('dispatch_company')->label('Company / Bank / Vendor Name')
+                        ->getStateUsing(function (Box $record) {
+                            $log = $record->movementLogs()->where('action_type', 'move_out')->latest('performed_at')->first();
+
+                            return $log?->destination;
+                        })
+                        ->placeholder('—'),
+                    TextEntry::make('dispatch_address')->label('Delivery Address')
+                        ->getStateUsing(fn (Box $record) => static::latestMoveOutMetadata($record)['delivery_address'] ?? null)
+                        ->placeholder('—'),
+                    TextEntry::make('dispatch_tracking_ref')->label('Courier Tracking Ref.')
+                        ->getStateUsing(fn (Box $record) => static::latestMoveOutMetadata($record)['courier_tracking_ref'] ?? null)
+                        ->placeholder('—'),
+                    TextEntry::make('dispatch_expected_return_date')->label('Expected Return Date')
+                        ->getStateUsing(fn (Box $record) => static::latestMoveOutMetadata($record)['expected_return_date'] ?? null)
+                        ->date()
+                        ->placeholder('—'),
+                ]),
             Section::make('Contents')
                 ->columns(3)
                 ->schema([
@@ -235,6 +258,20 @@ class BoxResource extends BaseResource
                     TextEntry::make('remarks')->hiddenLabel()->placeholder('No remarks.'),
                 ]),
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected static function latestMoveOutMetadata(Box $record): array
+    {
+        $log = $record->movementLogs()->where('action_type', 'move_out')->latest('performed_at')->first();
+
+        if (! $log) {
+            return [];
+        }
+
+        return $log->metadata ?? [];
     }
 
     public static function table(Table $table): Table
@@ -341,12 +378,11 @@ class BoxResource extends BaseResource
     }
 
     /**
-     * Fields match the "Dispatch to External Party" reference. Boxes have
-     * no borrowed_by/due_date columns (unlike Document Files), so every
-     * descriptive field here is folded into `remarks` — DocumentMovementLog
-     * already surfaces `remarks` on the Timeline action, and adding new
-     * box-table columns for a UI-only request isn't warranted while no
-     * business rule reads them separately.
+     * Fields match the "Dispatch to External Party" reference. Structured
+     * fields (recipient/address/tracking ref/expected return date) are
+     * stored in the move-out DocumentMovementLog's `metadata` JSON column,
+     * independently readable by infolist()'s "External Dispatch Details"
+     * section below — `remarks` stays free text ("Additional Notes") only.
      */
     public static function moveOutBoxAction(): Action
     {
@@ -367,17 +403,14 @@ class BoxResource extends BaseResource
                 Forms\Components\Textarea::make('remarks')->label('Additional Notes'),
             ])
             ->action(function (Box $record, array $data): void {
-                $lines = array_filter([
-                    "Recipient: {$data['recipient_name']}",
-                    filled($data['delivery_address'] ?? null) ? "Delivery address: {$data['delivery_address']}" : null,
-                    filled($data['courier_tracking_ref'] ?? null) ? "Courier tracking ref: {$data['courier_tracking_ref']}" : null,
-                    filled($data['expected_return_date'] ?? null) ? "Expected return date: {$data['expected_return_date']}" : null,
-                    filled($data['remarks'] ?? null) ? $data['remarks'] : null,
-                ]);
-
                 app(DocumentMovementService::class)->moveOutBox($record, $data['destination'], [
                     ...$data,
-                    'remarks' => implode("\n", $lines),
+                    'metadata' => [
+                        'recipient_name' => $data['recipient_name'],
+                        'delivery_address' => $data['delivery_address'] ?? null,
+                        'courier_tracking_ref' => $data['courier_tracking_ref'] ?? null,
+                        'expected_return_date' => $data['expected_return_date'] ?? null,
+                    ],
                 ]);
                 Notification::make()->title('Box moved out')->success()->send();
             });
@@ -484,6 +517,12 @@ class CreateBox extends CreateRecord
         // Attach a reserved-but-unclaimed barcode if one was pre-filled —
         // see BarcodeService::claim(). No-op for a manually-typed barcode.
         app(BarcodeService::class)->claim($record);
+
+        // A box can now be registered before it's placed (Current Location
+        // is optional) — nothing to log until it's actually placed.
+        if ($record->current_location_id === null) {
+            return;
+        }
 
         try {
             app(DocumentMovementService::class)->receiveInBox(

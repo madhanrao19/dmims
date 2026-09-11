@@ -159,6 +159,23 @@ class BarcodeScannerTest extends TestCase
         $this->assertSame(0, BarcodeRegistry::withoutGlobalScopes()->count());
     }
 
+    public function test_record_url_maps_a_found_registry_to_its_view_route(): void
+    {
+        $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACME', 'status' => 'active']);
+        $file = DocumentFile::create([
+            'customer_id' => $customer->id,
+            'file_barcode' => 'DOC-ACME-000001',
+            'title' => 'Contract',
+            'current_status' => 'active',
+        ]);
+        $registry = app(BarcodeService::class)->registerFor($file);
+
+        $url = app(ScannerService::class)->recordUrl($registry);
+
+        $this->assertStringContainsString((string) $file->id, $url);
+        $this->assertStringContainsString('document-files', $url);
+    }
+
     public function test_scan_unused_barcode_is_reported_distinctly(): void
     {
         $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACME', 'status' => 'active']);

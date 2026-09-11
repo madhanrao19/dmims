@@ -18,6 +18,7 @@ use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class FilamentPanelProvider extends PanelProvider
@@ -162,6 +163,13 @@ class FilamentPanelProvider extends PanelProvider
                         }
                     </script>
                     HTML,
+            )
+            // Global "scan from anywhere" listener (App\Livewire\BarcodeScannerListener)
+            // — mounted here rather than per-page so it survives wire:navigate
+            // page swaps, same reasoning as the print-label script above.
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                fn (): string => Blade::render("@livewire('barcode-scanner-listener')"),
             )
             ->sidebarCollapsibleOnDesktop()
             ->maxContentWidth(Width::Full)

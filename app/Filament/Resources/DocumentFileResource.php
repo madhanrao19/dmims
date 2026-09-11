@@ -68,7 +68,7 @@ class DocumentFileResource extends BaseResource
                     ->default(fn (): ?int => auth()->user()?->is_platform_user ? null : auth()->user()?->customer_id)
                     ->required()
                     ->visible(fn (): bool => (bool) auth()->user()?->is_platform_user),
-                Forms\Components\TextInput::make('file_barcode')->required()->maxLength(150)
+                Forms\Components\TextInput::make('file_barcode')->maxLength(150)
                     // Pre-fills from a ?file_barcode= query param, if present
                     // (e.g. a reserved-but-unclaimed barcode from Barcode
                     // Center's "Reserve Labels" — see BarcodeService::claim()).
@@ -79,7 +79,7 @@ class DocumentFileResource extends BaseResource
                     )
                     ->validationMessages(['unique' => 'This file barcode is already in use for the selected customer.']),
                 Forms\Components\TextInput::make('file_reference_no')->maxLength(150),
-                Forms\Components\TextInput::make('title')->required()->maxLength(255),
+                Forms\Components\TextInput::make('title')->maxLength(255),
                 Forms\Components\Select::make('document_type_id')
                     ->label('Document Type')
                     ->relationship('documentType', 'type_name')
@@ -137,7 +137,7 @@ class DocumentFileResource extends BaseResource
                         'damaged' => 'Damaged',
                         'closed' => 'Closed',
                     ])
-                    ->default('active')->required()
+                    ->default('active')
                     // 'active'/'moved_out' are also written by Transfer/Move
                     // Out/Return (DocumentMovementService) and must stay in
                     // sync with current_box_id, which is locked on edit above
@@ -161,7 +161,10 @@ class DocumentFileResource extends BaseResource
                     }),
                 Forms\Components\TextInput::make('source_origin')->maxLength(255),
                 Forms\Components\TextInput::make('destination')->maxLength(255),
-                Forms\Components\DatePicker::make('received_date'),
+                Forms\Components\DatePicker::make('received_date')
+                    // Auto-fills today's date when arriving via the scan-to-create
+                    // shortcut (barcode prefilled from an unregistered scan).
+                    ->default(fn (string $operation): ?string => $operation === 'create' && request()->filled('file_barcode') ? now()->toDateString() : null),
                 Forms\Components\DatePicker::make('archived_date'),
                 Forms\Components\Select::make('tags')
                     ->relationship('tags', 'name')

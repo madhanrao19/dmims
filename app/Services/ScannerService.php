@@ -2,6 +2,10 @@
 
 namespace App\Services;
 
+use App\Filament\Resources\BoxResource;
+use App\Filament\Resources\DocumentFileResource;
+use App\Filament\Resources\LocationResource;
+use App\Filament\Resources\ProductResource;
 use App\Models\BarcodeRegistry;
 use App\Models\BarcodeScanLog;
 use App\Models\Box;
@@ -42,6 +46,28 @@ class ScannerService
         return $model
             ? $model::withoutGlobalScopes()->find($registry->reference_id)
             : null;
+    }
+
+    /**
+     * The View page URL for a resolved barcode's record, keyed by which
+     * table it belongs to. Used by the global scan listener to jump
+     * straight to a registered record.
+     */
+    public function recordUrl(BarcodeRegistry $registry): ?string
+    {
+        if (! $registry->reference_id) {
+            return null;
+        }
+
+        return match ($registry->reference_table) {
+            'boxes' => BoxResource::getUrl('view', ['record' => $registry->reference_id]),
+            'document_files' => DocumentFileResource::getUrl('view', ['record' => $registry->reference_id]),
+            'locations' => LocationResource::getUrl('view', ['record' => $registry->reference_id]),
+            // ProductResource has no dedicated View page — Edit is its
+            // closest equivalent (see ProductResource::getPages()).
+            'products' => ProductResource::getUrl('edit', ['record' => $registry->reference_id]),
+            default => null,
+        };
     }
 
     /**

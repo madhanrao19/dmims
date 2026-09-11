@@ -8,6 +8,7 @@ use App\Models\Customer;
 use App\Models\DocumentFile;
 use App\Models\Location;
 use App\Models\User;
+use App\Services\DocumentMovementService;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -75,5 +76,27 @@ class BoxViewInfolistTest extends TestCase
         Livewire::test(ViewBox::class, ['record' => $box->id])
             ->assertOk()
             ->assertSee('Dispatched');
+    }
+
+    public function test_box_view_shows_structured_external_dispatch_details_after_move_out(): void
+    {
+        $this->platformAdmin();
+        $box = Box::create(['customer_id' => $this->customer->id, 'box_number' => 'B1', 'box_barcode' => 'BC-B1', 'status' => 'active']);
+
+        app(DocumentMovementService::class)->moveOutBox($box, 'Vendor Bank Ltd', [
+            'metadata' => [
+                'recipient_name' => 'Jane Doe',
+                'delivery_address' => '123 Main St',
+                'courier_tracking_ref' => 'TRK-999',
+                'expected_return_date' => '2026-12-01',
+            ],
+        ]);
+
+        Livewire::test(ViewBox::class, ['record' => $box->fresh()->id])
+            ->assertOk()
+            ->assertSee('Jane Doe')
+            ->assertSee('Vendor Bank Ltd')
+            ->assertSee('123 Main St')
+            ->assertSee('TRK-999');
     }
 }
