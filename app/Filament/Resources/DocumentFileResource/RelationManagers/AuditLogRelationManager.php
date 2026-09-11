@@ -9,6 +9,7 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 /**
  * Document File View tab: data edits, status changes, and box associations.
@@ -45,29 +46,12 @@ class AuditLogRelationManager extends RelationManager
             ->query($file->auditLogs()->getQuery()->where('customer_id', $file->customer_id))
             ->columns([
                 TextColumn::make('created_at')->label('Date & Time')->dateTime()->sortable(),
-                TextColumn::make('action')->badge(),
+                TextColumn::make('action')->badge()->formatStateUsing(fn (string $state): string => Str::headline(Str::lower($state))),
                 TextColumn::make('user.name')->label('Performed By')->placeholder('System'),
                 TextColumn::make('changes')
                     ->label('Changes')
                     ->wrap()
-                    ->state(function (AuditLog $record): string {
-                        $old = $record->old_values ?? [];
-                        $new = $record->new_values ?? [];
-                        $fields = array_unique([...array_keys($old), ...array_keys($new)]);
-
-                        if ($fields === []) {
-                            return '—';
-                        }
-
-                        return collect($fields)
-                            ->map(fn (string $field): string => sprintf(
-                                '%s: %s → %s',
-                                $field,
-                                $old[$field] ?? '—',
-                                $new[$field] ?? '—',
-                            ))
-                            ->implode("\n");
-                    }),
+                    ->state(fn (AuditLog $record): string => $record->changesSummary()),
             ])
             ->defaultSort('created_at', 'desc');
     }
