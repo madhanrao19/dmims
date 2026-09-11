@@ -6,6 +6,31 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed — Audit/Movement Log columns match the requested layout exactly
+
+Two follow-up fixes on top of the tab renames below, to match the requested
+column list literally:
+- Box/Document Audit Log tabs (and the platform-wide Audit Logs list) now
+  show **Field Name / Old Value / New Value as three separate columns**
+  instead of one combined "Changes" column — `AuditLog::changesRows()`
+  replaces `changesSummary()` as the shared source, returning one
+  `[field, old, new]` triple per changed field. A multi-field event (e.g.
+  "created", which touches every column) previously rendered as raw
+  `\n`-joined text that HTML silently collapses to one run-together line —
+  exactly the database-jargon-adjacent unreadability this was meant to fix.
+  Switched to `TextColumn::listWithLineBreaks()` with array state so each
+  field genuinely renders on its own line, aligned across all three columns.
+- Box Movement Log now shows **From Location / To Location / Destination**
+  (not four separate From/To Location/Box columns, since a Box only ever
+  moves between Locations) and Document Movement Log shows **From Box /
+  Location / To Box / Destination** (a Document File can move Box-to-Box) —
+  `DocumentMovementLog::fromLabel()`/`toLabel()` (new) resolve whichever of
+  box/location/destination actually applies. Both relation managers now
+  define their own columns instead of reusing
+  `DocumentMovementLogResource::table()` wholesale, since that resource's
+  own standalone list still needs the granular From/To Location/Box columns
+  (it spans both Box and Document File movements).
+
 ### Changed — Box/Document File tab renames + foreign-key values humanized
 
 Box View: "Documents in this Box" → "Documents Inside", "Physical Movement

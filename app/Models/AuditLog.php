@@ -65,30 +65,64 @@ class AuditLog extends Model
     ];
 
     /**
-     * "Field Name: old → new" per changed field, in plain English —
+     * One [field, old, new] triple per changed field, all humanized —
      * old_values/new_values store one raw diff per event (not one row per
-     * field), and both Box's and Document File's Audit Log tabs plus the
-     * platform-wide Audit Logs list need the same humanized rendering, so
-     * it lives here once instead of three times.
+     * field), and the Field Name / Old Value / New Value columns on Box's
+     * and Document File's Audit Log tabs plus the platform-wide Audit Logs
+     * list all need the same breakdown, so it lives here once instead of
+     * three times. An event's several changed fields render as one aligned
+     * line each within a single table row — not one table row per field —
+     * since old_values/new_values only ever describe one event.
+     *
+     * @return list<array{field: string, old: string, new: string}>
      */
-    public function changesSummary(): string
+    public function changesRows(): array
     {
         $old = $this->old_values ?? [];
         $new = $this->new_values ?? [];
         $fields = array_unique([...array_keys($old), ...array_keys($new)]);
 
-        if ($fields === []) {
-            return '—';
-        }
-
         return collect($fields)
-            ->map(fn (string $field): string => sprintf(
-                '%s: %s → %s',
-                static::formatFieldLabel($field),
-                static::formatChangeValue($field, $old[$field] ?? null),
-                static::formatChangeValue($field, $new[$field] ?? null),
-            ))
-            ->implode("\n");
+            ->map(fn (string $field): array => [
+                'field' => static::formatFieldLabel($field),
+                'old' => static::formatChangeValue($field, $old[$field] ?? null),
+                'new' => static::formatChangeValue($field, $new[$field] ?? null),
+            ])
+            ->all();
+    }
+
+    /**
+     * @return list<string> one entry per changed field, for
+     *                      TextColumn::listWithLineBreaks() — a joined "\n" string renders
+     *                      as literal whitespace in HTML (browsers collapse it), which made
+     *                      a multi-field "created" event's Field Name/Old/New Value cells
+     *                      unreadable run-together text, exactly the opposite of this
+     *                      column split's purpose.
+     */
+    public function changesFieldNames(): array
+    {
+        return static::changesColumn($this->changesRows(), 'field');
+    }
+
+    /** @return list<string> */
+    public function changesOldValues(): array
+    {
+        return static::changesColumn($this->changesRows(), 'old');
+    }
+
+    /** @return list<string> */
+    public function changesNewValues(): array
+    {
+        return static::changesColumn($this->changesRows(), 'new');
+    }
+
+    /**
+     * @param  list<array{field: string, old: string, new: string}>  $rows
+     * @return list<string>
+     */
+    protected static function changesColumn(array $rows, string $key): array
+    {
+        return $rows === [] ? ['—'] : array_column($rows, $key);
     }
 
     /**

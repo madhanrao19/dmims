@@ -70,4 +70,23 @@ class DocumentMovementLog extends Model
     {
         return $this->belongsTo(User::class, 'performed_by');
     }
+
+    /**
+     * A Box only ever moves between Locations, but a Document File can also
+     * move Box-to-Box — showing both raw "From Location"/"From Box" columns
+     * (one of them always "—") is the database-jargon this Audit/Movement
+     * Log rewrite was meant to remove, so the Box/Document Movement Log tabs
+     * show one combined "From"/"To" value instead. A Box's own relation
+     * manager never sets from_box_id/to_box_id, so preferring the box name
+     * when present is safe for both.
+     */
+    public function fromLabel(): string
+    {
+        return $this->fromBox->box_number ?? $this->fromLocation->location_name ?? '—';
+    }
+
+    public function toLabel(): string
+    {
+        return $this->toBox->box_number ?? $this->toLocation->location_name ?? $this->destination ?? '—';
+    }
 }
