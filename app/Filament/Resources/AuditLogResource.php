@@ -45,11 +45,21 @@ class AuditLogResource extends BaseResource
                 Tables\Columns\TextColumn::make('user.name')->label('Performed By')->sortable()->placeholder('System'),
                 Tables\Columns\TextColumn::make('module')->sortable()->searchable()->formatStateUsing(fn (string $state): string => Str::headline(Str::lower($state))),
                 Tables\Columns\TextColumn::make('action')->badge()->searchable()->formatStateUsing(fn (string $state): string => Str::headline(Str::lower($state))),
-                Tables\Columns\TextColumn::make('changes')
-                    ->label('Changes')
-                    ->wrap()
+                Tables\Columns\TextColumn::make('field_name')
+                    ->label('Field Name')
+                    ->listWithLineBreaks()
                     ->toggleable()
-                    ->state(fn (AuditLog $record): string => $record->changesSummary()),
+                    ->state(fn (AuditLog $record): array => $record->changesFieldNames()),
+                Tables\Columns\TextColumn::make('old_value')
+                    ->label('Old Value')
+                    ->listWithLineBreaks()
+                    ->toggleable()
+                    ->state(fn (AuditLog $record): array => $record->changesOldValues()),
+                Tables\Columns\TextColumn::make('new_value')
+                    ->label('New Value')
+                    ->listWithLineBreaks()
+                    ->toggleable()
+                    ->state(fn (AuditLog $record): array => $record->changesNewValues()),
             ])
             ->filters([
                 // Security review finding (24 August 2026): AuditLog::query()

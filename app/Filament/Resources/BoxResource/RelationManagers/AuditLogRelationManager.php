@@ -14,9 +14,10 @@ use Illuminate\Support\Str;
 /**
  * Box View tab: record changes and file linking history for compliance.
  * One row per create/update/delete event recorded by
- * App\Models\Concerns\Auditable, with a single "Changes" column summarizing
- * old_values/new_values — audit_logs stores one JSON blob per event, not
- * one row per field.
+ * App\Models\Concerns\Auditable — Field Name/Old Value/New Value each list
+ * every changed field on its own line within that one row (not one table
+ * row per field), since old_values/new_values store one JSON diff per
+ * event, not one row per field.
  */
 class AuditLogRelationManager extends RelationManager
 {
@@ -49,10 +50,18 @@ class AuditLogRelationManager extends RelationManager
                 TextColumn::make('created_at')->label('Date & Time')->dateTime()->sortable(),
                 TextColumn::make('action')->badge()->formatStateUsing(fn (string $state): string => Str::headline(Str::lower($state))),
                 TextColumn::make('user.name')->label('Performed By')->placeholder('System'),
-                TextColumn::make('changes')
-                    ->label('Changes')
-                    ->wrap()
-                    ->state(fn (AuditLog $record): string => $record->changesSummary()),
+                TextColumn::make('field_name')
+                    ->label('Field Name')
+                    ->listWithLineBreaks()
+                    ->state(fn (AuditLog $record): array => $record->changesFieldNames()),
+                TextColumn::make('old_value')
+                    ->label('Old Value')
+                    ->listWithLineBreaks()
+                    ->state(fn (AuditLog $record): array => $record->changesOldValues()),
+                TextColumn::make('new_value')
+                    ->label('New Value')
+                    ->listWithLineBreaks()
+                    ->state(fn (AuditLog $record): array => $record->changesNewValues()),
             ])
             ->defaultSort('created_at', 'desc');
     }
