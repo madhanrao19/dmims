@@ -529,6 +529,23 @@ class CreateDocumentFile extends CreateRecord
     protected static string $resource = DocumentFileResource::class;
 
     /**
+     * Captured at mount() — the only point in the request lifecycle where
+     * request()->query() still reflects this page's own URL; by afterCreate()
+     * the create action has gone through a separate Livewire AJAX request
+     * with no query string of its own, so this flag (a public Livewire
+     * property, preserved across that round trip) is what afterCreate() must
+     * check instead of re-reading request()->filled('file_barcode') there.
+     */
+    public bool $fromBarcodeScan = false;
+
+    public function mount(): void
+    {
+        parent::mount();
+
+        $this->fromBarcodeScan = request()->filled('file_barcode');
+    }
+
+    /**
      * Route creation through the same guided-workflow logging as every other
      * document movement (DocumentMovementService::receiveInFile), rather
      * than leaving the file's first event unlogged and the containing box's
@@ -541,7 +558,13 @@ class CreateDocumentFile extends CreateRecord
 
         // Attach a reserved-but-unclaimed barcode if one was pre-filled —
         // see BarcodeService::claim(). No-op for a manually-typed barcode.
-        app(BarcodeService::class)->claim($record);
+        // A barcode arriving via the global scan-to-create flow (?file_barcode=
+        // on an unknown scan, not a reservation) still needs registering so
+        // scanning it again resolves straight to this record — ordinary
+        // manual entry deliberately skips this (see registerExisting() doc).
+        if (! app(BarcodeService::class)->claim($record) && $this->fromBarcodeScan) {
+            app(BarcodeService::class)->registerExisting($record);
+        }
 
         // A file can now be registered before it's boxed (Current Box is
         // optional) — nothing to log/count until it's actually assigned.

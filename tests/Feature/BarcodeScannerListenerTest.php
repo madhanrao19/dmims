@@ -76,6 +76,36 @@ class BarcodeScannerListenerTest extends TestCase
         $this->assertDatabaseCount('document_files', 1);
     }
 
+    public function test_scan_to_create_document_file_is_scannable_again_immediately(): void
+    {
+        $barcode = 'DOC-SCAN-CREATED-1';
+
+        Livewire::withQueryParams(['file_barcode' => $barcode])
+            ->test(CreateDocumentFile::class)
+            ->fillForm(['customer_id' => $this->customer->id, 'file_barcode' => $barcode])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $file = DocumentFile::where('file_barcode', $barcode)->firstOrFail();
+
+        Livewire::test(BarcodeScannerListener::class)
+            ->call('scan', $barcode)
+            ->assertRedirect(DocumentFileResource::getUrl('view', ['record' => $file->id]));
+    }
+
+    public function test_manually_typed_barcode_outside_the_scan_flow_is_not_registered(): void
+    {
+        Livewire::test(CreateDocumentFile::class)
+            ->fillForm(['customer_id' => $this->customer->id, 'file_barcode' => 'HAND-TYPED-1'])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        Livewire::test(BarcodeScannerListener::class)
+            ->call('scan', 'HAND-TYPED-1');
+
+        Notification::assertNotified('Unregistered Barcode Scanned');
+    }
+
     public function test_create_box_saves_with_every_field_left_blank_except_customer(): void
     {
         Livewire::test(CreateBox::class)

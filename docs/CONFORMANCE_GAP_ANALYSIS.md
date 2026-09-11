@@ -1524,4 +1524,32 @@ Pint clean; PHPStan (project baseline level) clean on all changed files.
 **Deliberately not ported from DMOIS:** its unfinished "barcode pool pre-generation"
 page (labelled "soon" in its own nav) — DMIMS's lazier `BarcodeService::registerFor()`
 register-on-first-print already covers the need without pre-generating unused stock.
+
+**Bug caught by live browser verification, not by the test suite — fixed same day:**
+manually logging in and running the actual scan → create → scan-again flow (Turnstile
+required a human to solve the login challenge; the app itself was then driven end to
+end) surfaced a real gap the test suite's mocked/direct-call assertions had missed:
+a record created via the scan-to-create flow was **not** immediately scannable again.
+Root cause — `claim()` only activates a *pre-reserved* barcode; a barcode typed in
+fresh via the scan flow (never reserved) is, by the existing "register-on-first-print"
+design, left with no `BarcodeRegistry` row until its label is printed, so the very next
+scan of that same barcode came back `unknown` and re-showed the quick-create toast
+instead of opening the record.
+- Added `BarcodeService::registerExisting(Model $record): ?BarcodeRegistry` —
+  registers a record's own already-set barcode value as-is (unlike `registerFor()`,
+  which generates and overwrites with a brand-new one).
+- `CreateDocumentFile`/`CreateBox`/`CreateLocation` now call it in `afterCreate()`
+  when `claim()` was a no-op — but **only** when the record arrived via the scan flow.
+  That flag (`$fromBarcodeScan`) has to be captured in `mount()`, the one point in the
+  request lifecycle where `request()->query()` still reflects the page's own URL —
+  `afterCreate()` runs during a later, separate Livewire AJAX request with no query
+  string of its own, so re-reading `request()->filled('file_barcode')` there (the
+  first attempt) silently never registered anything. Ordinary manual barcode entry
+  (not via scan) deliberately still skips registration, unchanged.
+- Verified live in the browser end-to-end: scan unknown barcode → toast → New Document
+  → barcode/received-date prefilled, saved with every other field blank → scanned the
+  same barcode again → redirected straight to the new record's View page.
+- Regression tests added: `test_scan_to_create_document_file_is_scannable_again_immediately`,
+  `test_manually_typed_barcode_outside_the_scan_flow_is_not_registered`. 310/310 total
+  passing.
 clean.

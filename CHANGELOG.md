@@ -28,6 +28,10 @@ scan field):
 - The listener guards against unauthenticated calls (it mounts on the login page too),
   clamps scanned input to 150 characters, and HTML-escapes the barcode in its
   notifications.
+- A record created via this flow is now immediately scannable again (`BarcodeService::registerExisting()`)
+  — caught by live end-to-end browser testing, not the automated suite: a scan-created
+  barcode previously stayed unregistered until its label was printed, so re-scanning it
+  re-showed the quick-create toast instead of opening the record.
 
 ### Changed — Document File / Box / Location "Create" forms: all fields now optional
 

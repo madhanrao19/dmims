@@ -475,11 +475,29 @@ class CreateLocation extends CreateRecord
 {
     protected static string $resource = LocationResource::class;
 
+    /**
+     * Captured at mount() — see CreateDocumentFile::$fromBarcodeScan for why
+     * afterCreate() can't just re-read request()->filled('barcode') itself.
+     */
+    public bool $fromBarcodeScan = false;
+
+    public function mount(): void
+    {
+        parent::mount();
+
+        $this->fromBarcodeScan = request()->filled('barcode');
+    }
+
     /** Attach a reserved-but-unclaimed barcode if one was pre-filled — see
      *  BarcodeService::claim(). No-op for a manually-typed barcode. */
     protected function afterCreate(): void
     {
-        app(BarcodeService::class)->claim($this->record);
+        // See DocumentFileResource/BoxResource's afterCreate() for the same
+        // registerExisting() fallback and why it's scoped to the scan-to-
+        // create flow only (?barcode= present) rather than every manual entry.
+        if (! app(BarcodeService::class)->claim($this->record) && $this->fromBarcodeScan) {
+            app(BarcodeService::class)->registerExisting($this->record);
+        }
     }
 }
 

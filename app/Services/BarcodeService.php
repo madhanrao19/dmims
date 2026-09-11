@@ -169,6 +169,55 @@ class BarcodeService
     }
 
     /**
+     * Register a record's own already-set barcode value into the registry,
+     * without generating a new one — the counterpart to registerFor() for a
+     * barcode the user typed or scanned in themselves rather than one this
+     * service generated. Used specifically for the global scan-to-create
+     * flow (BarcodeScannerListener), so a barcode scanned as "unknown",
+     * used to create a record, is immediately scannable again — deliberately
+     * NOT called for ordinary manual entry, which keeps claim()'s existing
+     * "no registry row required" behaviour unchanged.
+     */
+    public function registerExisting(Model $record): ?BarcodeRegistry
+    {
+        [$type, $column] = $this->resolveModel($record);
+        $barcode = $record->getAttribute($column);
+
+        if (! $barcode) {
+            return null;
+        }
+
+        return DB::transaction(function () use ($record, $type, $barcode) {
+            $existing = BarcodeRegistry::withoutGlobalScopes()
+                ->where('customer_id', $record->getAttribute('customer_id'))
+                ->where('barcode', $barcode)
+                ->lockForUpdate()
+                ->first();
+
+            if ($existing) {
+                if ($existing->reference_id === null) {
+                    $existing->update([
+                        'reference_table' => $record->getTable(),
+                        'reference_id' => $record->getKey(),
+                        'status' => 'active',
+                    ]);
+                }
+
+                return $existing;
+            }
+
+            return BarcodeRegistry::create([
+                'customer_id' => $record->getAttribute('customer_id'),
+                'barcode' => $barcode,
+                'barcode_type' => $type,
+                'reference_table' => $record->getTable(),
+                'reference_id' => $record->getKey(),
+                'status' => 'active',
+            ]);
+        });
+    }
+
+    /**
      * Retire a lost/damaged barcode and issue a new one for the same record.
      * The old registry row is kept (status 'retired') for history/audit.
      */

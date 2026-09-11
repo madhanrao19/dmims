@@ -507,6 +507,19 @@ class CreateBox extends CreateRecord
 {
     protected static string $resource = BoxResource::class;
 
+    /**
+     * Captured at mount() — see CreateDocumentFile::$fromBarcodeScan for why
+     * afterCreate() can't just re-read request()->filled('box_barcode') itself.
+     */
+    public bool $fromBarcodeScan = false;
+
+    public function mount(): void
+    {
+        parent::mount();
+
+        $this->fromBarcodeScan = request()->filled('box_barcode');
+    }
+
     /** Same reasoning as CreateDocumentFile::afterCreate() — log the box's
      *  first event through DocumentMovementService::receiveInBox(). */
     protected function afterCreate(): void
@@ -516,7 +529,13 @@ class CreateBox extends CreateRecord
 
         // Attach a reserved-but-unclaimed barcode if one was pre-filled —
         // see BarcodeService::claim(). No-op for a manually-typed barcode.
-        app(BarcodeService::class)->claim($record);
+        // A barcode arriving via the global scan-to-create flow (?box_barcode=
+        // on an unknown scan, not a reservation) still needs registering so
+        // scanning it again resolves straight to this record — ordinary
+        // manual entry deliberately skips this (see registerExisting() doc).
+        if (! app(BarcodeService::class)->claim($record) && $this->fromBarcodeScan) {
+            app(BarcodeService::class)->registerExisting($record);
+        }
 
         // A box can now be registered before it's placed (Current Location
         // is optional) — nothing to log until it's actually placed.
