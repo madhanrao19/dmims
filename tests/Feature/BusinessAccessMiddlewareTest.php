@@ -6,6 +6,7 @@ use App\Models\Customer;
 use App\Models\CustomerSubscription;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 /**
@@ -136,5 +137,20 @@ class BusinessAccessMiddlewareTest extends TestCase
         $response = $this->actingAs($user)->get('/admin');
 
         $response->assertStatus(200);
+    }
+
+    /**
+     * Without ->persistentMiddleware(['business-access']) in
+     * FilamentPanelProvider, a session whose access was just revoked (user
+     * deactivated, subscription/license cut off) kept working for every
+     * Livewire action until the browser's next full page load — Livewire's
+     * own /livewire/update route only re-runs Filament's built-in persistent
+     * middleware (Authenticate), not this app's business-access group.
+     */
+    public function test_business_access_is_registered_as_persistent_livewire_middleware(): void
+    {
+        $this->get('/admin/login');
+
+        $this->assertContains('business-access', Livewire::getPersistentMiddleware());
     }
 }

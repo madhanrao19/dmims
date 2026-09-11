@@ -4,6 +4,7 @@
     // show the human-readable value, which can still be entered in the scanner.
     $size ??= 'medium';
     $title ??= null;
+    $copies ??= 1;
     // true when rendered as the top-level single-record print modal; false
     // when included inside batch-barcode-labels.blade.php, which owns the
     // Print button/script itself.
@@ -21,23 +22,31 @@
 @endphp
 
 <div @if ($standalone) data-print-root @endif>
-    <div data-print-target class="dmims-barcode-item flex flex-col items-center gap-3 py-4 text-center">
-        @if (! empty($title))
-            <div class="font-semibold">{{ $title }}</div>
-        @endif
-        <div class="text-xs uppercase tracking-wide text-gray-500">{{ str($type)->headline() }}</div>
+    {{-- One data-print-target wrapping every copy: the global print handler
+         (FilamentPanelProvider) grabs a single [data-print-target] element's
+         outerHTML, so "Copies" repeats the label inside it rather than
+         adding more [data-print-target] elements it would never see. --}}
+    <div data-print-target>
+        @for ($i = 0; $i < max(1, (int) $copies); $i++)
+            <div class="dmims-barcode-item flex flex-col items-center gap-3 py-4 text-center">
+                @if (! empty($title))
+                    <div class="font-semibold">{{ $title }}</div>
+                @endif
+                <div class="text-xs uppercase tracking-wide text-gray-500">{{ str($type)->headline() }}</div>
 
-        @if ($svg)
-            <div>{!! $svg !!}</div>
-        @endif
+                @if ($svg)
+                    <div>{!! $svg !!}</div>
+                @endif
 
-        <div class="font-mono {{ $fontSize }} font-semibold tracking-widest">{{ $barcode }}</div>
+                <div class="font-mono {{ $fontSize }} font-semibold tracking-widest">{{ $barcode }}</div>
 
-        @unless ($svg)
-            <p class="text-xs text-gray-500">
-                Scannable image requires the barcode library (installed on production).
-            </p>
-        @endunless
+                @unless ($svg)
+                    <p class="text-xs text-gray-500">
+                        Scannable image requires the barcode library (installed on production).
+                    </p>
+                @endunless
+            </div>
+        @endfor
     </div>
 
     @if ($standalone)

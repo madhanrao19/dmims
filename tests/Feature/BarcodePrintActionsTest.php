@@ -100,6 +100,43 @@ class BarcodePrintActionsTest extends TestCase
             ->assertHasNoTableActionErrors();
     }
 
+    /**
+     * Regression: printed_count previously incremented inside
+     * ->modalContent(), which Filament re-evaluates on every render —
+     * including the label-size Select's own ->live() update — so changing
+     * the size twice while the modal stayed open counted as three prints
+     * instead of the one real preview/open. It's now incremented in
+     * ->mountUsing(), which runs exactly once per modal open.
+     */
+    public function test_print_barcode_action_only_increments_printed_count_once_despite_live_size_changes(): void
+    {
+        $location = Location::create(['customer_id' => $this->customer->id, 'location_code' => 'L1', 'location_name' => 'Shelf 1', 'status' => 'active']);
+        $box = Box::create(['customer_id' => $this->customer->id, 'box_barcode' => 'BC-5', 'box_number' => 'BOX-5', 'current_location_id' => $location->id, 'status' => 'active']);
+
+        Livewire::test(ListBoxes::class)
+            ->mountTableAction('barcode', $box)
+            ->setTableActionData(['size' => 'large'])
+            ->setTableActionData(['size' => 'small'])
+            ->assertHasNoTableActionErrors();
+
+        $this->assertSame(1, app(BarcodeService::class)->registerFor($box->fresh())->printed_count);
+    }
+
+    /** BarcodeService::incrementPrinted()'s $by param, which the "Copies"
+     *  field on every print action now feeds — see barcodeAction()'s own
+     *  mountUsing() comment for why this is exercised at the service layer
+     *  rather than through the mount-time-only Filament test API. */
+    public function test_increment_printed_accepts_a_copies_count(): void
+    {
+        $location = Location::create(['customer_id' => $this->customer->id, 'location_code' => 'L1', 'location_name' => 'Shelf 1', 'status' => 'active']);
+        $box = Box::create(['customer_id' => $this->customer->id, 'box_barcode' => 'BC-6', 'box_number' => 'BOX-6', 'current_location_id' => $location->id, 'status' => 'active']);
+        $registry = app(BarcodeService::class)->registerFor($box);
+
+        app(BarcodeService::class)->incrementPrinted($registry, 3);
+
+        $this->assertSame(3, $registry->fresh()->printed_count);
+    }
+
     public function test_barcode_registry_batch_print_survives_a_label_size_change(): void
     {
         $location = Location::create(['customer_id' => $this->customer->id, 'location_code' => 'L1', 'location_name' => 'Shelf 1', 'status' => 'active']);

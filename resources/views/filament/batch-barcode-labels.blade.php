@@ -19,7 +19,7 @@
                  by the print handler's injected CSS to keep one label from being
                  split across a page break in a multi-page print. --}}
             <div class="dmims-barcode-item">
-                @include('filament.barcode-label', ['barcode' => $registry->barcode, 'type' => $registry->barcode_type, 'size' => $size ?? 'small', 'title' => $itemTitle, 'standalone' => false])
+                @include('filament.barcode-label', ['barcode' => $registry->barcode, 'type' => $registry->barcode_type, 'size' => $size ?? 'small', 'title' => $itemTitle, 'standalone' => false, 'copies' => $copies ?? 1])
             </div>
         @endforeach
     </div>

@@ -61,4 +61,28 @@ class LocationHierarchyTest extends TestCase
         $this->assertFalse($saved);
         $this->assertNull($locationB->fresh()->parent_id);
     }
+
+    /**
+     * Box Transfer/Return's location picker previously searched only the
+     * displayed ancestry-path label (location_name), not barcode — a
+     * handheld scanner's input (the shelf's barcode, not its name) never
+     * matched anything.
+     */
+    public function test_search_by_name_or_barcode_matches_a_shelf_barcode(): void
+    {
+        $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACM', 'status' => 'active']);
+        $warehouse = Location::create(['customer_id' => $customer->id, 'location_code' => 'WH', 'location_name' => 'Main Warehouse']);
+        $shelf = Location::create([
+            'customer_id' => $customer->id,
+            'parent_id' => $warehouse->id,
+            'location_code' => 'SH-A01',
+            'location_name' => 'Shelf A01',
+            'barcode' => 'LOC-ACME-000123',
+        ]);
+
+        $results = Location::searchByNameOrBarcode('LOC-ACME-000123');
+
+        $this->assertArrayHasKey($shelf->id, $results);
+        $this->assertSame('Main Warehouse > Shelf A01', $results[$shelf->id]);
+    }
 }

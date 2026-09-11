@@ -194,6 +194,15 @@ class BarcodeService
                 ->lockForUpdate()
                 ->first();
 
+            // A different type already reserved/claimed this exact barcode
+            // string (e.g. a Product label's code typed into a Document
+            // File's barcode field) — never repurpose it. The record keeps
+            // its typed-in barcode but stays unregistered rather than
+            // corrupting the other type's reservation.
+            if ($existing && $existing->barcode_type !== $type) {
+                return null;
+            }
+
             if ($existing) {
                 if ($existing->reference_id === null) {
                     $existing->update([
@@ -257,9 +266,9 @@ class BarcodeService
         return $query->first();
     }
 
-    public function incrementPrinted(BarcodeRegistry $registry): void
+    public function incrementPrinted(BarcodeRegistry $registry, int $by = 1): void
     {
-        $registry->increment('printed_count');
+        $registry->increment('printed_count', max(1, $by));
     }
 
     public function detectBarcodeType(string $barcode): ?string

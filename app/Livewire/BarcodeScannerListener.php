@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Filament\Resources\BoxResource;
 use App\Filament\Resources\DocumentFileResource;
 use App\Filament\Resources\LocationResource;
+use App\Filament\Resources\ProductResource;
 use App\Models\LocationType;
 use App\Services\ScannerService;
 use Filament\Actions\Action as NotificationAction;
@@ -62,7 +63,10 @@ class BarcodeScannerListener extends Component
                 'document_file' => DocumentFileResource::getUrl('create', ['file_barcode' => $barcode]),
                 'box' => BoxResource::getUrl('create', ['box_barcode' => $barcode]),
                 'location' => LocationResource::getUrl('create', ['barcode' => $barcode]),
-                default => null,
+                // barcode_type's DB enum only allows these 4 values —
+                // 'product' is the only one left once the others above are
+                // excluded.
+                default => ProductResource::getUrl('create', ['barcode' => $barcode]),
             };
 
             if ($url) {

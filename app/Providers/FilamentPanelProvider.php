@@ -48,6 +48,15 @@ class FilamentPanelProvider extends PanelProvider
                 // so auth()->user() is populated — see bootstrap/app.php.
                 'business-access',
             ])
+            // Without this, a session whose access was just revoked (user
+            // deactivated, subscription/license cut off) keeps working for
+            // every Livewire action — including this file's own barcode
+            // scanner — until the next full page load, since Livewire's
+            // /livewire/update route only re-runs Filament's own persistent
+            // middleware (Authenticate) by default, not this app's
+            // business-access group. All six of its checks are idempotent
+            // reads/aborts, safe to run again on every Livewire request.
+            ->persistentMiddleware(['business-access'])
             ->authMiddleware([
                 Authenticate::class,
             ])

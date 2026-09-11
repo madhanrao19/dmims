@@ -572,17 +572,24 @@ class CreateDocumentFile extends CreateRecord
             return;
         }
 
+        // Filament's own relationship-saving (saveRelationships(), which the
+        // Create page runs right after the initial INSERT, before this hook
+        // fires) already set current_box_id on this record — before
+        // receiveInFile()'s capacity check below would run.
+        // Left in place, that check would count this file against the box's
+        // OWN capacity, rejecting what should be a legitimate placement the
+        // instant a box's last slot is filled by its very first file. Detach
+        // it first so the check reflects the box's true existing count, then
+        // let receiveInFile() reapply the assignment properly (its own log
+        // entry + file-count adjustment) if there's room — same fix shape as
+        // an ordinary Transfer, which never has this problem because the
+        // file isn't pre-attached before the check runs.
+        $intendedBoxId = $record->current_box_id;
+        $record->update(['current_box_id' => null]);
+
         try {
-            app(DocumentMovementService::class)->receiveInFile($record, $record->current_box_id);
+            app(DocumentMovementService::class)->receiveInFile($record, $intendedBoxId);
         } catch (InvalidArgumentException $e) {
-            // The file record itself is already created (this hook runs
-            // post-insert) with current_box_id set from the raw create
-            // form. Since the receive was rejected, no movement log exists
-            // for that placement — clear it back to unboxed rather than
-            // leaving current_box_id pointing at a box the file was never
-            // actually logged into (the same invariant Edit's current_box_id
-            // lock protects). Recoverable via Transfer once the box has room.
-            $record->update(['current_box_id' => null]);
             Notification::make()->title('File created but not boxed')->body($e->getMessage())->danger()->send();
         }
     }

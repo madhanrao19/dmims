@@ -233,6 +233,24 @@ class DocumentOperationsTest extends TestCase
         app(DocumentMovementService::class)->transferBox($box->refresh(), $fullShelf->id);
     }
 
+    public function test_receive_in_box_is_rejected_when_location_is_inactive(): void
+    {
+        $location = $this->location('INACTIVE');
+        $location->update(['status' => 'inactive']);
+
+        $this->expectException(InvalidArgumentException::class);
+        app(DocumentMovementService::class)->receiveInBox($this->box(), $location->id);
+    }
+
+    public function test_receive_in_box_is_rejected_when_location_cannot_store_boxes(): void
+    {
+        $location = $this->location('STOCK-ONLY');
+        $location->update(['can_store_boxes' => false]);
+
+        $this->expectException(InvalidArgumentException::class);
+        app(DocumentMovementService::class)->receiveInBox($this->box(), $location->id);
+    }
+
     public function test_move_out_with_due_date_tracks_borrow_and_overdue_state(): void
     {
         $file = $this->file();
@@ -322,5 +340,59 @@ class DocumentOperationsTest extends TestCase
             'to_box_id' => $box->id,
         ]);
         $this->assertSame(1, $box->fresh()->current_file_count);
+    }
+
+    /**
+     * Regression: creating a Document File with Box Assignment preselected
+     * persists current_box_id on the INSERT itself (dehydrated on create),
+     * before afterCreate()'s receiveInFile() ever runs its capacity check —
+     * so Box::files()->count() at check time already includes this very
+     * record. A box with capacity_limit=1 and zero existing files was
+     * wrongly rejected as "at capacity" for what should be its first,
+     * legitimate file.
+     */
+    public function test_creating_a_document_file_into_a_box_with_exactly_one_slot_left_succeeds(): void
+    {
+        $this->actingAs($this->platformAdmin());
+        $box = $this->box();
+        $box->update(['capacity_limit' => 1]);
+
+        Livewire::test(CreateDocumentFile::class)
+            ->fillForm([
+                'customer_id' => $this->customer->id,
+                'file_barcode' => 'DOC-CAP1',
+                'title' => 'First File',
+                'current_box_id' => $box->id,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $file = DocumentFile::where('file_barcode', 'DOC-CAP1')->firstOrFail();
+
+        $this->assertSame($box->id, $file->current_box_id);
+        $this->assertSame(1, $box->fresh()->current_file_count);
+    }
+
+    /** Same regression, for Boxes: a location with box_capacity=1 and zero
+     *  existing boxes must accept a box created directly into it. */
+    public function test_creating_a_box_into_a_location_with_exactly_one_slot_left_succeeds(): void
+    {
+        $this->actingAs($this->platformAdmin());
+        $location = $this->location();
+        $location->update(['box_capacity' => 1]);
+
+        Livewire::test(CreateBox::class)
+            ->fillForm([
+                'customer_id' => $this->customer->id,
+                'box_barcode' => 'BC-CAP1',
+                'box_number' => 'CAP1',
+                'current_location_id' => $location->id,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $box = Box::where('box_number', 'CAP1')->firstOrFail();
+
+        $this->assertSame($location->id, $box->current_location_id);
     }
 }

@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\BarcodeRegistryResource\Pages;
 use App\Http\Middleware\EnsureModuleEnabled;
+use App\Models\AuditLog;
 use App\Models\BarcodeRegistry;
 use App\Services\BarcodeService;
 use App\Services\ModuleAccessService;
@@ -197,16 +198,36 @@ class BarcodeRegistryResource extends BaseResource
                             ->options(['small' => 'Small', 'medium' => 'Medium', 'large' => 'Large'])
                             ->default('medium')
                             ->live(),
+                        Forms\Components\TextInput::make('copies')
+                            ->label('Copies')
+                            ->numeric()
+                            ->minValue(1)
+                            ->default(1)
+                            ->live(),
                     ])
                     ->modalSubmitAction(false)
                     ->modalCancelActionLabel('Close')
+                    // incrementPrinted() runs here, not in ->modalContent()
+                    // below — Filament re-evaluates modalContent on every
+                    // render (including the label-size Select's own
+                    // ->live() updates), so incrementing there counted every
+                    // preview re-render as a print. mountUsing() runs
+                    // exactly once, when the modal opens — see
+                    // HasBarcodeAction::barcodeAction() for why "Copies" is
+                    // read from the field's default here rather than a
+                    // later, live-updated value (printing is fully
+                    // client-side, no server round trip to hang a precise
+                    // count off of).
+                    ->mountUsing(function (Schema $schema, BarcodeRegistry $record): void {
+                        $schema->fill();
+                        app(BarcodeService::class)->incrementPrinted($record, (int) ($schema->getState()['copies'] ?? 1));
+                    })
                     ->modalContent(function (BarcodeRegistry $record, array $data) {
-                        app(BarcodeService::class)->incrementPrinted($record);
-
                         return view('filament.barcode-label', [
                             'barcode' => $record->barcode,
                             'type' => $record->barcode_type,
                             'size' => $data['size'] ?? 'medium',
+                            'copies' => max(1, (int) ($data['copies'] ?? 1)),
                         ]);
                     }),
                 Action::make('replace')
@@ -215,10 +236,26 @@ class BarcodeRegistryResource extends BaseResource
                     ->color('danger')
                     ->visible(fn (BarcodeRegistry $record): bool => $record->status === 'active')
                     ->authorize(fn (BarcodeRegistry $record): bool => static::can('update', $record))
-                    ->requiresConfirmation()
+                    ->schema([
+                        Forms\Components\Textarea::make('reason')
+                            ->label('Reason')
+                            ->required()
+                            ->rows(2)
+                            ->helperText('Why is this barcode being retired? Kept on the record\'s audit log.'),
+                    ])
                     ->modalDescription('Retires this barcode and issues a new one for the same record. The old code is kept in history.')
-                    ->action(function (BarcodeRegistry $record): void {
+                    ->action(function (BarcodeRegistry $record, array $data): void {
                         $new = app(BarcodeService::class)->replace($record);
+                        AuditLog::create([
+                            'customer_id' => $record->customer_id,
+                            'user_id' => auth()->id(),
+                            'module' => 'barcode_registry',
+                            'action' => 'replace',
+                            'auditable_type' => BarcodeRegistry::class,
+                            'auditable_id' => $new->id,
+                            'old_values' => ['barcode' => $record->barcode],
+                            'new_values' => ['barcode' => $new->barcode, 'reason' => $data['reason']],
+                        ]);
                         Notification::make()
                             ->title('Barcode replaced')
                             ->body("New barcode: {$new->barcode}")
@@ -236,17 +273,29 @@ class BarcodeRegistryResource extends BaseResource
                             ->label('Label size')
                             ->options(['small' => 'Small', 'medium' => 'Medium', 'large' => 'Large'])
                             ->default('small'),
+                        Forms\Components\TextInput::make('copies')
+                            ->label('Copies (each)')
+                            ->numeric()
+                            ->minValue(1)
+                            ->default(1),
                     ])
                     ->modalHeading('Batch print preview')
                     ->modalSubmitAction(false)
                     ->modalCancelActionLabel('Close')
-                    ->modalContent(function (Collection $records, array $data) {
+                    // See the 'preview' action above for why this runs in
+                    // ->mountUsing() (once, on open) rather than
+                    // ->modalContent() (re-evaluated on every render).
+                    ->mountUsing(function (Schema $schema, Collection $records): void {
                         /** @var Collection<int, BarcodeRegistry> $records */
-                        $records->each(fn (BarcodeRegistry $record) => app(BarcodeService::class)->incrementPrinted($record));
-
+                        $schema->fill();
+                        $copies = (int) ($schema->getState()['copies'] ?? 1);
+                        $records->each(fn (BarcodeRegistry $record) => app(BarcodeService::class)->incrementPrinted($record, $copies));
+                    })
+                    ->modalContent(function (Collection $records, array $data) {
                         return view('filament.batch-barcode-labels', [
                             'registries' => $records,
                             'size' => $data['size'] ?? 'small',
+                            'copies' => max(1, (int) ($data['copies'] ?? 1)),
                         ]);
                     }),
             ])

@@ -24,11 +24,16 @@ class DocumentMovementService
 
     public function receiveInFile(DocumentFile $file, int $toBoxId, ?string $sourceOrigin = null, array $data = []): DocumentMovementLog
     {
-        $toBox = Box::withoutGlobalScopes()->findOrFail($toBoxId);
-        $this->assertSameCustomer($file, $toBox);
-        $this->assertBoxHasCapacity($toBox);
-
         return DB::transaction(function () use ($file, $toBoxId, $sourceOrigin, $data) {
+            // Locked (not a plain findOrFail() before the transaction) so
+            // two concurrent requests targeting the same nearly-full box
+            // can't both pass the capacity check before either commits —
+            // the second call's lockForUpdate() blocks until the first
+            // transaction ends, then re-counts against the up-to-date row.
+            $toBox = Box::withoutGlobalScopes()->whereKey($toBoxId)->lockForUpdate()->firstOrFail();
+            $this->assertSameCustomer($file, $toBox);
+            $this->assertBoxHasCapacity($toBox);
+
             $log = $this->log($file, 'create', array_merge($data, [
                 'to_box_id' => $toBoxId,
                 'source_origin' => $sourceOrigin,
@@ -44,11 +49,13 @@ class DocumentMovementService
 
     public function transferFile(DocumentFile $file, int $toBoxId, array $data = []): DocumentMovementLog
     {
-        $toBox = Box::withoutGlobalScopes()->findOrFail($toBoxId);
-        $this->assertSameCustomer($file, $toBox);
-        $this->assertBoxHasCapacity($toBox);
-
         return DB::transaction(function () use ($file, $toBoxId, $data) {
+            // See receiveInFile()'s own comment on why this is locked inside
+            // the transaction rather than checked before it.
+            $toBox = Box::withoutGlobalScopes()->whereKey($toBoxId)->lockForUpdate()->firstOrFail();
+            $this->assertSameCustomer($file, $toBox);
+            $this->assertBoxHasCapacity($toBox);
+
             $fromBoxId = $file->current_box_id;
 
             $log = $this->log($file, 'transfer_file', array_merge($data, [
@@ -96,11 +103,13 @@ class DocumentMovementService
 
     public function returnFile(DocumentFile $file, int $toBoxId, array $data = []): DocumentMovementLog
     {
-        $toBox = Box::withoutGlobalScopes()->findOrFail($toBoxId);
-        $this->assertSameCustomer($file, $toBox);
-        $this->assertBoxHasCapacity($toBox);
-
         return DB::transaction(function () use ($file, $toBoxId, $data) {
+            // See receiveInFile()'s own comment on why this is locked inside
+            // the transaction rather than checked before it.
+            $toBox = Box::withoutGlobalScopes()->whereKey($toBoxId)->lockForUpdate()->firstOrFail();
+            $this->assertSameCustomer($file, $toBox);
+            $this->assertBoxHasCapacity($toBox);
+
             $log = $this->log($file, 'return', array_merge($data, ['to_box_id' => $toBoxId]));
 
             $file->update([
@@ -189,11 +198,14 @@ class DocumentMovementService
 
     public function receiveInBox(Box $box, int $toLocationId, ?string $sourceOrigin = null, array $data = []): DocumentMovementLog
     {
-        $toLocation = Location::withoutGlobalScopes()->findOrFail($toLocationId);
-        $this->assertSameCustomer($box, $toLocation);
-        $this->assertLocationHasCapacity($toLocation);
-
         return DB::transaction(function () use ($box, $toLocationId, $sourceOrigin, $data) {
+            // See DocumentMovementService::receiveInFile()'s own comment on
+            // why this is locked inside the transaction rather than checked
+            // before it.
+            $toLocation = Location::withoutGlobalScopes()->whereKey($toLocationId)->lockForUpdate()->firstOrFail();
+            $this->assertSameCustomer($box, $toLocation);
+            $this->assertLocationHasCapacity($toLocation);
+
             $log = $this->log($box, 'create', array_merge($data, [
                 'to_location_id' => $toLocationId,
                 'source_origin' => $sourceOrigin,
@@ -207,11 +219,11 @@ class DocumentMovementService
 
     public function transferBox(Box $box, int $toLocationId, array $data = []): DocumentMovementLog
     {
-        $toLocation = Location::withoutGlobalScopes()->findOrFail($toLocationId);
-        $this->assertSameCustomer($box, $toLocation);
-        $this->assertLocationHasCapacity($toLocation);
-
         return DB::transaction(function () use ($box, $toLocationId, $data) {
+            $toLocation = Location::withoutGlobalScopes()->whereKey($toLocationId)->lockForUpdate()->firstOrFail();
+            $this->assertSameCustomer($box, $toLocation);
+            $this->assertLocationHasCapacity($toLocation);
+
             $log = $this->log($box, 'transfer_box', array_merge($data, [
                 'from_location_id' => $box->current_location_id,
                 'to_location_id' => $toLocationId,
@@ -239,11 +251,11 @@ class DocumentMovementService
 
     public function returnBox(Box $box, int $toLocationId, array $data = []): DocumentMovementLog
     {
-        $toLocation = Location::withoutGlobalScopes()->findOrFail($toLocationId);
-        $this->assertSameCustomer($box, $toLocation);
-        $this->assertLocationHasCapacity($toLocation);
-
         return DB::transaction(function () use ($box, $toLocationId, $data) {
+            $toLocation = Location::withoutGlobalScopes()->whereKey($toLocationId)->lockForUpdate()->firstOrFail();
+            $this->assertSameCustomer($box, $toLocation);
+            $this->assertLocationHasCapacity($toLocation);
+
             $log = $this->log($box, 'return', array_merge($data, ['to_location_id' => $toLocationId]));
 
             $box->update(['current_location_id' => $toLocationId, 'status' => 'active']);
@@ -281,10 +293,23 @@ class DocumentMovementService
     }
 
     /**
-     * Same reasoning as assertBoxHasCapacity(), for Location::box_capacity.
+     * Same capacity reasoning as assertBoxHasCapacity(), for
+     * Location::box_capacity — plus the destination-suitability checks
+     * (status, can_store_boxes) every box move into a location was missing:
+     * nothing previously stopped a box from being received/transferred/
+     * returned into a location marked inactive or explicitly configured to
+     * never hold boxes (e.g. a stock-only shelf).
      */
     protected function assertLocationHasCapacity(Location $location): void
     {
+        if ($location->status !== 'active') {
+            throw new InvalidArgumentException("Location {$location->ancestry_path} is not active.");
+        }
+
+        if (! $location->can_store_boxes) {
+            throw new InvalidArgumentException("Location {$location->ancestry_path} is not configured to store boxes.");
+        }
+
         if ($location->box_capacity && $location->boxes()->count() >= $location->box_capacity) {
             throw new InvalidArgumentException("Location {$location->ancestry_path} is at capacity ({$location->box_capacity} boxes).");
         }

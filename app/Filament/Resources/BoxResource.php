@@ -362,7 +362,11 @@ class BoxResource extends BaseResource
             ->authorize(fn (Box $record): bool => static::can('update', $record))
             ->schema([
                 Forms\Components\Select::make('to_location_id')->label('To location')
-                    ->options(fn () => static::locationOptions())->searchable()->preload()->required(),
+                    ->searchable()
+                    ->preload()
+                    ->getSearchResultsUsing(fn (string $search): array => Location::searchByNameOrBarcode($search))
+                    ->getOptionLabelUsing(fn ($value): ?string => Location::find($value)?->ancestry_path)
+                    ->required(),
                 Forms\Components\Textarea::make('remarks'),
             ])
             ->action(function (Box $record, array $data): void {
@@ -426,7 +430,11 @@ class BoxResource extends BaseResource
             ->authorize(fn (Box $record): bool => static::can('update', $record))
             ->schema([
                 Forms\Components\Select::make('to_location_id')->label('Return to location')
-                    ->options(fn () => static::locationOptions())->searchable()->preload()->required(),
+                    ->searchable()
+                    ->preload()
+                    ->getSearchResultsUsing(fn (string $search): array => Location::searchByNameOrBarcode($search))
+                    ->getOptionLabelUsing(fn ($value): ?string => Location::find($value)?->ancestry_path)
+                    ->required(),
                 Forms\Components\Textarea::make('remarks'),
             ])
             ->action(function (Box $record, array $data): void {
@@ -477,12 +485,6 @@ class BoxResource extends BaseResource
             'view' => Pages\ViewBox::route('/{record}'),
             'edit' => Pages\EditBox::route('/{record}/edit'),
         ];
-    }
-
-    /** @return array<int, string> location id => "Room 1 > Area A > Shelf-A01" */
-    protected static function locationOptions(): array
-    {
-        return Location::ancestryPathMap();
     }
 }
 
@@ -543,23 +545,32 @@ class CreateBox extends CreateRecord
             return;
         }
 
+        // Filament's own relationship-saving (saveRelationships(), which the
+        // Create page runs right after the initial INSERT, before this hook
+        // fires) already set current_location_id on this record — before
+        // receiveInBox()'s capacity check below would run. Left in place,
+        // that check would count this box against the location's OWN
+        // capacity, rejecting what should be a legitimate placement the
+        // instant a location's last slot is filled by its very first box.
+        // Detach it first so the check reflects the location's true
+        // existing count, then let receiveInBox() reapply the assignment
+        // properly (its own log entry) if there's room — same fix shape as
+        // an ordinary Transfer, which never has this problem because the
+        // box isn't pre-attached before the check runs.
+        $intendedLocationId = $record->current_location_id;
+        $record->update(['current_location_id' => null]);
+
         try {
             app(DocumentMovementService::class)->receiveInBox(
                 $record,
-                $record->current_location_id,
+                $intendedLocationId,
                 $record->source_origin,
             );
         } catch (InvalidArgumentException $e) {
-            // The box record itself is already created at this point (this
-            // hook runs post-insert) with current_location_id set from the
-            // raw create form. Since the receive was rejected, no movement
-            // log exists for that placement — clear it the same way
-            // moveOutBox() represents "exists, not currently placed
-            // anywhere" (null location + 'moved_out'), rather than leaving
-            // current_location_id pointing at a location the box was never
-            // actually logged into. Recoverable via Transfer once the
-            // destination has room.
-            $record->update(['current_location_id' => null, 'status' => 'moved_out']);
+            // current_location_id was stripped before insert (see
+            // mutateFormDataBeforeCreate()), so it's already null here on
+            // rejection — nothing to roll back beyond the status default.
+            $record->update(['status' => 'moved_out']);
             Notification::make()->title('Box created but not placed')->body($e->getMessage())->danger()->send();
         }
     }

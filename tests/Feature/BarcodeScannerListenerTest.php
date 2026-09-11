@@ -5,7 +5,9 @@ namespace Tests\Feature;
 use App\Filament\Resources\BoxResource\Pages\CreateBox;
 use App\Filament\Resources\DocumentFileResource;
 use App\Filament\Resources\DocumentFileResource\Pages\CreateDocumentFile;
+use App\Filament\Resources\ProductResource;
 use App\Livewire\BarcodeScannerListener;
+use App\Models\BarcodeRegistry;
 use App\Models\Customer;
 use App\Models\DocumentFile;
 use App\Models\User;
@@ -125,5 +127,37 @@ class BarcodeScannerListenerTest extends TestCase
             ->assertNoRedirect();
 
         Notification::assertNotNotified('Unregistered Barcode Scanned');
+    }
+
+    public function test_scanning_a_reserved_product_barcode_redirects_to_product_create(): void
+    {
+        $reservation = app(BarcodeService::class)->reserve($this->customer->id, 'product', 1)->first();
+
+        Livewire::test(BarcodeScannerListener::class)
+            ->call('scan', $reservation->barcode)
+            ->assertRedirect(ProductResource::getUrl('create', ['barcode' => $reservation->barcode]));
+    }
+
+    public function test_register_existing_does_not_attach_a_reservation_of_a_different_type(): void
+    {
+        $productReservation = app(BarcodeService::class)->reserve($this->customer->id, 'product', 1)->first();
+
+        Livewire::withQueryParams(['file_barcode' => $productReservation->barcode])
+            ->test(CreateDocumentFile::class)
+            ->fillForm(['customer_id' => $this->customer->id, 'file_barcode' => $productReservation->barcode])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        // The Product reservation must stay untouched — still unused, not
+        // repurposed to point at the new Document File.
+        $this->assertSame('unused', $productReservation->fresh()->status);
+        $this->assertNull($productReservation->fresh()->reference_id);
+
+        // No new registry row exists either — the duplicate barcode string
+        // can't be registered under a second type.
+        $this->assertSame(
+            1,
+            BarcodeRegistry::withoutGlobalScopes()->where('barcode', $productReservation->barcode)->count(),
+        );
     }
 }

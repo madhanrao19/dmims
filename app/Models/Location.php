@@ -152,6 +152,30 @@ class Location extends Model
     }
 
     /**
+     * Matches location_name OR barcode so a handheld scanner's input (which
+     * types the shelf/rack barcode, not its name) resolves a location — same
+     * reasoning as Box::searchByNumberOrBarcode(). Used by Box Transfer/
+     * Return's location picker, which — unlike a ->relationship() Select's
+     * ->searchable(['col']) shorthand — needs a manual search callback since
+     * it's a plain to_location_id action field, not tied to an Eloquent
+     * relationship on the acting model.
+     *
+     * @return array<int, string> location id => full ancestry path
+     */
+    public static function searchByNameOrBarcode(string $search, int $limit = 50): array
+    {
+        $ids = static::query()
+            ->where('location_name', 'like', "%{$search}%")
+            ->orWhere('barcode', 'like', "%{$search}%")
+            ->limit($limit)
+            ->pluck('id');
+
+        $paths = static::ancestryPathMap();
+
+        return $ids->mapWithKeys(fn (int $id): array => [$id => $paths[$id] ?? null])->filter()->all();
+    }
+
+    /**
      * @var array<string, array<int, string>>
      */
     protected static array $ancestryPathCache = [];

@@ -145,11 +145,29 @@ class CreateProduct extends CreateRecord
 {
     protected static string $resource = ProductResource::class;
 
+    /**
+     * Captured at mount() — see DocumentFileResource\Pages\CreateDocumentFile's
+     * $fromBarcodeScan for why afterCreate() can't just re-read
+     * request()->filled('barcode') itself.
+     */
+    public bool $fromBarcodeScan = false;
+
+    public function mount(): void
+    {
+        parent::mount();
+
+        $this->fromBarcodeScan = request()->filled('barcode');
+    }
+
     /** Attach a reserved-but-unclaimed barcode if one was pre-filled — see
-     *  BarcodeService::claim(). No-op for a manually-typed barcode. */
+     *  BarcodeService::claim(). No-op for a manually-typed barcode. A barcode
+     *  arriving via the global scan-to-create flow still needs registering
+     *  so scanning it again resolves straight to this record. */
     protected function afterCreate(): void
     {
-        app(BarcodeService::class)->claim($this->record);
+        if (! app(BarcodeService::class)->claim($this->record) && $this->fromBarcodeScan) {
+            app(BarcodeService::class)->registerExisting($this->record);
+        }
     }
 }
 

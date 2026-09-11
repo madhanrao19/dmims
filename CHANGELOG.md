@@ -6,6 +6,48 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed — Six issues from external review of the barcode-scan feature
+
+- **Reserved Product labels**: scanning a pre-reserved Product barcode now redirects
+  to Product's Create form (matching Document File/Box/Location), instead of falling
+  through to a plain "inactive" notification.
+- **Reservation type-safety**: `BarcodeService::registerExisting()` now refuses to
+  attach a barcode string that's already reserved/claimed under a *different* type
+  (e.g. a Product label's code typed into a Document File field) — it leaves the
+  record's own barcode column as typed but doesn't register it, rather than
+  repurposing the other type's registry row.
+- **Shelf-barcode search**: Box Transfer/Return's location picker matched only the
+  displayed name/path text, not the location's own barcode — a handheld scanner's
+  input never resolved anything. New `Location::searchByNameOrBarcode()` fixes it.
+- **Capacity off-by-one on create**: creating a Document File/Box with its Box
+  Assignment/Current Location preselected persisted that link on the very first
+  INSERT (via Filament's relationship-saving), so the capacity check that ran
+  afterward counted the record against itself — a box/location with exactly one
+  slot left always rejected what should have been its legitimate first occupant.
+- **Capacity race condition**: `DocumentMovementService`'s capacity checks
+  (`assertBoxHasCapacity`/`assertLocationHasCapacity`) now run inside the same
+  transaction as the write, with a row lock on the target, so two concurrent
+  requests can no longer both pass the check before either commits.
+- **Destination suitability**: moving a box into a location now also checks the
+  location's own `status` (must be active) and `can_store_boxes` flag — previously
+  unenforced, so a box could be placed into an inactive or stock-only location.
+- **Access control on Livewire requests**: the `business-access` middleware group
+  (user/company active, subscription, license) is now registered as persistent, so
+  it re-runs on every Livewire action (including the barcode scanner), not just full
+  page loads — a session whose access was just revoked no longer keeps working until
+  its next page navigation.
+- **Print-count accuracy**: `printed_count` was incrementing on every modal
+  re-render (e.g. changing the label-size dropdown), not just on actually opening a
+  label to print. Moved to Filament's `mountUsing()` hook, which fires exactly once
+  per modal open, across all four print actions (single/bulk × Print Barcode/Barcode
+  Registry).
+- **Reprint/damage tracking**: added an optional "Copies" field to every print
+  action (feeds `printed_count` and repeats the label that many times in the
+  printed output) and a required "Reason" field to Barcode Registry's "Lost/Damaged"
+  action, logged to the audit log.
+
+321/321 tests passing (11 new), Pint and PHPStan clean across the whole codebase.
+
 ### Added — Global barcode scan: quick-create shortcuts and jump-to-record from any page
 
 Reinstates and extends the "Scan Center" behaviour removed in `19a6e74` — a handheld

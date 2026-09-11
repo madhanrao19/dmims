@@ -1552,4 +1552,104 @@ instead of opening the record.
 - Regression tests added: `test_scan_to_create_document_file_is_scannable_again_immediately`,
   `test_manually_typed_barcode_outside_the_scan_flow_is_not_registered`. 310/310 total
   passing.
-clean.
+
+## 27. Six Issues From External Review of the Barcode-Scan Feature — 11 September 2026
+
+A second reviewer went through §26's work against `docs/DMIMS_ISSUES.md` and the
+broader feature discussion, and found six real gaps (five in code the barcode-scan
+work itself touched, one pre-existing) not caught by the original test suite or
+live-browser pass. All six fixed same day.
+
+**1. Reserved Product labels fell through to "inactive"** — `BarcodeScannerListener`'s
+`unused` branch matched `document_file`/`box`/`location` but had no `product` case,
+so scanning a pre-reserved Product barcode landed on a dead-end "Barcode is inactive"
+notification instead of Product's Create form. Fixed by adding the case (matching
+`ProductResource::getUrl('create', ['barcode' => $barcode])`); PHPStan then correctly
+flagged the explicit `'product' =>` arm as redundant once all three sibling types are
+excluded (the DB enum only has 4 values), so it collapsed into the `default` arm
+instead — same pattern the old, deleted `BarcodeScanner::scan()` used.
+
+**2. `registerExisting()` had no type check** — could silently attach an existing
+*unassigned* (`reference_id === null`) registry row to a new record without checking
+that its `barcode_type` matched what was being created, e.g. a Product label's code
+typed into a Document File's barcode field would get "claimed" as if it were a
+Document File barcode. Fixed: `registerExisting()` now refuses (returns `null`, no
+DB write) whenever an existing row for that barcode string has a *different* type —
+the record keeps its typed-in barcode but stays unregistered rather than corrupting
+the other type's entry.
+
+**3. Box Transfer/Return's location picker didn't search by barcode** — it used a
+static `Location::ancestryPathMap()` options array with `->searchable()`, which only
+matches the *displayed* ancestry-path text, not the location's own `barcode` column.
+A handheld scanner's input (the shelf's barcode) never matched anything. Added
+`Location::searchByNameOrBarcode()` (same shape as the existing
+`Box::searchByNumberOrBarcode()`) and switched both Selects to
+`getSearchResultsUsing()`/`getOptionLabelUsing()`. `BoxResource::locationOptions()`
+removed as dead code once nothing called it anymore.
+
+**4. Capacity off-by-one on create** — creating a Document File/Box with its Box
+Assignment/Current Location field preselected persisted `current_box_id`/
+`current_location_id` on the row's very first INSERT, because Filament's own
+`saveRelationships()` (which the Create page runs right after the insert, independent
+of `mutateFormDataBeforeCreate()`) re-applies a `->relationship()` Select's value from
+the live form state — before `afterCreate()`'s `receiveInFile()`/`receiveInBox()` call
+ever ran its capacity check. With the field already saved, `$box->files()->count()`/
+`$location->boxes()->count()` counted the record against itself: a box/location with
+exactly one slot left was always wrongly rejected as "at capacity" for what should
+have been its own first, legitimate occupant. Root-caused via a reproduction test
+(`test_creating_a_document_file_into_a_box_with_exactly_one_slot_left_succeeds`) that
+failed before the fix and passes after. Fix: `afterCreate()` now detaches the
+just-auto-set `current_box_id`/`current_location_id` (plain `->update()`, not through
+the relationship) immediately before calling `receiveInFile()`/`receiveInBox()`, so
+the capacity check sees the container's *true* existing count, then lets that same
+call reapply the assignment (with its own log entry) if there's room — the same shape
+an ordinary Transfer already used correctly, since a transferred file/box was never
+pre-attached before its own check ran.
+
+**5. Capacity checks ran outside the transaction** — `assertBoxHasCapacity()`/
+`assertLocationHasCapacity()` were called on a plain `findOrFail()`'d instance
+*before* `DB::transaction()` opened, so two concurrent requests targeting the same
+nearly-full box/location could both pass the check before either committed (TOCTOU).
+Fixed: all six capacity-gated methods (`receiveInFile`, `transferFile`, `returnFile`,
+`receiveInBox`, `transferBox`, `returnBox`) now fetch the target with
+`lockForUpdate()` *inside* the transaction, serializing concurrent writers on that
+row.
+
+**6. Destination suitability wasn't enforced** — nothing stopped a box from being
+received/transferred/returned into a `Location` marked `status = 'inactive'` or with
+`can_store_boxes = false` (e.g. a stock-only shelf). `assertLocationHasCapacity()`
+now checks both before the capacity count.
+
+**Pre-existing, unrelated to the barcode-scan work itself, also closed while here:**
+`business-access` middleware (user/company active, subscription, license gates) was
+registered only as regular panel middleware, not `->persistentMiddleware()` — so it
+never re-ran on Livewire's own `/livewire/update` route, only full page loads. A
+session whose access was revoked mid-session kept working for every Livewire action
+(including the barcode scanner) until its next navigation. Fixed with one additional
+`->persistentMiddleware(['business-access'])` call in `FilamentPanelProvider`; all six
+of the group's checks are idempotent reads/aborts, safe to re-run per-request.
+
+**Also, while auditing the same print actions for #1-2:** `printed_count` was
+incrementing inside `->modalContent()`, which Filament re-evaluates on every Livewire
+render — including the label-size Select's own `->live()` updates — so changing the
+size twice while a preview stayed open counted as three prints, not one. Moved to
+`->mountUsing()` (fires exactly once, on modal open) across all four print actions
+(`HasBarcodeAction::barcodeAction()`/`bulkBarcodeAction()`, `BarcodeRegistryResource`'s
+`preview`/`batchPrint`). Added an optional "Copies" field alongside (feeds
+`printed_count` and repeats the label N times in the actual printed output — printing
+itself is fully client-side `window.print()`, so `printed_count` remains "modal
+opens," an honest lower bound, not an exact physical-copy count) and a required
+"Reason" field on "Lost/Damaged", logged to `audit_logs`.
+
+**Regression tests:** 11 new (`test_scanning_a_reserved_product_barcode_redirects_to_product_create`,
+`test_register_existing_does_not_attach_a_reservation_of_a_different_type`,
+`test_search_by_name_or_barcode_matches_a_shelf_barcode`,
+`test_creating_a_document_file_into_a_box_with_exactly_one_slot_left_succeeds`,
+`test_creating_a_box_into_a_location_with_exactly_one_slot_left_succeeds`,
+`test_receive_in_box_is_rejected_when_location_is_inactive`,
+`test_receive_in_box_is_rejected_when_location_cannot_store_boxes`,
+`test_business_access_is_registered_as_persistent_livewire_middleware`,
+`test_replace_action_requires_a_reason`,
+`test_print_barcode_action_only_increments_printed_count_once_despite_live_size_changes`,
+`test_increment_printed_accepts_a_copies_count`). 321/321 total passing, Pint and
+PHPStan clean across the whole codebase (not just changed files).
