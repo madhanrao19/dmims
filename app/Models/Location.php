@@ -164,9 +164,17 @@ class Location extends Model
      */
     public static function searchByNameOrBarcode(string $search, int $limit = 50): array
     {
+        // The two conditions MUST be grouped in a nested where() — a bare
+        // ->where()->orWhere() chained directly onto the query breaks out of
+        // BelongsToCustomer's global scope (also a plain top-level ->where()),
+        // turning "customer_id = X AND name LIKE ?" OR "barcode LIKE ?" into
+        // a query that returns barcode matches from every tenant, not just
+        // this one.
         $ids = static::query()
-            ->where('location_name', 'like', "%{$search}%")
-            ->orWhere('barcode', 'like', "%{$search}%")
+            ->where(function ($query) use ($search): void {
+                $query->where('location_name', 'like', "%{$search}%")
+                    ->orWhere('barcode', 'like', "%{$search}%");
+            })
             ->limit($limit)
             ->pluck('id');
 

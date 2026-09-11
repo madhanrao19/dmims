@@ -1653,3 +1653,29 @@ opens," an honest lower bound, not an exact physical-copy count) and a required
 `test_print_barcode_action_only_increments_printed_count_once_despite_live_size_changes`,
 `test_increment_printed_accepts_a_copies_count`). 321/321 total passing, Pint and
 PHPStan clean across the whole codebase (not just changed files).
+
+## 28. Critical — `orWhere()` Broke Out of Tenant Scoping in Two Barcode Search Helpers — 11 September 2026
+
+**Critical, fixed same day.** A background security review of §27's commit caught a
+cross-tenant information disclosure in the new `Location::searchByNameOrBarcode()`
+(§27 item 3): a bare `->where('location_name', ...)->orWhere('barcode', ...)`
+chained directly onto `static::query()` breaks OUT of `BelongsToCustomer`'s global
+scope, which adds its own plain top-level `$builder->where('customer_id', $id)`.
+SQL operator precedence turns the intended `customer_id = X AND (name LIKE ? OR
+barcode LIKE ?)` into `customer_id = X AND name LIKE ? OR barcode LIKE ?` — the
+`barcode` half is no longer inside the customer_id condition at all, so any tenant
+user searching Box Transfer/Return's location picker by barcode could see (and
+select as a transfer destination) another tenant's location.
+
+Checking the pattern this was copied from — `Box::searchByNumberOrBarcode()`
+(pre-existing, used by `DocumentFileResource`'s Box Assignment search) — found the
+identical bug already live in production code, unrelated to today's work. Both
+fixed by grouping the two conditions inside a nested `->where(function ($query) {
+...})`, so the OR stays confined within one group that the global scope's AND wraps
+correctly.
+
+**Regression tests** added to `DocumentTenantIsolationTest.php` (the file that
+already exists specifically to guard this class of bug, previously only exercising
+the plain `Box::query()`/`Location::query()` path, not these two search helpers):
+`test_search_by_number_or_barcode_does_not_leak_another_companys_box`,
+`test_search_by_name_or_barcode_does_not_leak_another_companys_location`.

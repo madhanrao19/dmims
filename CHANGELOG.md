@@ -6,6 +6,17 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed — Critical: cross-tenant location/box leak in barcode search helpers
+
+A background security review of the commit below caught a cross-tenant data leak:
+`Location::searchByNameOrBarcode()`'s `->where(...)->orWhere(...)` chained directly
+onto the query broke out of `BelongsToCustomer`'s own tenant-scoping `where()`, so
+searching Box Transfer/Return's location picker by barcode could surface (and let
+you pick as a transfer destination) another tenant's location. The pre-existing
+`Box::searchByNumberOrBarcode()` this was copied from had the identical bug, live in
+production code already. Both fixed by grouping the OR'd conditions inside a nested
+`where()`. Regression tests added to `DocumentTenantIsolationTest.php`.
+
 ### Fixed — Six issues from external review of the barcode-scan feature
 
 - **Reserved Product labels**: scanning a pre-reserved Product barcode now redirects

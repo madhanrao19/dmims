@@ -77,13 +77,22 @@ class Box extends Model
      * Matches box_number OR box_barcode so a handheld scanner's input
      * (which types the barcode, not the box number) resolves to a box.
      *
+     * The two conditions MUST be grouped in a nested where() — a bare
+     * ->where()->orWhere() chained directly onto the query breaks out of
+     * BelongsToCustomer's global scope (also a plain top-level ->where()),
+     * turning "customer_id = X AND box_number LIKE ?" OR "box_barcode LIKE ?"
+     * into a query that returns box_barcode matches from every tenant, not
+     * just this one.
+     *
      * @return Collection<int, string>
      */
     public static function searchByNumberOrBarcode(string $search, int $limit = 50): Collection
     {
         return static::query()
-            ->where('box_number', 'like', "%{$search}%")
-            ->orWhere('box_barcode', 'like', "%{$search}%")
+            ->where(function ($query) use ($search): void {
+                $query->where('box_number', 'like', "%{$search}%")
+                    ->orWhere('box_barcode', 'like', "%{$search}%");
+            })
             ->limit($limit)
             ->pluck('box_number', 'id');
     }

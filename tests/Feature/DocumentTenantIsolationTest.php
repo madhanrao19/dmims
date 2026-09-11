@@ -55,4 +55,46 @@ class DocumentTenantIsolationTest extends TestCase
         $this->assertArrayHasKey($locA->id, $visible);
         $this->assertArrayNotHasKey($locB->id, $visible, 'Location::query() must not leak another tenant\'s locations into the Transfer/Return dropdown.');
     }
+
+    /**
+     * Regression: a bare ->where()->orWhere() chained directly onto
+     * Box::query() breaks OUT of BelongsToCustomer's own plain top-level
+     * ->where('customer_id', ...) — "customer_id = X AND box_number LIKE ?"
+     * OR "box_barcode LIKE ?" returns box_barcode matches from every
+     * tenant, not just this one. Caught by a security review of a
+     * near-identical Location method copied from this one; fixed here too
+     * by grouping both conditions inside a nested where().
+     */
+    public function test_search_by_number_or_barcode_does_not_leak_another_companys_box(): void
+    {
+        $companyA = Customer::create(['company_name' => 'A', 'company_code' => 'CA', 'status' => 'active']);
+        $companyB = Customer::create(['company_name' => 'B', 'company_code' => 'CB', 'status' => 'active']);
+
+        Box::create(['customer_id' => $companyA->id, 'box_barcode' => 'SHARED-CODE-A', 'box_number' => 'BA1', 'status' => 'active']);
+        $boxB = Box::create(['customer_id' => $companyB->id, 'box_barcode' => 'SHARED-CODE-B', 'box_number' => 'BB1', 'status' => 'active']);
+
+        $userA = User::factory()->create(['is_platform_user' => false, 'customer_id' => $companyA->id, 'status' => 'active']);
+        $this->actingAs($userA);
+
+        $results = Box::searchByNumberOrBarcode('SHARED-CODE');
+
+        $this->assertArrayNotHasKey($boxB->id, $results->all(), 'searchByNumberOrBarcode() must not leak another tenant\'s box.');
+    }
+
+    /** Same regression as the Box test above, for Location::searchByNameOrBarcode(). */
+    public function test_search_by_name_or_barcode_does_not_leak_another_companys_location(): void
+    {
+        $companyA = Customer::create(['company_name' => 'A', 'company_code' => 'CA', 'status' => 'active']);
+        $companyB = Customer::create(['company_name' => 'B', 'company_code' => 'CB', 'status' => 'active']);
+
+        Location::create(['customer_id' => $companyA->id, 'location_code' => 'LA1', 'location_name' => 'Shelf A', 'barcode' => 'SHARED-LOC-A', 'status' => 'active']);
+        $locB = Location::create(['customer_id' => $companyB->id, 'location_code' => 'LB1', 'location_name' => 'Shelf B', 'barcode' => 'SHARED-LOC-B', 'status' => 'active']);
+
+        $userA = User::factory()->create(['is_platform_user' => false, 'customer_id' => $companyA->id, 'status' => 'active']);
+        $this->actingAs($userA);
+
+        $results = Location::searchByNameOrBarcode('SHARED-LOC');
+
+        $this->assertArrayNotHasKey($locB->id, $results, 'searchByNameOrBarcode() must not leak another tenant\'s location.');
+    }
 }
