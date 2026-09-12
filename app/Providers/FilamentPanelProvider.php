@@ -10,8 +10,10 @@ use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Panel;
 use Filament\PanelProvider;
+use Filament\Support\Assets\Js;
 use Filament\Support\Colors\Color;
 use Filament\Support\Enums\Width;
+use Filament\Support\Facades\FilamentAsset;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -19,10 +21,26 @@ use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Vite;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class FilamentPanelProvider extends PanelProvider
 {
+    /**
+     * Registers resources/js/barcode-camera.js (built by this app's own
+     * Vite pipeline, not a Filament plugin asset) so the panel's <head>
+     * includes it — the panel otherwise only pulls in Filament's own core
+     * JS/Alpine bundle plus the admin theme.css registered via
+     * ->viteTheme() below, so a custom JS file needs this explicit
+     * registration to load on admin pages at all.
+     */
+    public function boot(): void
+    {
+        FilamentAsset::register([
+            Js::make('barcode-camera', Vite::asset('resources/js/barcode-camera.js'))->module(),
+        ]);
+    }
+
     public function panel(Panel $panel): Panel
     {
         return $panel

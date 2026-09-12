@@ -13,6 +13,9 @@
         "qa:ui": "playwright test --ui",
         "qa:report": "playwright show-report"
     },
+    "dependencies": {
+        "html5-qrcode": "^2.3.8"
+    },
     "devDependencies": {
         "@playwright/test": "^1.61.1",
         "@tailwindcss/vite": "^4.3.3",

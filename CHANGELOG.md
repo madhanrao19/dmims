@@ -6,6 +6,34 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added — Live camera barcode scanning (global scanner + Box Scan Document mode)
+
+Every scan input in DMIMS was keyboard-wedge only — it only worked with a
+physical USB/Bluetooth handheld scanner gun typing into a text field.
+A "Scan with Camera" button (new, feature-detected — absent entirely on a
+browser without `getUserMedia`) now opens a live camera view that
+continuously decodes barcodes via `html5-qrcode` (this project's first
+production JS dependency; the reader manages the camera stream and decodes
+both 1D and 2D formats, needed because iOS Safari has no native
+`BarcodeDetector`) and feeds the decoded text into the *exact same*
+`$wire.scan()` / `scannedFileBarcode` + `scanDocument()` paths a keyboard
+scanner already drives — `ScannerService`, `ViewBox::scanDocument()`, and
+`BarcodeController` are all unchanged. New: `resources/js/barcode-camera.js`
+(registers `Alpine.data('barcodeCamera')`), `resources/views/components/
+barcode-camera-button.blade.php`. Registered onto the Filament panel via
+`FilamentAsset::register()` in `FilamentPanelProvider::boot()` (the panel
+only pulls in Filament's own core JS + the admin `theme.css` otherwise, so
+a custom JS file needs this to load on `/admin` pages at all — a plain
+`resources/js/app.js` import would not, since that entry is only used by
+the public `welcome.blade.php` page). `resources/css/filament/admin/
+theme.css` gained two `@source` paths (`resources/views/livewire/**/*`,
+`resources/views/components/**/*`) — neither was previously scanned by
+Tailwind, so the new buttons' utility classes were silently absent from the
+compiled CSS until this was added. Requires a secure context (HTTPS, or
+Herd's `herd secure <site>` locally) — `getUserMedia` does not exist at all
+on a plain-HTTP origin, which is itself the correct/expected browser
+behavior, not a bug.
+
 ### Changed — Audit/Movement Log columns match the requested layout exactly
 
 Two follow-up fixes on top of the tab renames below, to match the requested

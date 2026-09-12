@@ -18,6 +18,9 @@
             <x-filament::button type="submit" icon="heroicon-o-qr-code">
                 Scan
             </x-filament::button>
+            <x-barcode-camera-button
+                x-on:barcode-camera-decoded="await $wire.set('scannedFileBarcode', $event.detail); $wire.scanDocument()"
+            />
         </form>
         @error('scannedFileBarcode')
             <p class="text-sm text-danger-600 dark:text-danger-400">{{ $message }}</p>
