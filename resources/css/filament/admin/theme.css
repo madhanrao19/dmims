@@ -2,3 +2,11 @@
 
 @source '../../../../app/Filament/**/*';
 @source '../../../../resources/views/filament/**/*';
+/* Both added for the camera-scan feature: the global scanner listener
+   lives in resources/views/livewire/ (barcode-scanner-listener.blade.php)
+   and the reusable scan button in resources/views/components/
+   (barcode-camera-button.blade.php) — neither path was scanned by
+   Tailwind before, so utility classes used there (fixed/bottom-4/etc.)
+   were silently absent from the compiled admin theme CSS. */
+@source '../../../../resources/views/livewire/**/*';
+@source '../../../../resources/views/components/**/*';

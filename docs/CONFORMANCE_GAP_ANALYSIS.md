@@ -1679,3 +1679,48 @@ already exists specifically to guard this class of bug, previously only exercisi
 the plain `Box::query()`/`Location::query()` path, not these two search helpers):
 `test_search_by_number_or_barcode_does_not_leak_another_companys_box`,
 `test_search_by_name_or_barcode_does_not_leak_another_companys_location`.
+
+## 29. Added — Live camera barcode scanning — 12 September 2026
+
+Every DMIMS scan input (`BarcodeScannerListener`, Box View's "Scan Mode") was
+keyboard-wedge only — no way to scan with a phone's own camera. Added a
+feature-detected "Scan with Camera" button (`html5-qrcode`, this project's
+first production JS dependency) at both existing scan entry points. **Zero
+backend changes**: `ScannerService::scan()`, `ViewBox::scanDocument()`, and
+`BarcodeController` are all untouched — the camera decodes a barcode and
+hands the plain string to the exact same `$wire.scan()` /
+`scannedFileBarcode` + `scanDocument()` paths a physical scanner already
+drives. Regression-verified live (not just by unit test) that the existing
+keyboard-wedge path is unaffected: scanning `DOC-MA-000011` by typing it
+into Box View's Scan Mode field + Enter still correctly added it to the box
+(`Total Files` 8 → 9, "Added to box..." notification) after the camera
+feature was wired in alongside it.
+
+`Document File` View has no scan-mode equivalent today (keyboard-wedge
+included) — pre-existing, unrelated to this change, intentionally left out
+of scope (this feature extends *how* scanning happens, not *where* it's
+available).
+
+Requires a secure context — `navigator.mediaDevices.getUserMedia` does not
+exist at all on a plain-HTTP origin (confirmed empirically: `dmims.test`
+over HTTP showed `supported: false` and the button correctly stayed
+hidden; enabling Herd's local TLS via `herd secure dmims` made it
+`supported: true` and the button appeared). This is correct browser
+behaviour, not a bug — production is HTTPS-only already (the PWA service
+worker registration itself requires a secure context, per `docs/PWA.md`).
+
+Also fixed along the way: `resources/css/filament/admin/theme.css`'s
+Tailwind `@source` list only covered `app/Filament/**/*` and
+`resources/views/filament/**/*` — the new views live in
+`resources/views/livewire/` and `resources/views/components/`, neither
+previously scanned, so their utility classes (`fixed`, `bottom-4`, etc.)
+were silently compiled out. Both paths added. Caught by loading the actual
+page rather than trusting `npm run build` succeeding — a clean build says
+nothing about whether Tailwind found the classes a new file uses.
+
+**Manual on-device QA still required** (cannot be automated — Playwright
+cannot grant real camera permissions or simulate a live decode): actual
+scan-to-decode speed/accuracy on a real iOS Safari and Android Chrome
+device, and confirming a decoded barcode correctly triggers the existing
+`found`/`unused`/`unknown`/`inactive` outcomes end-to-end in a live mobile
+browser.
