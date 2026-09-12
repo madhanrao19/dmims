@@ -33,12 +33,23 @@ class FilamentPanelProvider extends PanelProvider
      * JS/Alpine bundle plus the admin theme.css registered via
      * ->viteTheme() below, so a custom JS file needs this explicit
      * registration to load on admin pages at all.
+     *
+     * Vite::asset() reads public/build/manifest.json (or public/hot when
+     * `npm run dev` is active) and throws ViteManifestNotFoundException if
+     * neither exists — which boot() unconditionally calling it turned into
+     * a hard crash on every Artisan command (composer install's own
+     * package:discover included) on a fresh clone/CI checkout before the
+     * first `npm run build`. Skip registration rather than fatal in that
+     * window; the camera button simply doesn't render until assets exist,
+     * same as it wouldn't for any missing asset.
      */
     public function boot(): void
     {
-        FilamentAsset::register([
-            Js::make('barcode-camera', Vite::asset('resources/js/barcode-camera.js'))->module(),
-        ]);
+        if (is_file(public_path('build/manifest.json')) || is_file(public_path('hot'))) {
+            FilamentAsset::register([
+                Js::make('barcode-camera', Vite::asset('resources/js/barcode-camera.js'))->module(),
+            ]);
+        }
     }
 
     public function panel(Panel $panel): Panel
