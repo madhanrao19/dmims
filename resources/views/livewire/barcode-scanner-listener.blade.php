@@ -44,7 +44,9 @@
         x-init="window.addEventListener('keydown', handleKey.bind($data))"
     ></div>
 
-    <div class="fixed bottom-4 right-4 z-40">
-        <x-barcode-camera-button x-on:barcode-camera-decoded="$wire.scan($event.detail)" />
-    </div>
+    @auth
+        <div class="fixed bottom-4 right-4 z-40">
+            <x-barcode-camera-button x-on:barcode-camera-decoded="$wire.scan($event.detail)" />
+        </div>
+    @endauth
 </div>

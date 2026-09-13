@@ -2,12 +2,15 @@
 
 namespace App\Filament\Auth;
 
+use App\Models\User;
+use App\Services\AccessControlService;
 use App\Services\TurnstileVerifier;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse;
 use Filament\Auth\Pages\Login as BaseLogin;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\View as ViewComponent;
 use Filament\Schemas\Schema;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -20,6 +23,16 @@ use Illuminate\Validation\ValidationException;
  */
 class Login extends BaseLogin
 {
+    /**
+     * Set by isUserAllowedToAccessPanel() below when a login is rejected for
+     * a specific, known reason (account suspended/locked/inactive, company
+     * cancelled, license/subscription expired, etc.) — throwFailureValidationException()
+     * uses it instead of the base class's generic "these credentials don't
+     * match" message. Only ever set after the password has already been
+     * verified correct, so surfacing it isn't an account-enumeration risk.
+     */
+    protected ?string $accessDenialReason = null;
+
     public function form(Schema $schema): Schema
     {
         return $schema
@@ -61,5 +74,33 @@ class Login extends BaseLogin
     protected function turnstile(): TurnstileVerifier
     {
         return app(TurnstileVerifier::class);
+    }
+
+    protected function isUserAllowedToAccessPanel(Authenticatable $user): bool
+    {
+        if (! $user instanceof User) {
+            return parent::isUserAllowedToAccessPanel($user);
+        }
+
+        $reason = app(AccessControlService::class)->loginDenialReason($user);
+
+        if ($reason !== null) {
+            $this->accessDenialReason = $reason;
+
+            return false;
+        }
+
+        return true;
+    }
+
+    protected function throwFailureValidationException(): never
+    {
+        if ($this->accessDenialReason !== null) {
+            throw ValidationException::withMessages([
+                'data.email' => $this->accessDenialReason,
+            ]);
+        }
+
+        parent::throwFailureValidationException();
     }
 }
