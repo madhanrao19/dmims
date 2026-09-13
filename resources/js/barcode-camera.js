@@ -24,7 +24,17 @@ document.addEventListener('alpine:init', () => {
             this.open = true;
             await this.$nextTick();
 
-            this.scanner = new Html5Qrcode(this.readerId);
+            // Reuse one Html5Qrcode instance across the whole page session
+            // instead of `new Html5Qrcode(...)` on every open: creating a
+            // fresh instance each time makes the browser treat it as a brand
+            // new camera request, which is why the prompt reappeared on
+            // every scan even within the same signed-in session, and why a
+            // second open after a successful scan needed a full page
+            // refresh to work again — start()/stop() on the same instance
+            // is the library's intended repeat-scan usage.
+            if (! this.scanner) {
+                this.scanner = new Html5Qrcode(this.readerId);
+            }
 
             try {
                 await this.scanner.start(
@@ -61,8 +71,10 @@ document.addEventListener('alpine:init', () => {
                 // Already stopped/never started — nothing to clean up.
             }
 
-            this.scanner.clear();
-            this.scanner = null;
+            // Deliberately not clear()/null-ing the instance here — see
+            // openScanner()'s comment: keeping it alive is what lets the
+            // next open() reuse the same camera grant instead of prompting
+            // again.
         },
     }));
 });

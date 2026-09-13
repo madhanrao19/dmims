@@ -1685,8 +1685,9 @@ the plain `Box::query()`/`Location::query()` path, not these two search helpers)
 Every DMIMS scan input (`BarcodeScannerListener`, Box View's "Scan Mode") was
 keyboard-wedge only — no way to scan with a phone's own camera. Added a
 feature-detected "Scan with Camera" button (`html5-qrcode`, this project's
-first production JS dependency) at both existing scan entry points. **Zero
-backend changes**: `ScannerService::scan()`, `ViewBox::scanDocument()`, and
+first production JS dependency) at both existing scan entry points — later
+renamed "Scan Barcode" and fixed to not need a page refresh between scans;
+see §30. **Zero backend changes**: `ScannerService::scan()`, `ViewBox::scanDocument()`, and
 `BarcodeController` are all untouched — the camera decodes a barcode and
 hands the plain string to the exact same `$wire.scan()` /
 `scannedFileBarcode` + `scanDocument()` paths a physical scanner already
@@ -1724,3 +1725,37 @@ scan-to-decode speed/accuracy on a real iOS Safari and Android Chrome
 device, and confirming a decoded barcode correctly triggers the existing
 `found`/`unused`/`unknown`/`inactive` outcomes end-to-end in a live mobile
 browser.
+
+## 30. Login Rejection Reasons, Camera Scan Refresh Bug, Turnstile Explicit Render — 13 September 2026
+
+Three fixes; full detail in `CHANGELOG.md` (Unreleased) and
+`DEPLOYMENT_GUIDE.md`'s Deployment Lessons Learned items 9–10 — summarised
+here for the audit trail:
+
+- **Login rejection messages.** Every login rejection after a correct
+  password (suspended/inactive/locked/pending/password-expired/archived
+  account; cancelled/archived company; cancelled/revoked/blocked
+  license) previously showed the same generic "These credentials do not
+  match our records." as a wrong password. `AccessControlService::
+  loginDenialReason(User $user): ?string` now returns the specific reason;
+  `canLogin()` is unchanged in behaviour. `App\Filament\Auth\Login`
+  surfaces it via `isUserAllowedToAccessPanel()`/
+  `throwFailureValidationException()`, only reachable after the password
+  has already been verified correct — not an account-enumeration path.
+  Applies identically to platform (Super Admin) and customer users. New
+  tests: `tests/Feature/LoginErrorMessagesTest.php`.
+- **§29's "Scan with Camera" button renamed "Scan Barcode" and fixed.** It
+  needed a full page refresh to relaunch after a scan and re-prompted for
+  camera permission on every scan in the same session. Root cause:
+  `resources/views/components/barcode-camera-button.blade.php` was missing
+  `wire:ignore`, so every `$wire.scan()` call morphed the button's DOM out
+  from under the running `Html5Qrcode` instance. Fixed with `wire:ignore` +
+  instance reuse in `resources/js/barcode-camera.js`. Also gated behind
+  `@auth` in `barcode-scanner-listener.blade.php` — it was previously
+  rendering, unused, on the guest-facing login page.
+- **Turnstile switched from implicit to explicit render.** Implicit
+  auto-render raced with page parsing and could leave the widget
+  permanently empty (no iframe, no token), causing intermittent silent
+  login failures. `resources/views/filament/turnstile-widget.blade.php`
+  now uses Cloudflare's documented explicit pattern
+  (`?render=explicit` + `turnstile.render()` from Alpine `x-init`).

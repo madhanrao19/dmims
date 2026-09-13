@@ -6,6 +6,56 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed — Login rejection messages were indistinguishable, and camera scan needed a page refresh between scans
+
+Every login rejection *after a correct password* — suspended, inactive,
+locked, pending, password-expired, or archived account; cancelled/archived
+company; cancelled/revoked/blocked license or subscription — showed the
+exact same generic "These credentials do not match our records." message
+as a wrong password, with nothing in the UI to tell an admin why a real
+user couldn't sign in. `AccessControlService::loginDenialReason(User $user):
+?string` (`app/Services/AccessControlService.php`) now returns the specific
+reason; `canLogin()` is unchanged in behaviour (`return $this->
+loginDenialReason($user) === null;`). `App\Filament\Auth\Login` overrides
+`isUserAllowedToAccessPanel()`/`throwFailureValidationException()` to
+surface that reason — only reachable after Filament's base `Login::
+authenticate()` has already validated the password, so this isn't an
+account-enumeration path. Applies identically to platform users (Super
+Admin) and customer users, since both use the same `users.status` column
+and the same login page. Wrong email/password still shows the generic
+message. New tests: `tests/Feature/LoginErrorMessagesTest.php`.
+
+The "Scan Barcode" (renamed from "Scan with Camera") camera button needed a
+full page refresh to relaunch after a scan, and re-prompted for camera
+permission on every scan within the same signed-in session. Root cause:
+`resources/views/components/barcode-camera-button.blade.php` had no
+`wire:ignore` (unlike `turnstile-widget.blade.php`, which already needed
+one for the same reason) — every call site dispatches the decoded barcode
+into a `$wire` call on the *same* Livewire component this button lives in,
+and that request's response re-renders and morphs this component's whole
+DOM tree, destroying the running `Html5Qrcode` instance and its open camera
+stream on every single scan. `resources/js/barcode-camera.js` also now
+reuses one `Html5Qrcode` instance across opens instead of creating a new
+one each time (`new Html5Qrcode(...)` per open is what made the browser
+treat each open as a distinct camera request). The camera button is now
+also gated behind `@auth` in `resources/views/livewire/
+barcode-scanner-listener.blade.php` — it was previously rendering (unused)
+on the guest-facing login page.
+
+The Cloudflare Turnstile widget's *implicit* auto-render (`api.js`
+scanning the DOM for `.cf-turnstile[data-sitekey]` once, synchronously, the
+moment its `async` script finishes loading) raced with page parsing and
+could leave the widget permanently empty — no iframe, no token, ever — on
+a clean page load, which is why login intermittently failed with
+"Verification failed" even though the widget occasionally rendered
+"Success!" on a lucky load. `resources/views/filament/
+turnstile-widget.blade.php` now uses Cloudflare's documented *explicit*
+render pattern (`?render=explicit` + `turnstile.render()` called from
+Alpine's `x-init`, which only runs once this element exists in the DOM),
+removing the race. The temporary diagnostic logging added to `App\Services
+\TurnstileVerifier::verify()` while investigating this has been removed
+now that the fix is confirmed live.
+
 ### Added — Live camera barcode scanning (global scanner + Box Scan Document mode)
 
 Every scan input in DMIMS was keyboard-wedge only — it only worked with a

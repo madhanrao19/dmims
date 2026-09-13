@@ -6,10 +6,26 @@
     successful decode; each call site binds x-on:barcode-camera-decoded to
     whatever it needs (e.g. $wire.scan($event.detail)) — this component has
     no opinion about what happens with the decoded string.
+
+    wire:ignore is required, not optional (same reasoning as
+    turnstile-widget.blade.php): every call site dispatches the decoded
+    barcode into a $wire call (e.g. $wire.scan(...)) on the SAME Livewire
+    component this button lives in, and that call's response re-renders and
+    morphs this component's whole DOM tree. Without wire:ignore, morphdom
+    replaces this div with the server's static (empty) markup on every scan
+    — destroying the running Html5Qrcode instance and its open camera
+    stream along with it. That's the actual root cause of "won't relaunch
+    without a page refresh" and "asks for camera permission on every scan
+    within the same session": each scan silently tore down and rebuilt the
+    scanner (and its instance-reuse logic in barcode-camera.js never got a
+    chance to run, since a brand new Alpine component was created every
+    time). wire:ignore keeps this subtree — and the JS scanner instance
+    inside it — alive across those re-renders, so barcode-camera.js's own
+    single persistent instance is actually reused as intended.
 --}}
-<div x-data="barcodeCamera" x-show="supported" x-cloak {{ $attributes }}>
+<div x-data="barcodeCamera" x-show="supported" x-cloak wire:ignore {{ $attributes }}>
     <x-filament::button type="button" color="gray" icon="heroicon-o-camera" x-on:click="openScanner()">
-        Scan with Camera
+        Scan Barcode
     </x-filament::button>
 
     <div

@@ -781,6 +781,33 @@ deployment most often.
    production run — the script refuses `--seed-qa-users` there — and never run
    bare `php artisan db:seed` (always specify `--class`).
 
+9. **Any client-JS-owned widget rendered inside a Livewire component needs
+   `wire:ignore` on its root element.** The Turnstile widget
+   (`turnstile-widget.blade.php`) and the "Scan Barcode" live-camera button
+   (`barcode-camera-button.blade.php`) both inject their own DOM (an iframe /
+   a video stream) after Blade renders. Without `wire:ignore`, the *next*
+   Livewire request on that same component — including one the widget itself
+   triggers, e.g. `$wire.scan(...)` after a barcode decode — morphs the
+   element back to its static server-rendered markup and destroys whatever
+   the widget built, with no error. Symptoms: a camera scanner that needs a
+   full page refresh to work a second time and re-prompts for camera
+   permission on every scan; a Turnstile widget that intermittently vanishes.
+
+10. **Cloudflare Turnstile: use explicit rendering (`?render=explicit` +
+    `turnstile.render()` from `x-init`), not the implicit `data-sitekey` div
+    Cloudflare's docs show by default.** Turnstile's `api.js` performs its
+    implicit auto-scan for `.cf-turnstile[data-sitekey]` elements once,
+    synchronously, the moment the `async` script finishes loading — if that
+    happens before the browser has parsed down to the widget's div (a real
+    race, not fixed by also adding `defer`, since `async` wins when both are
+    set), the scan finds nothing and the widget stays permanently empty: no
+    iframe, no token, ever, with no console error. This intermittently broke
+    login with "Verification failed" even though the widget occasionally
+    rendered "Success!" on a lucky load. `turnstile-widget.blade.php` now
+    calls `turnstile.render()` itself from Alpine's `x-init` — which only
+    runs once the element actually exists in the DOM — removing the race
+    entirely.
+
 ---
 
 ## **SUPPORT & TROUBLESHOOTING**
