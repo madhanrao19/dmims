@@ -4,7 +4,14 @@
             Print
         </button>
     </div>
-    <div data-print-target class="grid grid-cols-2 gap-4">
+    {{-- A fixed 2-column grid regardless of size forced "Large" barcodes to
+         scale down to fit the column (via barcode-label.blade.php's
+         max-width:100% overflow guard), which visually erased most of the
+         size difference between Small/Medium/Large. Large gets a full-width
+         single column instead, so it has room to render at its true larger
+         size without needing to shrink; the max-width guard still applies as
+         a safety net for exceptionally long barcode values. --}}
+    <div data-print-target class="grid gap-4 {{ ($size ?? 'small') === 'large' ? 'grid-cols-1' : 'grid-cols-2' }}">
         @foreach ($registries as $item)
             @php
                 // $item is either a plain BarcodeRegistry (Barcode Center's own
