@@ -851,6 +851,23 @@ deployment most often.
     same machine, and the tunnel itself is outbound-only, so nothing here
     ever required an inbound allow rule or router port-forwarding.
 
+14. **On Windows, two PHP-FPM pools serving the same app from the same
+    `storage/framework/views/` directory can race on Blade view
+    compilation.** `dmims.test` (Herd's isolated PHP 8.4 pool) and
+    `dmims.datamationgroup.com` (Herd's default pool) are two separate
+    PHP-FPM processes pointed at the same codebase — Windows'
+    `rename()` fails ("Access is denied", error code 5) when one
+    process's temp file collides with a compiled-view path another
+    process has open, unlike POSIX's atomic-replace-even-if-open
+    semantics. Symptom: intermittent page hangs ending in "Maximum
+    execution time of 30 seconds exceeded" fatal errors, which can
+    make an otherwise-correct login look broken if it hits the login
+    page's own view. Fix: `php artisan view:clear && php artisan
+    view:cache` — pre-compiling every view removes the runtime
+    compile-and-rename step entirely. Trade-off: a Blade template edit
+    on a `view:cache`d app needs an explicit `view:clear` (or
+    re-running `view:cache`) to take effect; it won't auto-invalidate.
+
 ---
 
 ## **SUPPORT & TROUBLESHOOTING**
