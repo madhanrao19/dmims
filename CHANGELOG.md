@@ -6,6 +6,18 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed — Duplicate user email crashed instead of showing an inline validation error
+
+`UserResource`'s email field (`app/Filament/Resources/UserResource.php`)
+had no `->unique()` validation — a duplicate submission (`users.email` is
+globally unique) only got caught by the database constraint, producing a
+raw `QueryException` instead of a normal inline "already taken" message.
+Found via a live error log entry where an edit attempt against another
+user's record failed this way. Added `->unique(ignoreRecord: true)`,
+matching the same pattern already used elsewhere in this codebase (see
+`tests/Feature/DuplicateUniqueConstraintValidationTest.php`, which this
+change adds a case to).
+
 ### Fixed — `dmims.test` was pointed at a different codebase/database than `dmims.datamationgroup.com`
 
 Herd's `dmims` site link (`herd.bat paths` / the Sites symlink folder) was

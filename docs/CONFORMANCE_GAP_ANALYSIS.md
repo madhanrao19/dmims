@@ -1906,3 +1906,20 @@ the operative fix. Confirm the dashboard's Public Hostname setting for
    with the dev server was ruled out — `cache:clear` didn't fix it
    either). Needs investigation independent of this work; the new spec
    itself is believed correct pending that.
+
+## 32. UserResource Email Field Missing Unique Validation — 16 September 2026
+
+Found while investigating an unrelated live error-log entry (a failed
+edit attempt against another user's record, from 2026-09-14, predating
+this work — no data was corrupted, the DB's unique constraint correctly
+rejected it). `UserResource::form()`'s `email` field had no `->unique()`
+rule even though `users.email` is a globally-unique DB column — a
+duplicate submission bypassed Filament's inline validation entirely and
+hit the raw `QueryException`, which would render as an uncaught error
+rather than a normal "already taken" message. Fixed with
+`->unique(ignoreRecord: true)`, the same pattern already used by
+`CustomerResource::form()`'s `company_code` field and the composite
+unique fields covered by `DuplicateUniqueConstraintValidationTest.php`
+(this change adds a case for the email field to that same suite). Not
+part of the original 5-item request — investigated and fixed at the
+user's explicit request after the pre-existing log entry was flagged.
