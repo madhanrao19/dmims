@@ -1872,13 +1872,22 @@ the operative fix. Confirm the dashboard's Public Hostname setting for
   the hostname allowlist already includes both `dmims.test` and
   `dmims.datamationgroup.com` (alongside `localhost` and unrelated
   hostnames for other apps sharing the same widget). No change needed.
+- Live camera barcode scanning confirmed working on Android Chrome
+  against `dmims.datamationgroup.com`.
+- **Root cause found and fixed for "a tenant account works on one
+  hostname but not the other":** Herd's `dmims` site link pointed at a
+  different codebase/database than `dmims.datamationgroup.com` — see
+  `DEPLOYMENT_GUIDE.md` Deployment Lessons Learned #15. Re-linked to
+  the correct installation; Madhan Inc.'s Company Admin now signs in
+  successfully on `dmims.test`. Also cleaned up three throwaway test
+  customers this session's own diagnostics had created in the
+  now-orphaned working-repo database.
 
 **Still pending — requires further hardware/dashboard access:**
 1. Identifying what `AgentService` (the process that took over port
    8080 on this machine) actually is, in case it matters for other
    reasons.
-2. Remaining real-device QA: `dmims.test` from the Herd machine itself;
-   Android Chrome scanning; full login/Turnstile/dashboard/Livewire/
+2. Remaining real-device QA: full login/Turnstile/dashboard/Livewire/
    Customer 360 checks on both hostnames; installed-PWA behaviour.
 3. New Playwright coverage (`tests/playwright/barcode-camera.spec.js`)
    could not be run to green against a local `php artisan serve`

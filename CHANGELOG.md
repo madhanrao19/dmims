@@ -6,6 +6,26 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed — `dmims.test` was pointed at a different codebase/database than `dmims.datamationgroup.com`
+
+Herd's `dmims` site link (`herd.bat paths` / the Sites symlink folder) was
+pointing at a separate working-repo checkout rather than the installation
+`dmims.datamationgroup.com`'s nginx vhost actually serves. The two
+hostnames were therefore two different applications with two different
+databases — a tenant account present on one simply didn't exist on the
+other, with no error, indistinguishable from a real access-control bug.
+Re-linked via `herd unlink dmims` + `herd link dmims --secure` from the
+correct directory, so both hostnames now serve the same installation and
+database, matching the stated requirement that they serve the same local
+DMIMS installation. See `DEPLOYMENT_GUIDE.md`'s Deployment Lessons
+Learned #15.
+
+Also found and fixed along the way: a Windows-specific Blade
+view-compilation race between the two hostnames' separate PHP-FPM pools,
+producing intermittent "Maximum execution time of 30 seconds exceeded"
+errors — pre-compiled every view (`view:cache`) to remove the runtime
+compile step. See Deployment Lessons Learned #14.
+
 ### Changed — Camera scanning moved off html5-qrcode onto self-hosted zxing-wasm; Customer 360 Create/Add gate made explicit; dual-hostname (Herd + Cloudflare Tunnel) access restored
 
 `resources/js/barcode-camera.js` no longer depends on `html5-qrcode`

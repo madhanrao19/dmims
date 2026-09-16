@@ -867,6 +867,23 @@ deployment most often.
     compile-and-rename step entirely. Trade-off: a Blade template edit
     on a `view:cache`d app needs an explicit `view:clear` (or
     re-running `view:cache`) to take effect; it won't auto-invalidate.
+    (This was a real, separately-occurring bug — see #15 below for what
+    actually caused the specific login symptom that prompted finding it.)
+
+15. **Verify what a Herd site symlink actually points to — don't assume
+    from a Valet/nginx config file alone.** `dmims.test` and
+    `dmims.datamationgroup.com` are meant to be the same installation,
+    but `herd.bat paths` / the `Sites` folder showed `dmims` was a
+    symlink to a separate git clone (a working/dev checkout) — a
+    completely different codebase and database from the one
+    `dmims.datamationgroup.com`'s nginx vhost serves. Symptom: a
+    tenant account that exists on one hostname doesn't exist on the
+    other, with no error — login simply fails as "no such account,"
+    which looks identical to a real access-control bug. Diagnose with
+    `Get-ChildItem <Sites folder> | Select Name, LinkType, Target`
+    (PowerShell) before investigating anything in application code.
+    Fix: `herd unlink <name>` then `herd link <name> --secure` from
+    inside the correct directory.
 
 ---
 
