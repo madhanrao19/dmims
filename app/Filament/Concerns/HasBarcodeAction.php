@@ -7,6 +7,7 @@ use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Contracts\HasSchemas;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Collection;
@@ -56,7 +57,11 @@ trait HasBarcodeAction
         return Action::make('barcode')
             ->label('Print Barcode')
             ->icon('heroicon-o-qr-code')
-            ->authorize(fn (Model $record): bool => static::can('update', $record))
+            // 'view', not 'update' — printing a label doesn't modify the
+            // record, so a role with only the resource's "view *"
+            // permission (e.g. a customer who can see Locations but not
+            // manage them) must still be able to print its barcode.
+            ->authorize(fn (Model $record): bool => static::can('view', $record))
             ->modalHeading('Barcode label')
             ->modalSubmitAction(false)
             ->modalCancelActionLabel('Close')
@@ -72,6 +77,8 @@ trait HasBarcodeAction
                     ->minValue(1)
                     ->default(1)
                     ->live(),
+                Toggle::make('show_name')->label('Show Name')->default(true)->live(),
+                Toggle::make('show_barcode')->label('Show Barcode')->default(true)->live(),
             ])
             // Reads the field's default (1, unless overridden) rather than a
             // live-updated value: printing itself is fully client-side
@@ -97,6 +104,8 @@ trait HasBarcodeAction
                     'title' => static::barcodeLabelTitle($record),
                     'size' => $data['size'] ?? 'medium',
                     'copies' => max(1, (int) ($data['copies'] ?? 1)),
+                    'showName' => (bool) ($data['show_name'] ?? true),
+                    'showBarcodeText' => (bool) ($data['show_barcode'] ?? true),
                 ]);
             });
     }
@@ -115,7 +124,8 @@ trait HasBarcodeAction
         return BulkAction::make('bulkBarcode')
             ->label('Print Barcode')
             ->icon('heroicon-o-qr-code')
-            ->authorize(fn (): bool => static::can('update'))
+            // See barcodeAction()'s own authorize() comment.
+            ->authorize(fn (): bool => static::can('view'))
             ->modalHeading('Barcode labels')
             ->modalSubmitAction(false)
             ->modalCancelActionLabel('Close')
@@ -131,6 +141,8 @@ trait HasBarcodeAction
                     ->minValue(1)
                     ->default(1)
                     ->live(),
+                Toggle::make('show_name')->label('Show Name')->default(true)->live(),
+                Toggle::make('show_barcode')->label('Show Barcode')->default(true)->live(),
             ])
             // See barcodeAction()'s own mountUsing() comment — same "opens,
             // not an exact physical-copy count" reasoning, applied per
@@ -154,6 +166,8 @@ trait HasBarcodeAction
                     'registries' => $registries,
                     'size' => $data['size'] ?? 'small',
                     'copies' => max(1, (int) ($data['copies'] ?? 1)),
+                    'showName' => (bool) ($data['show_name'] ?? true),
+                    'showBarcodeText' => (bool) ($data['show_barcode'] ?? true),
                 ]);
             });
     }

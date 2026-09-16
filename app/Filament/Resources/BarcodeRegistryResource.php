@@ -192,7 +192,10 @@ class BarcodeRegistryResource extends BaseResource
                 Action::make('preview')
                     ->label('Preview / Print')
                     ->icon('heroicon-o-eye')
-                    ->authorize(fn (BarcodeRegistry $record): bool => static::can('update', $record))
+                    // 'view', not 'update' — see HasBarcodeAction's own
+                    // authorize() comment: printing doesn't modify the
+                    // record, so a view-only role can still use it.
+                    ->authorize(fn (BarcodeRegistry $record): bool => static::can('view', $record))
                     ->modalHeading('Barcode label')
                     ->schema([
                         Forms\Components\Select::make('size')
@@ -206,6 +209,8 @@ class BarcodeRegistryResource extends BaseResource
                             ->minValue(1)
                             ->default(1)
                             ->live(),
+                        Forms\Components\Toggle::make('show_name')->label('Show Name')->default(true)->live(),
+                        Forms\Components\Toggle::make('show_barcode')->label('Show Barcode')->default(true)->live(),
                     ])
                     ->modalSubmitAction(false)
                     ->modalCancelActionLabel('Close')
@@ -233,6 +238,8 @@ class BarcodeRegistryResource extends BaseResource
                             'type' => $record->barcode_type,
                             'size' => $data['size'] ?? 'medium',
                             'copies' => max(1, (int) ($data['copies'] ?? 1)),
+                            'showName' => (bool) ($data['show_name'] ?? true),
+                            'showBarcodeText' => (bool) ($data['show_barcode'] ?? true),
                         ]);
                     }),
                 Action::make('replace')
@@ -272,7 +279,8 @@ class BarcodeRegistryResource extends BaseResource
                 BulkAction::make('batchPrint')
                     ->label('Batch Print')
                     ->icon('heroicon-o-printer')
-                    ->authorize(fn (): bool => static::can('update'))
+                    // See preview()'s own authorize() comment.
+                    ->authorize(fn (): bool => static::can('view'))
                     ->schema([
                         Forms\Components\Select::make('size')
                             ->label('Label size')
@@ -285,6 +293,8 @@ class BarcodeRegistryResource extends BaseResource
                             ->minValue(1)
                             ->default(1)
                             ->live(),
+                        Forms\Components\Toggle::make('show_name')->label('Show Name')->default(true)->live(),
+                        Forms\Components\Toggle::make('show_barcode')->label('Show Barcode')->default(true)->live(),
                     ])
                     ->modalHeading('Batch print preview')
                     ->modalSubmitAction(false)
@@ -305,6 +315,8 @@ class BarcodeRegistryResource extends BaseResource
                             'registries' => $records,
                             'size' => $data['size'] ?? 'small',
                             'copies' => max(1, (int) ($data['copies'] ?? 1)),
+                            'showName' => (bool) ($data['show_name'] ?? true),
+                            'showBarcodeText' => (bool) ($data['show_barcode'] ?? true),
                         ]);
                     }),
             ])

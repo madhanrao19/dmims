@@ -5,6 +5,8 @@
     $size ??= 'medium';
     $title ??= null;
     $copies ??= 1;
+    $showName ??= true;
+    $showBarcodeText ??= true;
     // true when rendered as the top-level single-record print modal; false
     // when included inside batch-barcode-labels.blade.php, which owns the
     // Print button/script itself.
@@ -12,8 +14,9 @@
     // Some records (e.g. system-generated document files with no
     // descriptive title) have their $title default to the barcode value
     // itself, which would otherwise print the same code twice: once as
-    // the heading, once again below the scannable image.
-    $showTitle = ! empty($title) && trim((string) $title) !== trim((string) $barcode);
+    // the heading, once again below the scannable image. Also gated on the
+    // "Show Name" toggle.
+    $showTitle = $showName && ! empty($title) && trim((string) $title) !== trim((string) $barcode);
     [$width, $height, $fontSize] = match ($size) {
         'small' => [1.5, 40, 'text-lg'],
         'large' => [3, 90, 'text-3xl'],
@@ -53,7 +56,14 @@
                     <div>{!! $svg !!}</div>
                 @endif
 
-                <div class="font-mono {{ $fontSize }} font-semibold tracking-widest">{{ $barcode }}</div>
+                {{-- "Show Barcode" hides this text line only — the scannable
+                     image above is never hidden by it. When no image
+                     generator is installed, the text stays forced on
+                     regardless: it's the only thing left identifying the
+                     label at all. --}}
+                @if ($showBarcodeText || ! $svg)
+                    <div class="font-mono {{ $fontSize }} font-semibold tracking-widest">{{ $barcode }}</div>
+                @endif
 
                 @unless ($svg)
                     <p class="text-xs text-gray-500">

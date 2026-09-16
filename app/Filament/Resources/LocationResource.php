@@ -9,7 +9,6 @@ use App\Models\Location;
 use App\Models\LocationType;
 use Closure;
 use Filament\Actions\Action;
-use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -145,64 +144,65 @@ class LocationResource extends BaseResource
                     ->color(fn (string $state): string => $state === 'active' ? 'success' : 'gray'),
             ])
             ->recordActions([
-                ActionGroup::make([
-                    // A plain EditAction navigates to the standalone
-                    // /locations/{id}/edit page, which is jarring when this
-                    // table is embedded in Customer 360's Locations tab —
-                    // edit in place instead, mirroring the in-modal action
-                    // pattern already used by DocumentFileResource's
-                    // Transfer/Return.
-                    Action::make('edit')
-                        ->label('Edit')
-                        ->icon('heroicon-o-pencil-square')
-                        ->authorize(fn (Location $record): bool => static::can('update', $record))
-                        ->fillForm(fn (Location $record): array => $record->toArray())
-                        ->schema(fn (Schema $schema): Schema => static::form($schema))
-                        ->action(function (Location $record, array $data): void {
-                            // Every other edit path forces customer_id back to
-                            // the actor's own tenant server-side (see
-                            // ForcesOwnCustomerId) — this in-modal action is a
-                            // plain $record->update($data), not an EditRecord
-                            // page, so it would otherwise be the one edit path
-                            // in the app that skips that second layer.
-                            $user = auth()->user();
-                            if ($user && ! $user->is_platform_user && $user->customer_id) {
-                                $data['customer_id'] = $user->customer_id;
+                // A flat list of inline link-styled actions (Edit / Print
+                // Barcode / Delete), matching Barcode Registries' own
+                // recordActions() convention — not grouped behind one
+                // "Actions" dropdown button, so every action stays visible
+                // and reachable in one click.
+                //
+                // A plain EditAction navigates to the standalone
+                // /locations/{id}/edit page, which is jarring when this
+                // table is embedded in Customer 360's Locations tab —
+                // edit in place instead, mirroring the in-modal action
+                // pattern already used by DocumentFileResource's
+                // Transfer/Return.
+                Action::make('edit')
+                    ->label('Edit')
+                    ->icon('heroicon-o-pencil-square')
+                    ->authorize(fn (Location $record): bool => static::can('update', $record))
+                    ->fillForm(fn (Location $record): array => $record->toArray())
+                    ->schema(fn (Schema $schema): Schema => static::form($schema))
+                    ->action(function (Location $record, array $data): void {
+                        // Every other edit path forces customer_id back to
+                        // the actor's own tenant server-side (see
+                        // ForcesOwnCustomerId) — this in-modal action is a
+                        // plain $record->update($data), not an EditRecord
+                        // page, so it would otherwise be the one edit path
+                        // in the app that skips that second layer.
+                        $user = auth()->user();
+                        if ($user && ! $user->is_platform_user && $user->customer_id) {
+                            $data['customer_id'] = $user->customer_id;
+                        }
+
+                        $record->update($data);
+                        Notification::make()->title('Location updated')->success()->send();
+                    }),
+                static::barcodeAction(),
+                DeleteAction::make()
+                    ->authorize(fn (Location $record): bool => static::can('delete', $record))
+                    ->failureNotificationTitle('Cannot delete')
+                    ->failureNotificationMessage('This location still has boxes, sub-locations, or stock linked to it and cannot be deleted while those exist.')
+                    ->action(function (DeleteAction $action): void {
+                        try {
+                            $result = $action->process(static fn (Model $record): ?bool => $record->delete());
+                        } catch (QueryException $e) {
+                            if ($e->getCode() !== '23000') {
+                                throw $e;
                             }
 
-                            $record->update($data);
-                            Notification::make()->title('Location updated')->success()->send();
-                        }),
-                    static::barcodeAction(),
-                    DeleteAction::make()
-                        ->authorize(fn (Location $record): bool => static::can('delete', $record))
-                        ->failureNotificationTitle('Cannot delete')
-                        ->failureNotificationMessage('This location still has boxes, sub-locations, or stock linked to it and cannot be deleted while those exist.')
-                        ->action(function (DeleteAction $action): void {
-                            try {
-                                $result = $action->process(static fn (Model $record): ?bool => $record->delete());
-                            } catch (QueryException $e) {
-                                if ($e->getCode() !== '23000') {
-                                    throw $e;
-                                }
+                            $action->failure();
 
-                                $action->failure();
+                            return;
+                        }
 
-                                return;
-                            }
+                        if (! $result) {
+                            $action->failure();
 
-                            if (! $result) {
-                                $action->failure();
+                            return;
+                        }
 
-                                return;
-                            }
-
-                            $action->success();
-                        }),
-                ])
-                    ->label('Actions')
-                    ->icon('heroicon-m-ellipsis-vertical')
-                    ->button(),
+                        $action->success();
+                    }),
             ])
             ->bulkActions([
                 BulkActionGroup::make([
