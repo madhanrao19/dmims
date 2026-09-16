@@ -1416,14 +1416,21 @@ verification as a real gap rather than a formality.
 **Regression tests:** unchanged — 300/300 passing; Pint clean; Larastan (level 5) clean;
 `npm run build` clean.
 
-**⚠️ Known pre-existing, unrelated bug noticed during this verification, not fixed:** every
+**✅ Resolved (confirmed 16 September 2026):** the "select all" header
+checkbox's `ReferenceError: areRecordsPartiallySelected is not defined`
+noted below no longer reproduces — verified live on Boxes (row checkbox
+click, console clean) after this session's Filament 5.7.8 → 5.8.0
+upgrade (PR #62), which most likely fixed it upstream. Original note
+kept for history:
+
+~~**⚠️ Known pre-existing, unrelated bug noticed during this verification, not fixed:** every
 table page's "select all" header checkbox throws
 `ReferenceError: areRecordsPartiallySelected is not defined` in the console (Filament's own
 Alpine-generated indeterminate-state expression) on Boxes, Document Files, Barcode
 Registries, and Locations. Individual row checkboxes and bulk actions (including bulk
 Print Barcode, verified above) still work correctly — this only affects the header
 checkbox's visual indeterminate/checked state computation, not selection functionality
-itself. Out of scope for this barcode-print fix; flagged here for a future pass.
+itself. Out of scope for this barcode-print fix; flagged here for a future pass.~~
 
 ## 25. Barcode Print: Page-Break-Safe Labels, Box Removed From Print Output — 11 September 2026
 
@@ -1506,14 +1513,21 @@ shipping:**
   escaping on the two notification bodies that interpolate the raw barcode (Filament
   sanitizes notification HTML already, so this wasn't exploitable as XSS, but a
   hand-typed barcode containing markup rendered as a live, unescaped element).
-- **Noted, not fixed (pre-existing, broader than this change):** the security review
+- **✅ Resolved (confirmed 16 September 2026):**
+  `FilamentPanelProvider.php:88` now calls
+  `->persistentMiddleware(['business-access'])` — the gap noted below no
+  longer applies; a revoked session's access is re-checked on every
+  Livewire action too, not just full page loads. Original note kept for
+  history:
+
+  ~~**Noted, not fixed (pre-existing, broader than this change):** the security review
   found the panel's `business-access` middleware group (subscription/license/user-active
   gates, `FilamentPanelProvider.php`) isn't registered as `isPersistent: true`, so it
   doesn't re-run on Livewire's own update route — a session whose access should have
   just been revoked can keep calling any Livewire action, this new scanner included,
   until its next full page load. This predates this change and affects every Filament
   action in the app, not just barcode scanning; flagged for a separate fix rather than
-  folded into this diff.
+  folded into this diff.~~
 
 **Regression tests:** 308/308 passing, plus 10 new (`BarcodeScannerListenerTest` —
 found/unknown/blank-scan/logged-out-scan/optional-create-save for both Document File
