@@ -1882,14 +1882,19 @@ the operative fix. Confirm the dashboard's Public Hostname setting for
   successfully on `dmims.test`. Also cleaned up three throwaway test
   customers this session's own diagnostics had created in the
   now-orphaned working-repo database.
+- Identified `AgentService` (PID holding port 8080): Windows service
+  `MTAgentService`, binary `C:\Program Files\MiniTool
+  ShadowMaker\AgentService.exe` — MiniTool ShadowMaker's backup agent,
+  `StartMode: Auto`. Legitimate backup software, not malware; its local
+  management web UI defaults to port 8080, which is why it will always
+  reclaim that port on every boot. No action taken on it — the
+  tunnel/nginx move to port 80 already resolves the conflict without
+  touching backup software configuration.
 
-**Still pending — requires further hardware/dashboard access:**
-1. Identifying what `AgentService` (the process that took over port
-   8080 on this machine) actually is, in case it matters for other
-   reasons.
-2. Remaining real-device QA: full login/Turnstile/dashboard/Livewire/
+**Still pending:**
+1. Remaining real-device QA: full login/Turnstile/dashboard/Livewire/
    Customer 360 checks on both hostnames; installed-PWA behaviour.
-3. New Playwright coverage (`tests/playwright/barcode-camera.spec.js`)
+2. New Playwright coverage (`tests/playwright/barcode-camera.spec.js`)
    could not be run to green against a local `php artisan serve`
    instance in this session — every request past login 403'd
    ("Access Denied"). Confirmed **pre-existing and unrelated to this
