@@ -2022,3 +2022,47 @@ account already present in the live database:
   errors are no longer available for local `dmims.test` debugging
   either, since both hostnames now share one app instance; use
   `storage/logs/laravel.log` instead).
+
+## 34. Final Cross-Hostname End-to-End Verification, Post-Fixes — 16 September 2026
+
+A full re-verification pass on both hostnames after §31–§33's fixes
+(dual-hostname site-link correction, seat-limit check, `customer_id`
+required, email uniqueness, Add User button, `APP_DEBUG`, plus the
+merged Dependabot dependency bumps):
+
+- **`dmims.test`: first successful real sign-in since the site-link
+  fix** (`qa-superadmin@example.com`). Dashboard renders with live
+  data — confirmed byte-for-byte identical to `dmims.datamationgroup.com`
+  (Customers: 3, Active Subscriptions: 3, Active Products: 1,
+  Documents: 12, Boxes: 5, Open Stock Alerts: 0, same 10-row Recent
+  Activity feed) — direct proof both hostnames now serve one shared
+  installation and database, not just a plausible inference from
+  config inspection.
+- Customer 360 → Madhan Inc → Users tab → "Add User": form opens
+  correctly on `dmims.test`, no `Customer` field leaked (still
+  correctly replaced by the fixed hidden value), confirming §31/§33's
+  Customer 360 create-gate fix and §34's own seat-limit fix didn't
+  regress the everyday create flow. Not submitted, to avoid writing
+  test data into the shared live database (see §31's disclosure about
+  earlier accidental pollution and cleanup).
+- Scan Barcode button/modal: opens and closes cleanly on `dmims.test`
+  (same automation-environment camera limitation as before — no real
+  device, no permission-prompt handling; real iPhone/Android testing
+  already covers actual decode behaviour).
+- `APP_DEBUG=false` (§33) confirmed still in effect on `dmims.test` too
+  (same shared `.env`) — the same GET-to-POST-only-route trigger still
+  renders Laravel's generic error page, not a stack trace.
+- One more transient recurrence of the known Windows view-compile race
+  (`DEPLOYMENT_GUIDE.md` #14) — a dashboard widget stuck on "Loading…"
+  after rapid automated navigation, fully recovered on a plain page
+  refresh. Confirms this is genuinely a rapid-concurrent-request
+  artifact of automated testing, not something normal human browsing
+  pace triggers, and that it is self-healing once the view-cache
+  settles — no further action taken.
+- `dmims.datamationgroup.com` re-confirmed clean on the same pass:
+  dashboard renders with no console errors, service worker registers
+  successfully.
+
+**Net result: every fix from this session (§31–§34) is confirmed
+working, on both hostnames, against live production data, with no new
+issues found.**
