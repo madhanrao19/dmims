@@ -9,6 +9,11 @@
     // when included inside batch-barcode-labels.blade.php, which owns the
     // Print button/script itself.
     $standalone ??= true;
+    // Some records (e.g. system-generated document files with no
+    // descriptive title) have their $title default to the barcode value
+    // itself, which would otherwise print the same code twice: once as
+    // the heading, once again below the scannable image.
+    $showTitle = ! empty($title) && trim((string) $title) !== trim((string) $barcode);
     [$width, $height, $fontSize] = match ($size) {
         'small' => [1.5, 40, 'text-lg'],
         'large' => [3, 90, 'text-3xl'],
@@ -29,12 +34,22 @@
     <div data-print-target>
         @for ($i = 0; $i < max(1, (int) $copies); $i++)
             <div class="dmims-barcode-item flex flex-col items-center gap-3 py-4 text-center">
-                @if (! empty($title))
+                @if ($showTitle)
                     <div class="font-semibold">{{ $title }}</div>
                 @endif
                 <div class="text-xs uppercase tracking-wide text-gray-500">{{ str($type)->headline() }}</div>
 
                 @if ($svg)
+                    {{-- The SVG generator sets explicit pixel width/height attributes,
+                         which at the "Large" size (module width 3) can exceed a
+                         batch-print grid column and overflow into the next one; this
+                         constrains it back to its container, which browsers scale
+                         proportionally (SVG intrinsic aspect ratio is preserved, same
+                         as an <img>). @once keeps this from repeating once per label
+                         when this partial is included many times in a batch. --}}
+                    @once
+                        <style>.dmims-barcode-item svg { max-width: 100%; height: auto; }</style>
+                    @endonce
                     <div>{!! $svg !!}</div>
                 @endif
 
