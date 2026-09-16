@@ -808,6 +808,49 @@ deployment most often.
     runs once the element actually exists in the DOM — removing the race
     entirely.
 
+11. **Self-hosted WASM assets need `?url`, not a CDN reference.** Importing
+    `zxing-wasm/reader/zxing_reader.wasm?url` in `barcode-camera.js` makes
+    Vite copy the `.wasm` into `public/build/assets/` with the same
+    content-hash versioning as every other build asset, so `readBarcodes()`
+    fetches it from this app's own origin (`prepareZXingModule({ overrides:
+    { locateFile: () => wasmUrl } })`) rather than jsDelivr/unpkg. Confirm
+    after every `npm run build` that the emitted bundle actually resolves to
+    the hashed filename (`grep -o "zxing_reader.*\.wasm"
+    public/build/assets/barcode-camera-*.js`) — a plain string import
+    instead of `?url` would ship the wasm file's raw source as text.
+
+12. **A Windows/Herd dev box serving two hostnames (`dmims.test` locally,
+    `dmims.datamationgroup.com` externally via Cloudflare Tunnel) needs a
+    second nginx vhost bound to `0.0.0.0`, not Valet's own dispatcher.**
+    Herd's built-in per-site routing (`herd secure`, `dmims.test.conf`) only
+    binds `127.0.0.1` and resolves projects by matching the Host header
+    against its own known `*.test`/parked-directory names — an external
+    domain never matches, so it 404s even with nginx's `server_name`
+    correctly set. The fix is a separate file dropped into
+    `~/.config/herd/config/valet/Nginx/<hostname>.conf` (auto-included by
+    Herd's `nginx.conf`) that serves the project directly via PHP-FPM
+    (`$herd_sock`), sets `fastcgi_param HTTPS on` unconditionally (this
+    vhost is only ever reached via the tunnel, so it's always true — no
+    need to trust a forwarded-proto header), and binds `0.0.0.0:<port>`
+    since a wildcard bind and Herd's own `127.0.0.1:80` bind are different
+    sockets and don't conflict. Apply a config change with `herd restart`
+    (needs no elevation); the paired `cloudflared` Windows service restart
+    to reload `~/.cloudflared/config.yml` does need an elevated shell.
+
+13. **A previously-working Cloudflare Tunnel origin port can be silently
+    stolen by unrelated software.** `dmims.datamationgroup.com` confirmed
+    working via port 8080 on 2026-09-13; by 2026-09-16 an unrelated process
+    (`AgentService`) had bound `0.0.0.0:8080` first, and cloudflared's
+    origin requests were failing with nothing in this app's own logs to
+    show it (the request never reached nginx). Diagnose with `netstat -ano
+    | findstr LISTENING` before assuming an application-level bug. Moving
+    the vhost + tunnel ingress to a still-free port (here, `80` at the
+    `0.0.0.0` scope) is safer and faster than trying to reclaim a port an
+    unidentified process already holds. No firewall rule was needed either
+    time — `cloudflared`'s connection to the origin is a local hop on the
+    same machine, and the tunnel itself is outbound-only, so nothing here
+    ever required an inbound allow rule or router port-forwarding.
+
 ---
 
 ## **SUPPORT & TROUBLESHOOTING**

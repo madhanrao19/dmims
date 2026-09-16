@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\CustomerResource\Pages\Concerns;
 
 use App\Filament\Resources\BaseResource;
+use App\Filament\Resources\UserResource;
 use Closure;
 use Filament\Actions\CreateAction;
 use Filament\Forms\Components\Hidden;
@@ -107,7 +108,13 @@ trait HasCustomerScopedEmbeddedTable
         $action = CreateAction::make()
             ->label($label)
             ->model($resource::getModel())
-            ->authorize(fn (): bool => $resource::can('create'))
+            // Governance: only Super Admin may Create/Add within Customer
+            // 360 (Users/License/Modules/Subscription/Billing tabs alike),
+            // including users. $resource::can('create') already happens to
+            // gate to Super Admin only today (permission-assignment
+            // side-effect, not a rule), so pin it explicitly here rather
+            // than rely on that staying true as roles evolve.
+            ->authorize(fn (): bool => auth()->user()?->hasRole(UserResource::SUPER_ADMIN_ROLE) && $resource::can('create'))
             ->schema(function (Schema $schema) use ($resource, $customer): Schema {
                 $schema = $resource::form($schema);
 

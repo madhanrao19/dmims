@@ -48,6 +48,24 @@ class MyCompanyClusterTest extends TestCase
      * suite need one, unlike the resource-level ::can()/::getEloquentQuery()
      * assertions elsewhere that don't go through the middleware stack.
      */
+    /**
+     * AccessControlService::modeFromLicense() degrades a customer with no
+     * license row at all to MODE_VIEW_ONLY by design ("full access must be
+     * earned by an actual license, not its absence") — BaseResource::can()
+     * blocks every write action, including create, under that mode. Needed
+     * only by tests that actually exercise a write/create path.
+     */
+    private function activeLicense(Customer $customer): void
+    {
+        License::create([
+            'customer_id' => $customer->id,
+            'license_no' => 'LIC-'.$customer->id,
+            'valid_from' => now()->subMonth(),
+            'valid_to' => now()->addYear(),
+            'status' => 'active',
+        ]);
+    }
+
     private function activeSubscription(Customer $customer): void
     {
         CustomerSubscription::create([
@@ -186,6 +204,42 @@ class MyCompanyClusterTest extends TestCase
         $response->assertOk();
         $response->assertSee($admin->name);
         $response->assertDontSee('Other Tenant User');
+    }
+
+    /**
+     * Regression: "My Company > Users" had no "Add User" button at all — a
+     * Company Admin holding UserResource's `manage users` permission (full
+     * CRUD, RolesAndPermissionsSeeder.php) had no way to reach create from
+     * this tab, only the unlinked standalone /admin/users/create route.
+     */
+    public function test_users_tab_shows_add_user_action_for_company_admin(): void
+    {
+        $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACM', 'status' => 'active']);
+        $admin = $this->companyAdmin($customer);
+        $this->activeLicense($customer);
+        $this->actingAs($admin);
+
+        $response = $this->get(CompanyUsers::getUrl());
+        $response->assertOk();
+        $response->assertSee('Add User');
+        $response->assertSee(UserResource::getUrl('create'), false);
+    }
+
+    /**
+     * Company Supervisor holds only `view users` (RolesAndPermissionsSeeder.php)
+     * — the Add User action's ->authorize() must hide it, not just its
+     * absence from nav, since the link would otherwise point at a create
+     * page this role has no business reaching.
+     */
+    public function test_users_tab_hides_add_user_action_for_company_supervisor(): void
+    {
+        $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACM', 'status' => 'active']);
+        $supervisor = $this->companySupervisor($customer);
+        $this->actingAs($supervisor);
+
+        $response = $this->get(CompanyUsers::getUrl());
+        $response->assertOk();
+        $response->assertDontSee('Add User');
     }
 
     public function test_tabs_reuse_the_matching_resource_authorization(): void
