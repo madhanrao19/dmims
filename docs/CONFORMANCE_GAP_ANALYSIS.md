@@ -1867,18 +1867,20 @@ the operative fix. Confirm the dashboard's Public Hostname setting for
   the `dmims.datamationgroup.com` route's service is
   `http://192.168.6.113` with no port specified, i.e. port 80 by
   default — matches this session's nginx/tunnel port change.
+- Confirmed in the Cloudflare dashboard (Application Security >
+  Turnstile > widget matching site key `0x4AAAAAAAKvq5_hJjbIITb0`):
+  the hostname allowlist already includes both `dmims.test` and
+  `dmims.datamationgroup.com` (alongside `localhost` and unrelated
+  hostnames for other apps sharing the same widget). No change needed.
 
 **Still pending — requires further hardware/dashboard access:**
 1. Identifying what `AgentService` (the process that took over port
    8080 on this machine) actually is, in case it matters for other
    reasons.
-2. Verifying the Turnstile hostname allowlist (`dmims.test`,
-   `dmims.datamationgroup.com`) — a separate dashboard section
-   (Application Security > Turnstile), not the Tunnels/Routes page.
-3. Remaining real-device QA: `dmims.test` from the Herd machine itself;
+2. Remaining real-device QA: `dmims.test` from the Herd machine itself;
    Android Chrome scanning; full login/Turnstile/dashboard/Livewire/
    Customer 360 checks on both hostnames; installed-PWA behaviour.
-4. New Playwright coverage (`tests/playwright/barcode-camera.spec.js`)
+3. New Playwright coverage (`tests/playwright/barcode-camera.spec.js`)
    could not be run to green against a local `php artisan serve`
    instance in this session — every request past login 403'd
    ("Access Denied"). Confirmed **pre-existing and unrelated to this
