@@ -1863,21 +1863,22 @@ the operative fix. Confirm the dashboard's Public Hostname setting for
   `dmims.datamationgroup.com`.
 - Live camera barcode scanning confirmed working on iPhone Safari
   against `dmims.datamationgroup.com`.
+- Confirmed in the Cloudflare Zero Trust dashboard (Tunnels > Routes):
+  the `dmims.datamationgroup.com` route's service is
+  `http://192.168.6.113` with no port specified, i.e. port 80 by
+  default — matches this session's nginx/tunnel port change.
 
 **Still pending — requires further hardware/dashboard access:**
-1. Confirming the Cloudflare Zero Trust dashboard's Public Hostname
-   setting for `dmims.datamationgroup.com` actually points at port 80 —
-   see the dashboard-managed-tunnel-mode note above; this was not
-   directly inspectable from this session.
-2. Identifying what `AgentService` (the process that took over port
+1. Identifying what `AgentService` (the process that took over port
    8080 on this machine) actually is, in case it matters for other
    reasons.
-3. Verifying the Turnstile hostname allowlist (`dmims.test`,
-   `dmims.datamationgroup.com`) in the Cloudflare dashboard.
-4. Remaining real-device QA: `dmims.test` from the Herd machine itself;
+2. Verifying the Turnstile hostname allowlist (`dmims.test`,
+   `dmims.datamationgroup.com`) — a separate dashboard section
+   (Application Security > Turnstile), not the Tunnels/Routes page.
+3. Remaining real-device QA: `dmims.test` from the Herd machine itself;
    Android Chrome scanning; full login/Turnstile/dashboard/Livewire/
    Customer 360 checks on both hostnames; installed-PWA behaviour.
-7. New Playwright coverage (`tests/playwright/barcode-camera.spec.js`)
+4. New Playwright coverage (`tests/playwright/barcode-camera.spec.js`)
    could not be run to green against a local `php artisan serve`
    instance in this session — every request past login 403'd
    ("Access Denied"). Confirmed **pre-existing and unrelated to this
