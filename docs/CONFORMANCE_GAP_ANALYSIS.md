@@ -1923,3 +1923,43 @@ unique fields covered by `DuplicateUniqueConstraintValidationTest.php`
 (this change adds a case for the email field to that same suite). Not
 part of the original 5-item request — investigated and fixed at the
 user's explicit request after the pre-existing log entry was flagged.
+
+## 33. Live End-to-End Browser Verification + APP_DEBUG Exposure Found and Fixed — 16 September 2026
+
+Real browser verification (not just curl/log inspection) against both
+`dmims.test` and `dmims.datamationgroup.com`, using a QA platform-admin
+account already present in the live database:
+
+- Login page, Turnstile widget, and PWA service worker registration all
+  confirmed working on both hostnames (Turnstile auto-passed on the
+  real-TLS external hostname; `dmims.test`'s self-signed cert triggered
+  only a browser-profile trust warning, not an app issue — real device
+  testing earlier in this session already confirmed it working
+  normally).
+- Real sign-in succeeded on `dmims.datamationgroup.com`; dashboard
+  rendered with live data (3 customers, 3 subscriptions, 12 documents,
+  5 boxes); Scan Barcode button present and its modal opened/closed
+  cleanly (camera itself can't be exercised from this automated browser
+  context — no device, no permission-prompt handling — already covered
+  by real iPhone/Android testing earlier).
+- Customer 360 → Madhan Inc → Users tab: confirmed "Add User" visible
+  for the Super Admin account, live-testing §31/§32's Customer 360
+  permission gate.
+- One transient recurrence of the known view-compile race (§ "Windows
+  view-compile race", `DEPLOYMENT_GUIDE.md` #14) during rapid automated
+  navigation — self-healed once the compiled file existed; not expected
+  under normal human browsing pace.
+- **Found: `APP_DEBUG=true` on the installation both hostnames share**
+  — any error on the publicly-reachable `dmims.datamationgroup.com`
+  (e.g. a plain method-not-allowed) rendered Laravel's full debug page:
+  stack trace, absolute file paths, Laravel/PHP version numbers,
+  visible to any external visitor. Pre-existing, unrelated to this
+  session's other changes, found by deliberately triggering an error
+  during this verification pass. **Fixed**: set `APP_DEBUG=false`;
+  confirmed the same trigger now shows Laravel's generic error page
+  with no sensitive detail. This is an env-only change (`.env` is
+  never committed) — applied directly on the live installation, with
+  the user's explicit go-ahead given the trade-off (detailed on-screen
+  errors are no longer available for local `dmims.test` debugging
+  either, since both hostnames now share one app instance; use
+  `storage/logs/laravel.log` instead).

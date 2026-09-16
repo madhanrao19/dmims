@@ -885,6 +885,21 @@ deployment most often.
     Fix: `herd unlink <name>` then `herd link <name> --secure` from
     inside the correct directory.
 
+16. **`APP_DEBUG=true` on a `.env` any externally-reachable hostname
+    shares is a live information-disclosure risk, not just a local dev
+    convenience.** Once `dmims.test` and `dmims.datamationgroup.com`
+    were confirmed to correctly share one installation (#15 above),
+    they also share one `APP_DEBUG` setting — and it was `true`. Any
+    error on the public hostname (even an innocuous one, like a GET
+    request to a POST-only route) rendered Laravel's full debug page:
+    stack trace, absolute file paths, framework/PHP version, to any
+    external visitor. Set `APP_DEBUG=false` once any hostname sharing
+    that `.env` is reachable from outside the LAN — accept losing
+    on-screen stack traces for local debugging too (use
+    `storage/logs/laravel.log` instead), or split the two hostnames
+    onto genuinely separate `.env`/database instances if on-screen
+    local debugging is a hard requirement.
+
 ---
 
 ## **SUPPORT & TROUBLESHOOTING**
