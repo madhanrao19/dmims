@@ -8,6 +8,7 @@ use App\Filament\Resources\UserResource;
 use App\Models\Customer;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
+use Filament\Actions\CreateAction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -99,10 +100,10 @@ class Customer360CreatePermissionTest extends TestCase
 
             public function getRecord(): Customer
             {
-                return new Customer();
+                return new Customer;
             }
 
-            public function makeCreateAction(): \Filament\Actions\CreateAction
+            public function makeCreateAction(): CreateAction
             {
                 return $this->customerScopedCreateAction('Add');
             }
