@@ -1791,6 +1791,18 @@ plus every item still pending manual/on-device verification.
   with a mocked `getUserMedia`, asserting the camera track is actually
   stopped on close — decode accuracy itself still needs a real device,
   same limitation §29 already documented).
+- **"My Company > Users" had no Add User button at all** (found while
+  verifying Company Admin's own create permissions weren't collaterally
+  broken by the Customer 360 change above — they weren't, but the button
+  to use that permission never existed). Fixed by adding a page-level
+  header action (`CompanyUsers::getHeaderActions()`) linking to
+  `UserResource`'s own hardened create page — not a bare `CreateAction`,
+  which would have skipped that page's tenant-hop guard and
+  platform-role-stripping (`CreateUser::mutateFormDataBeforeCreate()`/
+  `afterCreate()`). **Deployed to the Herd-served copy and confirmed
+  working live** on `dmims.datamationgroup.com` (2026-09-16). New tests:
+  `MyCompanyClusterTest::test_users_tab_shows_add_user_action_for_company_admin`
+  and `..._hides_..._for_company_supervisor`.
 - **Customer 360 Create/Add gate made explicit, not incidental.**
   `HasCustomerScopedEmbeddedTable::customerScopedCreateAction()` (backs
   the Users/License/Modules/Subscription/Billing "Add" actions) and
