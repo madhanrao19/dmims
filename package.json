@@ -14,7 +14,7 @@
         "qa:report": "playwright show-report"
     },
     "dependencies": {
-        "html5-qrcode": "^2.3.8"
+        "zxing-wasm": "^3.1.4"
     },
     "devDependencies": {
         "@playwright/test": "^1.61.1",

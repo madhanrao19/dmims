@@ -59,6 +59,15 @@ class CustomerResource extends BaseResource
     {
         $user = auth()->user();
 
+        // Governance: "only Super Admin may Create/Add any records" in
+        // Customer 360 / customer management. Today this already holds
+        // incidentally (only Super Admin's role grants 'manage customers'),
+        // but that's a permission-assignment accident, not a guarantee — a
+        // future role grant could silently reopen this. Pin it explicitly.
+        if ($action === 'create' && ! ($user && $user->hasRole(UserResource::SUPER_ADMIN_ROLE))) {
+            return false;
+        }
+
         if ($record instanceof Customer
             && $user && ! $user->is_platform_user
             && (int) $record->getKey() !== (int) $user->customer_id) {

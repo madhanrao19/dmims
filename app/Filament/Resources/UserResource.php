@@ -56,6 +56,12 @@ class UserResource extends BaseResource
      */
     public const PLATFORM_ROLES = ['Datamation Super Admin', 'Datamation Management'];
 
+    /** Single source of truth for the exact role name — see CustomerResource::can()
+     *  and HasCustomerScopedEmbeddedTable::customerScopedCreateAction(), which both
+     *  gate Customer 360 Create/Add on this role by name and would fail closed
+     *  (denying the real Super Admin, silently) on a typo'd duplicate literal. */
+    public const SUPER_ADMIN_ROLE = 'Datamation Super Admin';
+
     /**
      * Defense in depth against the roles Select above: removes any
      * platform-only role from $user unless the acting user is themselves a
