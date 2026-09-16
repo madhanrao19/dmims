@@ -1854,33 +1854,29 @@ and the local `~/.cloudflared/config.yml` edit above may not have been
 the operative fix. Confirm the dashboard's Public Hostname setting for
 `dmims.datamationgroup.com` points at port 80.
 
-**Pending — requires admin/elevated access or physical hardware, not
-completed in this session:**
-1. Restarting the `Cloudflared` Windows service to load the updated
-   `~/.cloudflared/config.yml` (port 8080 → 80) — this session's shell
-   is not elevated (`Restart-Service` failed: access denied).
-2. Confirming `192.168.6.113:80` is actually reachable end-to-end once
-   that restart happens — a same-machine `Invoke-WebRequest`/`curl` to
-   `http://192.168.6.113:80/` with `Host: dmims.datamationgroup.com`
-   timed out even after the nginx side was confirmed listening on
-   `0.0.0.0:80`, suggesting a firewall/network-profile block on
-   traffic addressed to this machine's own LAN IP (as opposed to
-   `127.0.0.1`) that needs investigating with elevated access.
-3. Identifying what `AgentService` (the process that took over port
-   8080) actually is, in case it matters for other reasons.
-4. Verifying the Turnstile widget renders and the hostname allowlist
-   (`dmims.test`, `dmims.datamationgroup.com`) is configured correctly
-   in the Cloudflare dashboard — a Cloudflare-side setting, not a code
-   change, not verifiable from this shell.
-5. Real-device QA: `dmims.test` from the Herd machine itself, and
-   `dmims.datamationgroup.com` from a phone on mobile data (not Wi-Fi) —
-   login, Turnstile, dashboard, assets, Livewire, Customer 360
-   permissions, and actual barcode-label scanning on iPhone Safari and
-   Android Chrome, including as an installed PWA.
-6. Deploying these code changes to the Herd-served copy
-   (`D:\Users\Madhan Rao\Herd\dmims`, a separate git clone from this
-   working repo) once merged — a GitHub merge alone does not update
-   what Herd/the tunnel actually serves.
+**Resolved since first written (2026-09-16):**
+- Cloudflared Windows service restarted (with elevated access from the
+  user) — confirmed clean restart via Windows Event Log.
+- Deployed to the Herd-served copy (`D:\Users\Madhan Rao\Herd\dmims`)
+  and to `main` via PR #68 — both now serving this work.
+- Company Admin's "Add User" action confirmed working live on
+  `dmims.datamationgroup.com`.
+- Live camera barcode scanning confirmed working on iPhone Safari
+  against `dmims.datamationgroup.com`.
+
+**Still pending — requires further hardware/dashboard access:**
+1. Confirming the Cloudflare Zero Trust dashboard's Public Hostname
+   setting for `dmims.datamationgroup.com` actually points at port 80 —
+   see the dashboard-managed-tunnel-mode note above; this was not
+   directly inspectable from this session.
+2. Identifying what `AgentService` (the process that took over port
+   8080 on this machine) actually is, in case it matters for other
+   reasons.
+3. Verifying the Turnstile hostname allowlist (`dmims.test`,
+   `dmims.datamationgroup.com`) in the Cloudflare dashboard.
+4. Remaining real-device QA: `dmims.test` from the Herd machine itself;
+   Android Chrome scanning; full login/Turnstile/dashboard/Livewire/
+   Customer 360 checks on both hostnames; installed-PWA behaviour.
 7. New Playwright coverage (`tests/playwright/barcode-camera.spec.js`)
    could not be run to green against a local `php artisan serve`
    instance in this session — every request past login 403'd
