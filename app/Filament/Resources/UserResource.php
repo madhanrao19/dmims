@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\UserResource\Pages;
 use App\Models\User;
 use Filament\Forms;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -165,6 +166,25 @@ class UserResource extends BaseResource
                     ->relationship('customer', 'company_name')
                     ->searchable()
                     ->preload()
+                    // Only required when a platform actor CREATES a
+                    // non-platform user — leaving it blank there is a real
+                    // data-integrity defect (AccessControlService::canLogin()
+                    // fails closed on it, but that's a symptom, not a
+                    // prevention). Deliberately scoped to create, not edit:
+                    // an edit must not newly block on an *existing* record
+                    // that already has a null customer_id (exactly the
+                    // legacy-broken state `dmims:fix-platform-role-
+                    // consistency` exists to clean up) — that's a separate,
+                    // pre-existing data-repair job, not something a save on
+                    // an unrelated field should suddenly require fixing
+                    // first. Not required for a Company Admin either way:
+                    // their submitted value is always force-overwritten to
+                    // their own company by CreateUser/EditUser's mutate
+                    // hooks regardless, so requiring it here would only add
+                    // meaningless friction to their everyday create.
+                    ->required(fn (Get $get, string $operation): bool => $operation === 'create'
+                        && (bool) auth()->user()?->is_platform_user
+                        && ! $get('is_platform_user'))
                     ->disabled(fn (): bool => ! static::actorCanFullyManage()),
                 Forms\Components\Select::make('department_id')
                     ->label('Department')
@@ -185,6 +205,7 @@ class UserResource extends BaseResource
                     ->required()
                     ->disabled(fn (): bool => ! static::actorCanFullyManage()),
                 Forms\Components\Toggle::make('is_platform_user')
+                    ->live()
                     ->visible(fn (): bool => (bool) auth()->user()?->is_platform_user),
                 Forms\Components\Select::make('roles')->multiple()
                     ->relationship(

@@ -130,19 +130,38 @@ abstract class BaseResource extends Resource
      */
     protected static function usageLimitReached($user): bool
     {
-        if (! static::$usageLimitKey || ! $user->customer_id) {
+        if (! $user->customer_id) {
+            return false;
+        }
+
+        return static::usageLimitReachedForCustomer($user->customer_id);
+    }
+
+    /**
+     * Same check as usageLimitReached(), keyed explicitly by customer_id
+     * instead of derived from the acting user. usageLimitReached() alone
+     * is a no-op for a platform user (their own customer_id is always
+     * null), which is exactly right for their OWN reads/writes — but
+     * Customer 360's Add actions have a platform user creating a row FOR
+     * a specific, known customer, and that create must still respect
+     * *that customer's* limit. Called directly by
+     * HasCustomerScopedEmbeddedTable::customerScopedCreateAction().
+     */
+    public static function usageLimitReachedForCustomer(int $customerId): bool
+    {
+        if (! static::$usageLimitKey) {
             return false;
         }
 
         $limit = app(AccessControlService::class)
-            ->getEffectiveLimits($user->customer_id)[static::$usageLimitKey] ?? null;
+            ->getEffectiveLimits($customerId)[static::$usageLimitKey] ?? null;
 
         if ($limit === null) {
             return false;
         }
 
         $current = static::getModel()::withoutGlobalScopes()
-            ->where('customer_id', $user->customer_id)
+            ->where('customer_id', $customerId)
             ->count();
 
         return $current >= $limit;

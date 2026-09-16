@@ -6,6 +6,7 @@ use App\Filament\Resources\CustomerResource;
 use App\Filament\Resources\CustomerResource\Pages\Concerns\HasCustomerScopedEmbeddedTable;
 use App\Filament\Resources\UserResource;
 use App\Models\Customer;
+use App\Models\CustomerSubscription;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Filament\Actions\CreateAction;
@@ -55,18 +56,50 @@ class Customer360CreatePermissionTest extends TestCase
     {
         $superAdmin = $this->platformUser('Datamation Super Admin');
         $this->actingAs($superAdmin);
+        $customer = Customer::create(['company_name' => 'Alpha', 'company_code' => 'A', 'status' => 'active']);
 
         $this->assertTrue(CustomerResource::can('create'));
-        $this->assertTrue($this->customerScopedAuthorized());
+        $this->assertTrue($this->customerScopedAuthorized($customer));
     }
 
     public function test_view_only_platform_role_cannot_create(): void
     {
         $viewOnly = $this->platformUser('Datamation Management');
         $this->actingAs($viewOnly);
+        $customer = Customer::create(['company_name' => 'Alpha', 'company_code' => 'A', 'status' => 'active']);
 
         $this->assertFalse(CustomerResource::can('create'));
-        $this->assertFalse($this->customerScopedAuthorized());
+        $this->assertFalse($this->customerScopedAuthorized($customer));
+    }
+
+    /**
+     * Regression: BaseResource::usageLimitReached() derives the customer
+     * from the ACTOR's own customer_id, which is always null for a
+     * platform user — so a Super Admin's Customer 360 "Add User" silently
+     * skipped the target customer's max_users seat limit entirely. Fixed
+     * via BaseResource::usageLimitReachedForCustomer($customer->getKey()),
+     * called explicitly with the target customer in
+     * HasCustomerScopedEmbeddedTable::customerScopedCreateAction().
+     */
+    public function test_super_admin_cannot_add_user_once_customer_seat_limit_reached(): void
+    {
+        $superAdmin = $this->platformUser('Datamation Super Admin');
+        $this->actingAs($superAdmin);
+
+        $customer = Customer::create(['company_name' => 'Alpha', 'company_code' => 'A', 'status' => 'active']);
+        CustomerSubscription::create([
+            'customer_id' => $customer->id,
+            'subscription_no' => 'SUB-'.$customer->id,
+            'valid_from' => now()->subMonth(),
+            'valid_to' => now()->addYear(),
+            'status' => 'active',
+            'max_users' => 1,
+        ]);
+        User::factory()->create(['customer_id' => $customer->id, 'is_platform_user' => false, 'status' => 'active']);
+
+        // Seat limit (1) already met by the one existing user above.
+        $this->assertTrue(CustomerResource::can('create'), 'Customer-level create gate is unrelated to per-resource seat limits');
+        $this->assertFalse($this->customerScopedAuthorized($customer));
     }
 
     /**
@@ -83,15 +116,19 @@ class Customer360CreatePermissionTest extends TestCase
 
         $this->assertFalse(CustomerResource::can('create'));
         $this->assertFalse(CustomerResource::canAccessCustomer360());
-        $this->assertFalse($this->customerScopedAuthorized());
+        $this->assertFalse($this->customerScopedAuthorized(Customer::create([
+            'company_name' => 'Beta', 'company_code' => 'B', 'status' => 'active',
+        ])));
     }
 
     /** @return bool The exact closure HasCustomerScopedEmbeddedTable::customerScopedCreateAction() passes to ->authorize(). */
-    private function customerScopedAuthorized(): bool
+    private function customerScopedAuthorized(Customer $customer): bool
     {
-        $trait = new class
+        $trait = new class($customer)
         {
             use HasCustomerScopedEmbeddedTable;
+
+            public function __construct(private Customer $customer) {}
 
             protected static function sourceResource(): string
             {
@@ -100,7 +137,7 @@ class Customer360CreatePermissionTest extends TestCase
 
             public function getRecord(): Customer
             {
-                return new Customer;
+                return $this->customer;
             }
 
             public function makeCreateAction(): CreateAction

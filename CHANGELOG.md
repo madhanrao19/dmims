@@ -6,6 +6,27 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed — Two pre-existing access-control/data-integrity gaps closed
+
+`BaseResource::usageLimitReached()` derives the tenant to check from the
+*acting* user's own `customer_id`, which is always null for a platform
+user — so a Super Admin using Customer 360's "Add User" could add users
+for a customer past their `max_users` seat limit, since the check
+silently no-opped for them. Added `usageLimitReachedForCustomer(int
+$customerId)`, called explicitly with the Customer 360 page's target
+customer from `HasCustomerScopedEmbeddedTable::
+customerScopedCreateAction()`'s `->authorize()` closure.
+
+`UserResource`'s `customer_id` Select had no `->required()` — a platform
+actor creating a new non-platform user could leave it blank, producing
+exactly the data-integrity defect `AccessControlService::canLogin()` has
+to fail closed against. Added `->required()`, scoped to create only (not
+edit, so it doesn't newly block editing an existing user already in that
+broken state) and only when the actor is a platform user creating a
+non-platform user (a Company Admin's value is always force-overwritten
+to their own company regardless, so requiring it there would just add
+friction).
+
 ### Fixed — Duplicate user email crashed instead of showing an inline validation error
 
 `UserResource`'s email field (`app/Filament/Resources/UserResource.php`)

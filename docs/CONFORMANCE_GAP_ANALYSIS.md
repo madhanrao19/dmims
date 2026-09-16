@@ -129,7 +129,25 @@ Customer roles must not access Platform Customer 360. **Verified** — `Customer
 **Browser QA:** ✅ Passing (Playwright: browse all tabs, Add User end-to-end, non-platform denial, standalone nav gone + routes still functional)
 **Conformance:** ✅ Closed
 
-**Known pre-existing gap, not introduced by this change (flagged, not fixed):** `BaseResource::usageLimitReached()` keys its "Limit Rule" check off the *acting* user's own `customer_id`, which is always null for a platform user — so a platform-initiated create (via Customer 360's Add actions, or via any of these resources' own standalone create pages, which already had this gap) never enforces a customer's subscription usage limit (e.g. `max_users`). Pre-existing in `BaseResource`, orthogonal to this feature; left for a separate fix.
+**✅ Resolved for the Customer 360 pathway (16 September 2026):** the gap
+described below is fixed via a new `BaseResource::
+usageLimitReachedForCustomer(int $customerId)`, called explicitly from
+`HasCustomerScopedEmbeddedTable::customerScopedCreateAction()`'s
+`->authorize()` closure with the Customer 360 page's own target
+customer — so a Super Admin can no longer add e.g. a user past the
+customer's `max_users` seat limit through Customer 360.
+`usageLimitReached($user)` itself is intentionally left as a no-op for
+platform users (correct for their own unrelated reads/writes); the
+residual, narrower gap — a platform user's own *standalone* create
+pages for a tenant resource still don't enforce this, since `can()`
+never receives a target customer for a plain 'create' check — is
+real but very low-usage in practice (platform staff essentially never
+create tenant resources outside Customer 360) and is left open. New
+test: `Customer360CreatePermissionTest::
+test_super_admin_cannot_add_user_once_customer_seat_limit_reached`.
+Original note kept for history:
+
+~~**Known pre-existing gap, not introduced by this change (flagged, not fixed):** `BaseResource::usageLimitReached()` keys its "Limit Rule" check off the *acting* user's own `customer_id`, which is always null for a platform user — so a platform-initiated create (via Customer 360's Add actions, or via any of these resources' own standalone create pages, which already had this gap) never enforces a customer's subscription usage limit (e.g. `max_users`). Pre-existing in `BaseResource`, orthogonal to this feature; left for a separate fix.~~
 
 ---
 
@@ -477,9 +495,18 @@ High and three Medium findings. Fixed same-day unless noted:
   `AccessControlService::canLogin()`, `BelongsToCustomer`'s global scope, and
   `BaseResource::getEloquentQuery()`/`can()` fail closed (no rows / denied)
   for this state instead. Regression tests in `AccessControlTest` and
-  `TenantScopeTest`. The underlying data-integrity gap (the `customer_id`
-  Select on `UserResource`'s form has no `->required()`) is not yet closed —
-  tracked below.
+  `TenantScopeTest`. **✅ The underlying data-integrity gap closed 16
+  September 2026:** `UserResource`'s `customer_id` Select now has
+  `->required()`, scoped to exactly the create-time gap this note
+  describes (`$operation === 'create' && auth()->user()?->is_platform_user
+  && ! $get('is_platform_user')`) — deliberately NOT applied on edit, so
+  it doesn't newly block editing an *existing* record already sitting in
+  this exact broken state (that's `dmims:fix-platform-role-consistency`'s
+  job, not a save on an unrelated field's). Not required for a Company
+  Admin either way, since their submitted value is always
+  force-overwritten to their own company regardless. New test:
+  `UserResourcePrivilegeEscalationTest::
+  test_customer_id_is_required_when_a_platform_actor_creates_a_non_platform_user`.
 - **H3 (fixed 24 August 2026, follow-up pass):** `LocationTypeResource`
   (`manage inventory`) is global master data — the `location_types` table has
   no `customer_id` column at all, the same shape as the module catalogue —
@@ -927,7 +954,17 @@ a non-dehydrated field's key is stripped from the state array server-side,
 per the field's own definition, before `mutateFormDataBeforeSave()` ever
 runs — not based on client-supplied state. No change needed.
 
-**⚠️ New gap found, not yet fixed (needs a decision):**
+**✅ Resolved (confirmed 16 September 2026):** the narrower-guard option
+described below is already implemented for both resources —
+`BoxResource.php`'s `status` field and `DocumentFileResource.php`'s
+`current_status` field each carry a `->rule()` closure that rejects a
+direct edit into `'active'` (without a location/box already set) or
+`'moved_out'` (while one still is), with an inline error message
+pointing the user at Transfer/Move Out/Return instead;
+`damaged`/`missing`/`archived`/`closed` remain freely editable since
+they have no dedicated action. Original note kept for history:
+
+~~**⚠️ New gap found, not yet fixed (needs a decision):**
 `DocumentFileResource`'s `current_status` and `BoxResource`'s `status`
 fields are freely editable on Edit — unlike their sibling
 `current_box_id`/`current_location_id`. Setting `current_status` to
@@ -937,7 +974,7 @@ dispatched-file bug via a different path. Can't simply lock the field:
 `damaged`/`missing`/`archived`/`closed` have no dedicated action and are
 only reachable through this Select today. Needs either a narrower guard
 (reject only the `moved_out`/`active` transitions on direct edit) or
-dedicated status-change actions — deferred pending that decision.
+dedicated status-change actions — deferred pending that decision.~~
 
 **Deliberately not ported:** barcode pre-printing/reservation + global
 uniqueness constraint (needs a duplicate-barcode data check and a

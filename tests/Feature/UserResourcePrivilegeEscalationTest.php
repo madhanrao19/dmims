@@ -147,6 +147,38 @@ class UserResourcePrivilegeEscalationTest extends TestCase
     }
 
     /**
+     * Regression: `customer_id` had no `->required()` on UserResource's
+     * form — a platform actor creating a non-platform user could leave it
+     * blank, producing exactly the data-integrity defect
+     * AccessControlService::canLogin() has to fail closed against (a
+     * non-platform user with no customer_id). Required only when the
+     * actor is a platform user AND is_platform_user is off; a Company
+     * Admin's own create/edit is unaffected (their value is always
+     * force-overwritten to their own company regardless).
+     */
+    public function test_customer_id_is_required_when_a_platform_actor_creates_a_non_platform_user(): void
+    {
+        $platformAdmin = User::factory()->create(['is_platform_user' => true, 'status' => 'active']);
+        $platformAdmin->assignRole('Datamation Super Admin');
+        $this->actingAs($platformAdmin);
+
+        Livewire::test(CreateUser::class)
+            ->fillForm([
+                'name' => 'No Company User',
+                'email' => 'no-company@example.com',
+                'password' => 'password123',
+                'status' => 'active',
+                'is_platform_user' => false,
+                'roles' => [Role::findByName('Company Admin')->id],
+                // customer_id deliberately left blank
+            ])
+            ->call('create')
+            ->assertHasFormErrors(['customer_id' => 'required']);
+
+        $this->assertDatabaseMissing('users', ['email' => 'no-company@example.com']);
+    }
+
+    /**
      * Security review caught a regression in an earlier version of this fix:
      * EditUser::afterSave() ran stripDisallowedRoles() BEFORE restoring a
      * limited actor's pre-save role snapshot, so the restore could put a

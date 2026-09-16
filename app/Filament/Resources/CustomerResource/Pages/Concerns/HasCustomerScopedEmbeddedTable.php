@@ -114,7 +114,17 @@ trait HasCustomerScopedEmbeddedTable
             // gate to Super Admin only today (permission-assignment
             // side-effect, not a rule), so pin it explicitly here rather
             // than rely on that staying true as roles evolve.
-            ->authorize(fn (): bool => auth()->user()?->hasRole(UserResource::SUPER_ADMIN_ROLE) && $resource::can('create'))
+            //
+            // $resource::can('create') alone does NOT enforce this
+            // customer's subscription usage limit (e.g. max_users) — a
+            // platform actor's own customer_id is always null, so
+            // BaseResource::usageLimitReached() is a no-op for them by
+            // design (it's meant to gate a tenant's own create, not a
+            // platform admin's unrelated reads/writes). Check the TARGET
+            // customer's limit explicitly here instead.
+            ->authorize(fn (): bool => auth()->user()?->hasRole(UserResource::SUPER_ADMIN_ROLE)
+                && $resource::can('create')
+                && ! $resource::usageLimitReachedForCustomer($customer->getKey()))
             ->schema(function (Schema $schema) use ($resource, $customer): Schema {
                 $schema = $resource::form($schema);
 
