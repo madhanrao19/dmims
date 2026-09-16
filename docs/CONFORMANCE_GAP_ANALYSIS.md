@@ -1891,10 +1891,17 @@ the operative fix. Confirm the dashboard's Public Hostname setting for
   tunnel/nginx move to port 80 already resolves the conflict without
   touching backup software configuration.
 
+**Resolved:**
+- Live end-to-end browser verification (login, Turnstile, dashboard,
+  Livewire, Customer 360 Add-User visibility) confirmed on
+  `dmims.datamationgroup.com`; `APP_DEBUG` exposure found and fixed —
+  see §33.
+- Installed-PWA behaviour ("Add to Home Screen" / "Install app")
+  confirmed working on both **iOS Safari and Android Chrome** by the
+  user on real devices, against `dmims.datamationgroup.com`.
+
 **Still pending:**
-1. Remaining real-device QA: full login/Turnstile/dashboard/Livewire/
-   Customer 360 checks on both hostnames; installed-PWA behaviour.
-2. New Playwright coverage (`tests/playwright/barcode-camera.spec.js`)
+1. New Playwright coverage (`tests/playwright/barcode-camera.spec.js`)
    could not be run to green against a local `php artisan serve`
    instance in this session — every request past login 403'd
    ("Access Denied"). Confirmed **pre-existing and unrelated to this
