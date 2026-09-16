@@ -8,6 +8,7 @@ use App\Filament\Resources\DocumentFileResource\Pages\CreateDocumentFile;
 use App\Filament\Resources\DocumentTypeResource\Pages\CreateDocumentType;
 use App\Filament\Resources\LocationResource\Pages\CreateLocation;
 use App\Filament\Resources\ProductResource\Pages\CreateProduct;
+use App\Filament\Resources\UserResource\Pages\CreateUser;
 use App\Models\Box;
 use App\Models\Customer;
 use App\Models\CustomerModule;
@@ -141,6 +142,24 @@ class DuplicateUniqueConstraintValidationTest extends TestCase
             ->fillForm(['type_code' => 'INV', 'type_name' => 'Invoice Duplicate'])
             ->call('create')
             ->assertHasFormErrors(['type_code' => 'unique']);
+    }
+
+    /**
+     * Regression: found via a live Herd error log — a duplicate email
+     * submission on UserResource's create/edit form (users.email is
+     * globally unique, no per-customer scoping) had no ->unique()
+     * validation, so it hit the raw DB constraint and crashed instead of
+     * showing an inline "already taken" error.
+     */
+    public function test_duplicate_user_email_shows_inline_error_instead_of_crashing(): void
+    {
+        $this->platformAdmin();
+        User::factory()->create(['email' => 'taken@example.com', 'status' => 'active']);
+
+        Livewire::test(CreateUser::class)
+            ->fillForm(['name' => 'New User', 'email' => 'taken@example.com', 'password' => 'password12345'])
+            ->call('create')
+            ->assertHasFormErrors(['email' => 'unique']);
     }
 
     public function test_creating_a_module_grant_for_a_different_customer_still_succeeds(): void

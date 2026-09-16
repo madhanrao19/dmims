@@ -144,6 +144,7 @@ class UserResource extends BaseResource
             ->components([
                 Forms\Components\TextInput::make('name')->required()->maxLength(255),
                 Forms\Components\TextInput::make('email')->email()->required()->maxLength(255)
+                    ->unique(ignoreRecord: true)
                     ->disabled(fn (): bool => ! static::actorCanFullyManage()),
                 Forms\Components\TextInput::make('password')
                     ->password()
