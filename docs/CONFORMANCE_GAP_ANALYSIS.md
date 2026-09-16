@@ -1759,3 +1759,118 @@ here for the audit trail:
   login failures. `resources/views/filament/turnstile-widget.blade.php`
   now uses Cloudflare's documented explicit pattern
   (`?render=explicit` + `turnstile.render()` from Alpine `x-init`).
+
+## 31. zxing-wasm Scanner Swap, Explicit Customer 360 Create/Add Gate, Dual-Hostname Access Restored — 16 September 2026
+
+Full detail in `CHANGELOG.md` (Unreleased) and `DEPLOYMENT_GUIDE.md`'s
+Deployment Lessons Learned #11–13; summarised here for the audit trail,
+plus every item still pending manual/on-device verification.
+
+- **Camera scanning moved off `html5-qrcode` onto self-hosted
+  `zxing-wasm`.** `resources/js/barcode-camera.js` now drives raw
+  `getUserMedia()` frames through `zxing-wasm/reader`'s `readBarcodes()`
+  in a `requestAnimationFrame` loop instead of wrapping an `Html5Qrcode`
+  instance. Both existing entry points (Box Scan Mode, the global
+  scanner) are untouched — the component's public contract
+  (`barcode-camera-decoded` CustomEvent) didn't change. `html5-qrcode`
+  is fully removed from `package.json` (confirmed zero remaining
+  consumers first). Rear-camera preference, duplicate-scan prevention,
+  and the `wire:ignore` fix from §29/§30 all carry over. Camera cleanup
+  is simpler than before: a fresh `getUserMedia()` call per open doesn't
+  re-prompt once permission is granted for the page, so `closeScanner()`
+  can always fully stop every track — no more "keep the instance alive
+  so the next open reuses the same grant" workaround. The `.wasm` binary
+  is self-hosted via Vite's `?url` import
+  (`zxing-wasm/reader/zxing_reader.wasm?url`), emitted into
+  `public/build/assets/` with the same content-hash versioning as every
+  other build asset. `public/service-worker.js` needed no change — its
+  existing `/build/` path-prefix rule already covers the `.wasm` file
+  regardless of extension, and its `/admin` exclusion already keeps all
+  customer-data pages out of the cache. New regression coverage:
+  `tests/playwright/barcode-camera.spec.js` (open/error/close/reopen
+  with a mocked `getUserMedia`, asserting the camera track is actually
+  stopped on close — decode accuracy itself still needs a real device,
+  same limitation §29 already documented).
+- **Customer 360 Create/Add gate made explicit, not incidental.**
+  `HasCustomerScopedEmbeddedTable::customerScopedCreateAction()` (backs
+  the Users/License/Modules/Subscription/Billing "Add" actions) and
+  `CustomerResource::can()`'s own create path both now require
+  `hasRole('Datamation Super Admin')` explicitly. Before this, "only
+  Super Admin can create here" held only because Super Admin is
+  currently the only platform role granted any `manage *` permission —
+  a permission-assignment side effect, not a rule, so a future role
+  grant could have silently reopened it. Company Admin's own
+  same-company user management (outside Customer 360) was already
+  correctly gated by `UserResource` and is untouched — this change did
+  not touch, and was not meant to touch, any other module's Create/Add
+  behaviour. New test: `tests/Feature/Customer360CreatePermissionTest.php`
+  (Super Admin allowed; a view-only platform role denied; Company Admin
+  denied even calling the action's `authorize()` closure directly,
+  bypassing the UI).
+- **`dmims.datamationgroup.com` (Cloudflare Tunnel) restored.** Working
+  as of 2026-09-13 per nginx's own access logs; by 2026-09-16 an
+  unrelated process (`AgentService`) had taken over port 8080, the
+  tunnel's configured origin, silently breaking it. Moved the origin to
+  port 80 (free at the `0.0.0.0` scope — Herd's own `dmims.test`/default
+  vhosts only bind `127.0.0.1:80`) in both
+  `~/.config/herd/config/valet/Nginx/dmims.datamationgroup.com.conf` and
+  `~/.cloudflared/config.yml`. Narrowed `TRUSTED_PROXIES` from `*` to
+  `127.0.0.1,192.168.6.113` (PHP-FPM is only ever reached over loopback
+  per nginx's own fastcgi logs). No firewall rule existed for 8080
+  before this and none was added for 80 — `cloudflared`'s hop to the
+  origin is a same-machine local connection and the tunnel itself is
+  outbound-only, so no inbound allow rule or router port-forwarding was
+  ever required.
+- **Turnstile site key rotated to the value specified for this work**
+  (`0x4AAAAAAAKvq5_hJjbIITb0`) in both this repo's local `.env` and the
+  Herd-served copy's `.env`; the Herd copy's secret already appears to
+  be the newly-rotated one (a different, correctly-shaped value from
+  the one previously in this repo's own `.env`, which has been cleared
+  rather than left in place — see below).
+
+**Security note, disclosed rather than buried:** during this work, an
+existing (old, since-replaced) Turnstile secret value was inadvertently
+echoed into a terminal/session transcript twice while inspecting `.env`
+files. It has been cleared from this repo's `.env` rather than left in
+place. Recommend rotating the Herd-copy secret once more as a
+precaution, since it appeared in the same transcript.
+
+**Pending — requires admin/elevated access or physical hardware, not
+completed in this session:**
+1. Restarting the `Cloudflared` Windows service to load the updated
+   `~/.cloudflared/config.yml` (port 8080 → 80) — this session's shell
+   is not elevated (`Restart-Service` failed: access denied).
+2. Confirming `192.168.6.113:80` is actually reachable end-to-end once
+   that restart happens — a same-machine `Invoke-WebRequest`/`curl` to
+   `http://192.168.6.113:80/` with `Host: dmims.datamationgroup.com`
+   timed out even after the nginx side was confirmed listening on
+   `0.0.0.0:80`, suggesting a firewall/network-profile block on
+   traffic addressed to this machine's own LAN IP (as opposed to
+   `127.0.0.1`) that needs investigating with elevated access.
+3. Identifying what `AgentService` (the process that took over port
+   8080) actually is, in case it matters for other reasons.
+4. Verifying the Turnstile widget renders and the hostname allowlist
+   (`dmims.test`, `dmims.datamationgroup.com`) is configured correctly
+   in the Cloudflare dashboard — a Cloudflare-side setting, not a code
+   change, not verifiable from this shell.
+5. Real-device QA: `dmims.test` from the Herd machine itself, and
+   `dmims.datamationgroup.com` from a phone on mobile data (not Wi-Fi) —
+   login, Turnstile, dashboard, assets, Livewire, Customer 360
+   permissions, and actual barcode-label scanning on iPhone Safari and
+   Android Chrome, including as an installed PWA.
+6. Deploying these code changes to the Herd-served copy
+   (`D:\Users\Madhan Rao\Herd\dmims`, a separate git clone from this
+   working repo) once merged — a GitHub merge alone does not update
+   what Herd/the tunnel actually serves.
+7. New Playwright coverage (`tests/playwright/barcode-camera.spec.js`)
+   could not be run to green against a local `php artisan serve`
+   instance in this session — every request past login 403'd
+   ("Access Denied"). Confirmed **pre-existing and unrelated to this
+   work**: the repo's own untouched `row-actions.spec.js` hits the
+   identical 403 on the identical server. Root cause not found (all six
+   `business-access` middleware checks pass individually via `tinker`
+   for the QA seed user; a `subscription_active:*` cache-poisoning
+   theory from `RefreshDatabase` feature tests sharing the file cache
+   with the dev server was ruled out — `cache:clear` didn't fix it
+   either). Needs investigation independent of this work; the new spec
+   itself is believed correct pending that.

@@ -13,15 +13,9 @@
     component this button lives in, and that call's response re-renders and
     morphs this component's whole DOM tree. Without wire:ignore, morphdom
     replaces this div with the server's static (empty) markup on every scan
-    — destroying the running Html5Qrcode instance and its open camera
-    stream along with it. That's the actual root cause of "won't relaunch
-    without a page refresh" and "asks for camera permission on every scan
-    within the same session": each scan silently tore down and rebuilt the
-    scanner (and its instance-reuse logic in barcode-camera.js never got a
-    chance to run, since a brand new Alpine component was created every
-    time). wire:ignore keeps this subtree — and the JS scanner instance
-    inside it — alive across those re-renders, so barcode-camera.js's own
-    single persistent instance is actually reused as intended.
+    — destroying the open <video>/camera stream along with it, which is why
+    scanning previously wouldn't relaunch without a page refresh.
+    wire:ignore keeps this subtree alive across those re-renders.
 --}}
 <div x-data="barcodeCamera" x-show="supported" x-cloak wire:ignore {{ $attributes }}>
     <x-filament::button type="button" color="gray" icon="heroicon-o-camera" x-on:click="openScanner()">
@@ -40,7 +34,7 @@
                 <button type="button" x-on:click="closeScanner()" class="text-gray-400 hover:text-gray-600">&times;</button>
             </div>
 
-            <div :id="readerId" class="w-full overflow-hidden rounded"></div>
+            <video x-ref="video" class="w-full overflow-hidden rounded" autoplay playsinline muted></video>
 
             <p x-show="error" x-text="error" class="text-sm text-danger-600 dark:text-danger-400"></p>
         </div>

@@ -37,7 +37,11 @@ class SecurityHeaders
     // otherwise block it), and its own verification XHR all need an explicit
     // allowance since the base policy is deliberately same-origin only.
     private const CSP = "default-src 'self'; ".
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com; ".
+        // 'wasm-unsafe-eval' is needed by zxing-wasm (barcode-camera.js)
+        // instantiating its self-hosted WebAssembly module — kept alongside
+        // 'unsafe-eval' rather than relying on it, so a future pass that
+        // drops 'unsafe-eval' for Alpine doesn't silently break scanning.
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://challenges.cloudflare.com; ".
         "style-src 'self' 'unsafe-inline'; ".
         "img-src 'self' data:; ".
         "font-src 'self' data:; ".
@@ -54,7 +58,10 @@ class SecurityHeaders
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('X-Frame-Options', 'SAMEORIGIN');
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
-        $response->headers->set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+        // camera=(self) — 'camera=()' entirely blocked getUserMedia() for
+        // the live barcode-camera scanner (resources/js/barcode-camera.js);
+        // geolocation/microphone stay fully disabled since nothing uses them.
+        $response->headers->set('Permissions-Policy', 'geolocation=(), microphone=(), camera=(self)');
         $response->headers->set('Content-Security-Policy', self::CSP);
 
         if ($request->secure()) {

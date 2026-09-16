@@ -6,6 +6,74 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed — Camera scanning moved off html5-qrcode onto self-hosted zxing-wasm; Customer 360 Create/Add gate made explicit; dual-hostname (Herd + Cloudflare Tunnel) access restored
+
+`resources/js/barcode-camera.js` no longer depends on `html5-qrcode`
+(now removed from `package.json` entirely — grepped for zero remaining
+consumers first). It uses `zxing-wasm`'s reader entry
+(`zxing-wasm/reader`) directly against raw `getUserMedia()` camera frames
+via a `<canvas>`/`readBarcodes()` loop, replacing the previous
+`Html5Qrcode` instance. The component's public contract is unchanged —
+still an Alpine `barcodeCamera` component dispatching a plain
+`barcode-camera-decoded` CustomEvent — so neither call site
+(`resources/views/filament/box-assignment.blade.php`'s Box Scan Mode,
+`resources/views/livewire/barcode-scanner-listener.blade.php`'s global
+scanner) needed any change. Rear-camera preference
+(`facingMode: 'environment'`), duplicate-scan prevention (the scan loop
+stops the instant a symbol decodes) and the `wire:ignore` fix from the
+previous camera bug are all preserved. Camera cleanup is actually simpler
+and more reliable now: unlike `Html5Qrcode`, a fresh `getUserMedia()` call
+doesn't re-prompt for permission once granted for the page, so
+`closeScanner()` can always fully `stop()` every media track — no
+special-cased "keep the instance alive" workaround needed, which also
+means reopening after Livewire re-mounts the component (e.g. after
+navigation) always gets a genuinely fresh camera rather than relying on a
+kept-alive instance surviving the remount.
+
+The `.wasm` binary is self-hosted, not CDN-loaded: `barcode-camera.js`
+imports it via Vite's `?url` suffix
+(`zxing-wasm/reader/zxing_reader.wasm?url`), so it's emitted into
+`public/build/assets/` with the same content-hash versioning as every
+other build asset and served from this app's own origin. No change was
+needed to `public/service-worker.js` — its existing `/build/`
+path-prefix check already covers the `.wasm` file regardless of
+extension, and its `/admin` exclusion already keeps every customer-data
+page (the app's only Filament panel) out of the cache, so this stays "no
+sensitive customer data cached" without any new rule.
+
+Customer 360's Create/Add actions (`HasCustomerScopedEmbeddedTable::
+customerScopedCreateAction()`, used by the Users/License/Modules/
+Subscription/Billing tabs, and `CustomerResource`'s own "New customer")
+previously reached "only Super Admin can create" *only* because Super
+Admin happens to be the only platform role holding any `manage *`
+permission today — a permission-assignment accident, not a guarantee.
+Both now also explicitly require `hasRole('Datamation Super Admin')`, so
+a future role grant can't silently reopen Create/Add there. Company
+Admin's own tenant-scoped user management (own company only) was already
+correctly enforced by `UserResource` and is untouched. New tests:
+`tests/Feature/Customer360CreatePermissionTest.php` (Super Admin allowed,
+view-only platform role denied, Company Admin denied even via a direct
+action call bypassing the UI).
+
+`dmims.datamationgroup.com` (Cloudflare Tunnel → this machine) had gone
+dark: an unrelated process (`AgentService`) had taken over port 8080,
+the tunnel's configured origin port, some time after the working setup
+confirmed live on 2026-09-13. Moved the origin to port 80 instead — free
+at the `0.0.0.0` scope, since Herd's own `dmims.test`/default vhosts only
+ever bind `127.0.0.1:80` — in both
+`~/.config/herd/config/valet/Nginx/dmims.datamationgroup.com.conf`
+(`listen 0.0.0.0:8080` → `:80`) and `~/.cloudflared/config.yml`
+(`http://192.168.6.113:8080` → `:80`). No firewall change was needed:
+no inbound rule for 8080 ever existed, confirming the tunnel's local hop
+from `cloudflared` to nginx never crossed the network boundary that
+would require one. Also narrowed `TRUSTED_PROXIES` from `*` to
+`127.0.0.1,192.168.6.113` (PHP-FPM is only ever reached over loopback per
+nginx's own fastcgi logs) so Laravel only honours forwarded-IP/proto
+headers from this machine itself. See `DEPLOYMENT_GUIDE.md`'s Deployment
+Lessons Learned #12–13 for the full writeup, and CONFORMANCE_GAP_ANALYSIS.md
+for the pending manual steps this still needs (Cloudflared service
+restart, on-device verification).
+
 ### Fixed — Login rejection messages were indistinguishable, and camera scan needed a page refresh between scans
 
 Every login rejection *after a correct password* — suspended, inactive,
