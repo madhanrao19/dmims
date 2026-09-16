@@ -1847,6 +1847,13 @@ files. It has been cleared from this repo's `.env` rather than left in
 place. Recommend rotating the Herd-copy secret once more as a
 precaution, since it appeared in the same transcript.
 
+**Follow-up (2026-09-16):** the Cloudflared Windows service runs in
+Cloudflare's dashboard-managed tunnel mode, not config-file mode — so
+the public-hostname-to-origin mapping lives in the Zero Trust dashboard,
+and the local `~/.cloudflared/config.yml` edit above may not have been
+the operative fix. Confirm the dashboard's Public Hostname setting for
+`dmims.datamationgroup.com` points at port 80.
+
 **Pending — requires admin/elevated access or physical hardware, not
 completed in this session:**
 1. Restarting the `Cloudflared` Windows service to load the updated
