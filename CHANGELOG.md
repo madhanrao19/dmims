@@ -38,6 +38,15 @@ their own barcode value (e.g. system-generated document files with no
 descriptive title) printed the same code twice — once as the heading,
 once again below the scannable image — now suppressed when identical.
 
+A third follow-up: the overflow guard above fixed the overlap, but a
+*fixed* 2-column batch-print grid meant "Large" routinely had to scale
+itself back down to fit that column anyway, which visually erased most
+of the intended Small/Medium/Large size difference. Large now renders
+in a full-width single column instead
+(`resources/views/filament/batch-barcode-labels.blade.php`); Small/
+Medium (which normally fit a half-width column without scaling) stay
+at 2 columns.
+
 ### Fixed — Two pre-existing access-control/data-integrity gaps closed
 
 `BaseResource::usageLimitReached()` derives the tenant to check from the

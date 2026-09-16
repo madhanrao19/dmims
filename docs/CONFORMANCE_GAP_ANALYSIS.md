@@ -2125,6 +2125,22 @@ fix, both fixed in the same pass:
   Suppressed the heading whenever it's identical (after trimming) to
   the barcode.
 
+A third round of user testing, using the real "Print Barcode" bulk
+action against Boxes, found the overflow fix above had traded one bug
+for another: a *fixed* 2-column grid meant a "Large" barcode still
+routinely had to scale itself back down (via the `max-width:100%`
+guard) to fit that column, which visually erased most of the intended
+size difference — Large ended up barely bigger than Medium, sometimes
+indistinguishable in a printed PDF. **Fix**: `batch-barcode-labels.blade.php`
+now renders "Large" in a full-width single column instead of squeezing
+it into half a row, so it has room to render at its true larger size;
+Small/Medium (which normally fit a half-width column without scaling)
+stay at 2 columns. The `max-width` guard remains as a safety net for
+exceptionally long barcode values in any column width. Confirmed live
+on `dmims.datamationgroup.com`'s Boxes bulk "Print Barcode": Small
+renders ~2 columns at ~35-40px tall; Large renders single-column at
+~85px tall, a clear and correct size distinction with no overlap.
+
 `tests/Feature/BarcodePrintActionsTest.php`'s 8 existing tests only
 ever asserted "no error", never that the rendered size actually
 changed — a real gap that let this ship undetected. Investigated
