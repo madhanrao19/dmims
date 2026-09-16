@@ -7,9 +7,11 @@ use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Contracts\HasSchemas;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Livewire\Component as LivewireComponent;
 
 /**
  * Adds a "Print Barcode" table action to a resource: it generates and
@@ -17,10 +19,35 @@ use Illuminate\Database\Eloquent\Model;
  * printable label with a label-size choice, and prints directly from the
  * browser (window.print(), triggered client-side from inside the modal —
  * no "mark as printed" confirmation step). printed_count is incremented in
- * ->mountUsing(), which runs exactly once when the modal opens — unlike
- * ->modalContent(), which Filament re-evaluates on every Livewire render
- * (including the label-size Select's own ->live() updates), so incrementing
- * there counted every preview re-render as a print, not just the one open.
+ * ->mountUsing(), which runs exactly once when the modal opens.
+ *
+ * modalContent()'s closure MUST read the live size/copies fields via
+ * liveActionData($livewire), not `array $data` — regression found 16
+ * September 2026: `array $data` resolves to Action::getData(), a
+ * property only ever populated by the mounted-action SUBMIT flow
+ * (Filament\Actions\Concerns\InteractsWithActions calling
+ * `$action->data($schemaState)` as part of validating/calling the
+ * action). This modal has `->modalSubmitAction(false)` (printing is
+ * client-side window.print(), no server round trip needed for the print
+ * itself), so that flow never runs — `$data` stays frozen at whatever
+ * ->mountUsing()'s $schema->fill() set, for the modal's entire lifetime,
+ * regardless of any ->live() field the user changes afterwards.
+ * `Get $get` (Filament's usual reactive-state utility) does NOT work
+ * here either — it requires a "current schema component" context
+ * (Action::getSchemaComponent()) that a plain table/bulk action's
+ * modalContent() never has (confirmed: `Call to a member function
+ * makeGetUtility() on null`). Nor does reading
+ * `$livewire->getMountedActions()[0]` directly — that returns the
+ * mounted Action *object* itself (same stale ->getData() underneath),
+ * not the live schema state. liveActionData() instead reads
+ * `$livewire->getSchema('mountedActionSchema0')->getState()` — the
+ * same cached-schema lookup Filament's own action-modal Blade partial
+ * uses to render these very Size/Copies fields (confirmed against the
+ * rendered DOM: the Select's own `wire:key` is literally
+ * "mountedActionSchema0.size"), which the label-size/copies Selects'
+ * `->live()` bindings do keep genuinely current. Confirmed via real
+ * printed output before this fix: three "Small"/"Medium"/"Large" label
+ * prints of the same records produced byte-for-byte identical PDFs.
  */
 trait HasBarcodeAction
 {
@@ -60,8 +87,9 @@ trait HasBarcodeAction
                     (int) ($schema->getState()['copies'] ?? 1),
                 );
             })
-            ->modalContent(function (Model $record, array $data) {
+            ->modalContent(function (Model $record, LivewireComponent&HasSchemas $livewire) {
                 $registry = app(BarcodeService::class)->registerFor($record);
+                $data = static::liveActionData($livewire);
 
                 return view('filament.barcode-label', [
                     'barcode' => $registry->barcode,
@@ -115,11 +143,12 @@ trait HasBarcodeAction
                     $copies,
                 ));
             })
-            ->modalContent(function (Collection $records, array $data) {
+            ->modalContent(function (Collection $records, LivewireComponent&HasSchemas $livewire) {
                 $registries = $records->map(fn (Model $record): array => [
                     'registry' => app(BarcodeService::class)->registerFor($record),
                     'title' => static::barcodeLabelTitle($record),
                 ]);
+                $data = static::liveActionData($livewire);
 
                 return view('filament.batch-barcode-labels', [
                     'registries' => $registries,
@@ -133,5 +162,24 @@ trait HasBarcodeAction
     protected static function barcodeLabelTitle(Model $record): ?string
     {
         return $record->title ?? $record->box_number ?? null;
+    }
+
+    /**
+     * `getSchema('mountedActionSchema0')` reads the same cached-schema
+     * key Filament's own action-modal Blade partial uses to render this
+     * action's Size/Copies fields (confirmed against the rendered DOM:
+     * the Select's own `id`/`wire:key` is literally
+     * "mountedActionSchema0.size") — the "0" assumes this action is
+     * never nested inside another open action's modal, true for every
+     * barcodeAction()/bulkBarcodeAction() call site. `getSchema()` (not
+     * `getMountedActionSchema()`, which is protected) is the public
+     * equivalent, declared on `Filament\Schemas\Contracts\HasSchemas`.
+     *
+     * @param  LivewireComponent&HasSchemas  $livewire
+     * @return array<string, mixed>
+     */
+    protected static function liveActionData(LivewireComponent $livewire): array
+    {
+        return $livewire->getSchema('mountedActionSchema0')?->getState() ?? [];
     }
 }

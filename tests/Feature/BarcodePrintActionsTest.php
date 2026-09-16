@@ -24,10 +24,19 @@ use Tests\TestCase;
  * the exact interaction that previously crashed BarcodeRegistryResource's
  * preview/batchPrint actions with "Call to a member function
  * makeGetUtility() on null" (CONFORMANCE_GAP_ANALYSIS §14, root-caused to a
- * modalContent() closure typed with `Get $get` instead of `array $data`).
- * These actions all now use `array $data`, but the failure mode is easy to
- * reintroduce by copy-paste, so it stays under a real test rather than only
- * a code-review note.
+ * modalContent() closure typed with `Get $get`) and, separately, silently
+ * ignored every size selection everywhere (all four resources): reading
+ * `array $data` never reflects a ->live() field change, because it resolves
+ * to Action::getData(), only populated by the mounted-action submit flow —
+ * a flow that never runs for these ->modalSubmitAction(false) modals. Every
+ * barcodeAction()/bulkBarcodeAction() call site (HasBarcodeAction, shared by
+ * Box/DocumentFile/Location) and BarcodeRegistryResource's own
+ * preview/batchPrint now read live state via
+ * `$livewire->getSchema('mountedActionSchema0')->getState()` instead. Note:
+ * Livewire's test harness does not expose the mounted action's modal
+ * content in ->html(), so these tests can only assert the action survives
+ * the live change without erroring, not the rendered size itself — that is
+ * covered by manual/browser verification.
  */
 class BarcodePrintActionsTest extends TestCase
 {

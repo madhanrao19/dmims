@@ -12,10 +12,12 @@ use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Forms;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Contracts\HasSchemas;
 use Filament\Schemas\Schema;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Collection;
+use Livewire\Component as LivewireComponent;
 
 /**
  * Barcode Center (production-readiness roadmap #1): generate, batch
@@ -208,12 +210,13 @@ class BarcodeRegistryResource extends BaseResource
                     ->modalSubmitAction(false)
                     ->modalCancelActionLabel('Close')
                     // incrementPrinted() runs here, not in ->modalContent()
-                    // below — Filament re-evaluates modalContent on every
-                    // render (including the label-size Select's own
-                    // ->live() updates), so incrementing there counted every
-                    // preview re-render as a print. mountUsing() runs
-                    // exactly once, when the modal opens — see
-                    // HasBarcodeAction::barcodeAction() for why "Copies" is
+                    // below — that closure's `Get $get` genuinely tracks the
+                    // label-size/copies Selects' ->live() updates (see
+                    // HasBarcodeAction's own top-of-file comment for why it
+                    // must be `Get $get`, not `array $data`), so incrementing
+                    // there would count every live re-render as a print, not
+                    // just the one open. mountUsing() runs exactly once, when
+                    // the modal opens — same reasoning is why "Copies" is
                     // read from the field's default here rather than a
                     // later, live-updated value (printing is fully
                     // client-side, no server round trip to hang a precise
@@ -222,7 +225,9 @@ class BarcodeRegistryResource extends BaseResource
                         $schema->fill();
                         app(BarcodeService::class)->incrementPrinted($record, (int) ($schema->getState()['copies'] ?? 1));
                     })
-                    ->modalContent(function (BarcodeRegistry $record, array $data) {
+                    ->modalContent(function (BarcodeRegistry $record, LivewireComponent&HasSchemas $livewire) {
+                        $data = static::liveActionData($livewire);
+
                         return view('filament.barcode-label', [
                             'barcode' => $record->barcode,
                             'type' => $record->barcode_type,
@@ -272,12 +277,14 @@ class BarcodeRegistryResource extends BaseResource
                         Forms\Components\Select::make('size')
                             ->label('Label size')
                             ->options(['small' => 'Small', 'medium' => 'Medium', 'large' => 'Large'])
-                            ->default('small'),
+                            ->default('small')
+                            ->live(),
                         Forms\Components\TextInput::make('copies')
                             ->label('Copies (each)')
                             ->numeric()
                             ->minValue(1)
-                            ->default(1),
+                            ->default(1)
+                            ->live(),
                     ])
                     ->modalHeading('Batch print preview')
                     ->modalSubmitAction(false)
@@ -291,7 +298,9 @@ class BarcodeRegistryResource extends BaseResource
                         $copies = (int) ($schema->getState()['copies'] ?? 1);
                         $records->each(fn (BarcodeRegistry $record) => app(BarcodeService::class)->incrementPrinted($record, $copies));
                     })
-                    ->modalContent(function (Collection $records, array $data) {
+                    ->modalContent(function (Collection $records, LivewireComponent&HasSchemas $livewire) {
+                        $data = static::liveActionData($livewire);
+
                         return view('filament.batch-barcode-labels', [
                             'registries' => $records,
                             'size' => $data['size'] ?? 'small',
@@ -300,6 +309,18 @@ class BarcodeRegistryResource extends BaseResource
                     }),
             ])
             ->defaultSort('barcode');
+    }
+
+    /**
+     * See HasBarcodeAction's top-of-file comment for why modalContent()
+     * must read this way rather than `array $data` or `Get $get`.
+     *
+     * @param  LivewireComponent&HasSchemas  $livewire
+     * @return array<string, mixed>
+     */
+    protected static function liveActionData(LivewireComponent $livewire): array
+    {
+        return $livewire->getSchema('mountedActionSchema0')?->getState() ?? [];
     }
 
     public static function getPages(): array
