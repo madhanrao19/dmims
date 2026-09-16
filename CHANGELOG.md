@@ -6,6 +6,38 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed — "Label size" dropdown had no effect on printed barcodes (Barcode Registries, Box, Document File, Location)
+
+Every "Print Barcode" preview/batch modal (`modalContent()`, in
+`app/Filament/Concerns/HasBarcodeAction.php` — shared by Box, Document
+File and Location — and `BarcodeRegistryResource`'s own preview/
+batchPrint actions) read `array $data`, which resolves to
+`Action::getData()` — a property only ever populated by the
+mounted-action *submit* flow. These modals all use
+`->modalSubmitAction(false)` (printing is client-side `window.print()`,
+no server round trip), so that flow never runs: `$data` stayed frozen at
+whatever `->mountUsing()` set on open, regardless of any later change to
+the "Label size" Select or "Copies" field. Confirmed against three of the
+user's own real Small/Medium/Large PDF exports, which were byte-for-byte
+identical. Fixed by reading the live schema state instead —
+`$livewire->getSchema('mountedActionSchema0')->getState()` — the same
+cached-schema lookup Filament's own action-modal partial uses to render
+these fields, kept current by their existing `->live()` bindings. Also
+fixed a second, compounding bug specific to `BarcodeRegistryResource`'s
+`batchPrint` bulk action: its Label size/Copies fields were missing
+`->live()` entirely.
+
+Two further issues surfaced by follow-up user testing after that fix:
+picqer's generated barcode SVG carries explicit pixel width/height
+attributes with no CSS constraint, so at "Large" size a longer barcode
+value could render wider than a batch-print grid column and overflow
+into the neighbouring label (`resources/views/filament/barcode-label.blade.php`
+now scopes a `max-width:100%; height:auto` rule to
+`.dmims-barcode-item svg`); and records whose title happens to equal
+their own barcode value (e.g. system-generated document files with no
+descriptive title) printed the same code twice — once as the heading,
+once again below the scannable image — now suppressed when identical.
+
 ### Fixed — Two pre-existing access-control/data-integrity gaps closed
 
 `BaseResource::usageLimitReached()` derives the tenant to check from the

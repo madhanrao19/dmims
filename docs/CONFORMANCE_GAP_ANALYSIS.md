@@ -2066,3 +2066,71 @@ merged Dependabot dependency bumps):
 **Net result: every fix from this session (§31–§34) is confirmed
 working, on both hostnames, against live production data, with no new
 issues found.**
+
+## 35. "Label Size" Had No Effect on Printed Barcodes (All Four Print-Barcode Resources) — 16 September 2026
+
+Reported by the user after testing the Batch Print preview on Barcode
+Registries, then confirmed to affect every resource with a "Print
+Barcode" action once investigated: Box, Document File and Location
+(all via the shared `HasBarcodeAction` trait) plus Barcode Registry's
+own preview/batchPrint actions. Choosing Small/Medium/Large in the
+modal's Label size dropdown had no effect on the rendered/printed
+barcode — proven conclusively by three of the user's own real PDF
+exports (Small/Medium/Large of the same records), which were
+byte-for-byte identical.
+
+**Root cause**: `modalContent()`'s closure read `array $data`, which
+resolves to `Action::getData()` — populated only by the mounted-action
+*submit* flow. Every one of these modals uses
+`->modalSubmitAction(false)` (printing is client-side `window.print()`,
+no server round trip), so that flow never runs; `$data` stayed frozen
+at whatever `->mountUsing()` set when the modal opened, regardless of
+any later change to the live Select/TextInput fields. Two earlier fix
+attempts were tried and rejected before landing on the right one:
+`Get $get` failed with `Call to a member function makeGetUtility() on
+null` (it requires an `Action::getSchemaComponent()` context that a
+plain table/bulk action's `modalContent()` never has), and
+`$livewire->getMountedActions()[0]['data']` failed with `Cannot use
+object of type Filament\Actions\BulkAction as array` (that method
+returns real `Action`/`BulkAction` objects, not an array). **Fix**:
+`$livewire->getSchema('mountedActionSchema0')->getState()` — the
+public equivalent of the protected `getMountedActionSchema()` Filament's
+own action-modal Blade partial uses internally to render these very
+fields — kept current by the fields' existing `->live()` bindings.
+Also fixed a second, compounding bug specific to
+`BarcodeRegistryResource`'s `batchPrint` bulk action: its Label
+size/Copies fields were missing `->live()` entirely, so even the
+write-side wasn't reactive.
+
+Confirmed live on `dmims.datamationgroup.com` after the fix, for both
+single and bulk/batch print, across all four resources: changing Label
+size now visibly resizes the rendered barcode (Small ≈ 40px tall,
+Medium ≈ 60px, Large ≈ 90px).
+
+Two further issues surfaced by the user's continued testing after that
+fix, both fixed in the same pass:
+
+- **Large batch print overflowed its grid column.** picqer's generated
+  SVG carries explicit pixel width/height attributes with no CSS
+  constraint; at "Large" (module width 3), a longer barcode value could
+  render wider than a `grid-cols-2` batch-print column and visually
+  overlap the neighbouring label. Fixed by scoping a
+  `max-width:100%; height:auto` rule to `.dmims-barcode-item svg` in
+  `barcode-label.blade.php` (guarded by `@once` since this partial is
+  included once per label in a batch).
+- **Redundant duplicate label.** Some records — e.g. system-generated
+  Document Files with no descriptive title — have their title default
+  to the barcode value itself, so the label printed the same code
+  twice: once as the heading, once again below the scannable image.
+  Suppressed the heading whenever it's identical (after trimming) to
+  the barcode.
+
+`tests/Feature/BarcodePrintActionsTest.php`'s 8 existing tests only
+ever asserted "no error", never that the rendered size actually
+changed — a real gap that let this ship undetected. Investigated
+strengthening them to assert the rendered `text-lg`/`text-2xl`/
+`text-3xl` font-size class, but Livewire's test harness does not expose
+a mounted action's modal content in `->html()` (confirmed by dumping
+the raw output to a file), so that assertion isn't reachable from this
+test suite; left as a known coverage gap, covered instead by the live
+browser verification above.
