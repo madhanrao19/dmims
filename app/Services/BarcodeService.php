@@ -271,6 +271,28 @@ class BarcodeService
         $registry->increment('printed_count', max(1, $by));
     }
 
+    /**
+     * Descriptive title for a barcode label's "Show Name" line —
+     * BarcodeRegistryResource's own preview/batchPrint actions have only a
+     * BarcodeRegistry row, not the underlying Product/Location/Box/
+     * DocumentFile record HasBarcodeAction::barcodeLabelTitle() reads title
+     * from, so "Show Name" toggled on there rendered nothing to show. Null
+     * for a reserved-but-unclaimed label (no reference yet) or a reference
+     * row that no longer resolves.
+     */
+    public function resolveTitle(BarcodeRegistry $registry): ?string
+    {
+        $modelClass = self::TABLE_MODELS[$registry->reference_table ?? ''] ?? null;
+
+        if (! $modelClass || ! $registry->reference_id) {
+            return null;
+        }
+
+        $record = $modelClass::withoutGlobalScopes()->find($registry->reference_id);
+
+        return $record?->title ?? $record?->box_number ?? $record?->location_name ?? $record?->product_name ?? null;
+    }
+
     public function detectBarcodeType(string $barcode): ?string
     {
         $prefix = Str::before($barcode, '-');
