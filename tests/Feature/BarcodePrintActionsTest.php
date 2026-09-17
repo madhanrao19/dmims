@@ -8,8 +8,10 @@ use App\Filament\Resources\DocumentFileResource\Pages\ListDocumentFiles;
 use App\Filament\Resources\LocationResource\Pages\ListLocations;
 use App\Models\Box;
 use App\Models\Customer;
+use App\Models\CustomerModule;
 use App\Models\DocumentFile;
 use App\Models\Location;
+use App\Models\Module;
 use App\Models\User;
 use App\Services\BarcodeService;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -155,5 +157,43 @@ class BarcodePrintActionsTest extends TestCase
         Livewire::test(ListBarcodeRegistries::class)
             ->callTableBulkAction('batchPrint', [$registry], data: ['size' => 'large'])
             ->assertHasNoTableBulkActionErrors();
+    }
+
+    /**
+     * Every test above acts as a Datamation Super Admin (platform user) —
+     * this suite's setUp(). Barcode printing (label size, Show Name/Show
+     * Barcode) must work identically for an actual tenant "Customer" role,
+     * not just platform staff: HasBarcodeAction::barcodeAction()/
+     * bulkBarcodeAction() authorize on `static::can('view', $record)`,
+     * which for a tenant user runs through BaseResource::can()'s
+     * permission + module + license branch instead of the platform-user
+     * shortcut — a genuinely different code path worth its own coverage.
+     */
+    public function test_barcode_printing_works_for_a_tenant_customer_role(): void
+    {
+        foreach (['stock_inventory', 'document_tracking'] as $moduleCode) {
+            $module = Module::firstOrCreate(['module_code' => $moduleCode], ['module_name' => $moduleCode, 'status' => 'active']);
+            CustomerModule::create(['customer_id' => $this->customer->id, 'module_id' => $module->id, 'is_enabled' => true, 'enabled_at' => now()]);
+        }
+
+        $tenant = User::factory()->create(['customer_id' => $this->customer->id, 'is_platform_user' => false, 'status' => 'active']);
+        $tenant->assignRole('Company Admin');
+        $this->actingAs($tenant);
+
+        $location = Location::create(['customer_id' => $this->customer->id, 'location_code' => 'L9', 'location_name' => 'Tenant Shelf', 'status' => 'active']);
+        $box = Box::create(['customer_id' => $this->customer->id, 'box_barcode' => 'BC-9', 'box_number' => 'BOX-9', 'current_location_id' => $location->id, 'status' => 'active']);
+
+        Livewire::test(ListLocations::class)
+            ->mountTableAction('barcode', $location)
+            ->setTableActionData(['size' => 'large', 'show_name' => false])
+            ->assertHasNoTableActionErrors();
+
+        Livewire::test(ListBoxes::class)
+            ->mountTableAction('barcode', $box)
+            ->setTableActionData(['size' => 'small', 'show_name' => true])
+            ->assertHasNoTableActionErrors();
+
+        $registry = app(BarcodeService::class)->registerFor($box);
+        $this->assertSame('BOX-9', app(BarcodeService::class)->resolveTitle($registry));
     }
 }

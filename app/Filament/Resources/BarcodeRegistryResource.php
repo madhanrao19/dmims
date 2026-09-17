@@ -236,6 +236,7 @@ class BarcodeRegistryResource extends BaseResource
                         return view('filament.barcode-label', [
                             'barcode' => $record->barcode,
                             'type' => $record->barcode_type,
+                            'title' => app(BarcodeService::class)->resolveTitle($record),
                             'size' => $data['size'] ?? 'medium',
                             'copies' => max(1, (int) ($data['copies'] ?? 1)),
                             'showName' => (bool) ($data['show_name'] ?? true),
@@ -310,9 +311,13 @@ class BarcodeRegistryResource extends BaseResource
                     })
                     ->modalContent(function (Collection $records, LivewireComponent&HasSchemas $livewire) {
                         $data = static::liveActionData($livewire);
+                        $barcodeService = app(BarcodeService::class);
 
                         return view('filament.batch-barcode-labels', [
-                            'registries' => $records,
+                            'registries' => $records->map(fn (BarcodeRegistry $record): array => [
+                                'registry' => $record,
+                                'title' => $barcodeService->resolveTitle($record),
+                            ]),
                             'size' => $data['size'] ?? 'small',
                             'copies' => max(1, (int) ($data['copies'] ?? 1)),
                             'showName' => (bool) ($data['show_name'] ?? true),

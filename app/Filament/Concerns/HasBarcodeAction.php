@@ -172,10 +172,16 @@ trait HasBarcodeAction
             });
     }
 
-    /** Short human label shown above the barcode value on a printed label. */
+    /**
+     * Short human label shown above the barcode value on a printed label —
+     * "Show Name" toggles this line. Location and Product have neither
+     * `title` nor `box_number`, so this fell through to null and made
+     * "Show Name" a silent no-op for them; `location_name`/`product_name`
+     * cover those two, `title`/`box_number` the rest.
+     */
     protected static function barcodeLabelTitle(Model $record): ?string
     {
-        return $record->title ?? $record->box_number ?? null;
+        return $record->title ?? $record->box_number ?? $record->location_name ?? $record->product_name ?? null;
     }
 
     /**
