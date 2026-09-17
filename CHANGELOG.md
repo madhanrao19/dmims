@@ -6,6 +6,79 @@ and the project aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed — My Company's "Locations" tab was invisible for any customer without the `stock_inventory` module enabled
+
+`MyCompanyLocations::canAccess()` used `LocationResource::can('viewAny')`,
+which also requires the `stock_inventory` module enabled for the customer —
+hiding this read-only tab entirely for a real customer ("Madhan Inc") who
+doesn't have that module on, even though their role holds `manage
+inventory`. Changed to check the underlying permission
+(`manage inventory`/`view inventory`) directly, bypassing the module gate —
+this tab is a passive view, not the operational feature the module
+controls. A row's own View Location link still respects the module gate
+(`LocationResource::can('view', $record)`), so the list always shows but
+drill-in only works once the module is enabled.
+
+### Changed — View Location matches View Box's tab layout (Boxes Inside, Location Audit Log)
+
+Location's "Boxes on this Rack" and "Audit Log" tabs were separate
+sub-navigation pages (their own URLs, a top tab-strip) instead of inline
+tabs on the same page, unlike Box's View page. Converted both to
+RelationManagers rendered inline below the Location Details/Box Capacity
+cards, matching `BoxResource`'s own `DocumentFilesRelationManager`/
+`AuditLogRelationManager` pattern exactly (same column layout): renamed
+"Boxes on this Rack" → **Boxes Inside** (`BoxesInsideRelationManager`,
+`Location::boxes()`) and "Audit Log" → **Location Audit Log**
+(`LocationAuditLogRelationManager`, new `Location::auditLogs()` relation,
+mirroring `Box::auditLogs()`). The separate `LocationResource\Pages\
+BoxesOnRack`/`AuditLog` pages and their routes are removed;
+`LocationResource::getRecordSubNavigation()` is gone in favor of
+`getRelations()`. My Company's read-only Locations tab is unaffected — its
+row links already point at this same View Location page, so it picks up the
+new tab layout automatically.
+
+### Added — Read-only "Locations" tab on My Company (customer-facing Customer 360)
+
+Tenant users previously had no way to see their own locations from "My
+Company" (the customer-side equivalent of Platform's Customer 360) — only
+via the standalone Locations menu, which grants full management to whoever
+can already reach it. Added `App\Filament\Clusters\MyCompany\Pages\Locations`:
+reuses `LocationResource::table()`'s own columns (kept in sync automatically)
+but strips every Add/Edit/Delete/Batch Generate/bulk action, so the tab is
+pure view regardless of the viewer's actual permission level. Row clicks open
+the existing read-only View Location page (Location Details/Box Capacity
+cards, Boxes on this Rack, Audit Log). The standalone Locations menu is
+unaffected and still gives roles with `manage inventory` full CRUD.
+
+### Fixed — "Show Name" toggle was a silent no-op for Locations, Products, and Barcode Center's own Preview/Batch Print
+
+`HasBarcodeAction::barcodeLabelTitle()` (shared by Box, Document File,
+Location, Product) resolved a record's label title as `$record->title ??
+$record->box_number ?? null` — Location and Product have neither field, so
+their title was always `null` and "Show Name" had nothing to show or hide.
+Added `?? $record->location_name ?? $record->product_name` to the chain.
+Separately, `BarcodeRegistryResource`'s own `preview`/`batchPrint` actions
+never passed a `title` to the label view at all (they only have a
+`BarcodeRegistry` row, not the Box/Location/etc. record it points to), so
+"Show Name" was a no-op there regardless of which record type the barcode
+belonged to. Added `BarcodeService::resolveTitle(BarcodeRegistry $registry)`
+— resolves the underlying record via the existing `reference_table`/
+`reference_id` + `TABLE_MODELS` map and reads the same title fields — and
+wired it into both actions' `modalContent()`.
+
+### Added — Locations list/view brought to old-system column and tab parity
+
+`LocationResource`'s table (standalone `/admin/locations` and Customer 360's
+embedded "Locations" tab, which shares it) gains Location ID, a breadcrumb
+"Type" column (new `Location::getTypePathAttribute()`/`typePathMap()`,
+sharing its tree-walk with the existing `ancestryPathMap()`), "Full Path"
+(ancestry + barcode), a plain "Barcode" column, and an "Active" boolean icon
+column — replacing the previous name/code/leaf-type/parent/status columns,
+which didn't match the old system. `ViewLocation` gains an `infolist()`
+("Location Details" + "Box Capacity" cards, mirroring `BoxResource`'s own
+read-only-infolist exception) and a new "Boxes on this Rack" sub-navigation
+tab (`Pages\BoxesOnRack`) listing boxes stored directly at that location.
+
 ### Fixed — "Label size" dropdown had no effect on printed barcodes (Barcode Registries, Box, Document File, Location)
 
 Every "Print Barcode" preview/batch modal (`modalContent()`, in

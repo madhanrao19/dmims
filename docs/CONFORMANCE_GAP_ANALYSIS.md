@@ -2150,3 +2150,302 @@ a mounted action's modal content in `->html()` (confirmed by dumping
 the raw output to a file), so that assertion isn't reachable from this
 test suite; left as a known coverage gap, covered instead by the live
 browser verification above.
+
+## 36. Locations List/View Brought to Old-System Column & Tab Parity — 17 September 2026
+
+User reported the Batch Barcode Printing overlap "still" happening, with three
+PDF exports (Small/Medium/Large) as evidence, and asked for Customer Locations
+to visually match the old system's screenshots (list columns, Add/Batch
+Generate/View/Boxes-on-this-Rack/System-Activity-Log/Print-Barcode).
+
+**Batch Barcode Printing: not a new bug.** The three evidence PDFs were
+timestamped 23:04–23:05 on 16 September 2026 — 6–7 minutes *before*
+`de2e027`'s single-column-for-Large fix landed at 23:11 the same night (§35).
+Reproduced live post-fix on Document Files and Locations (single and bulk,
+`dmims.test`): "Large" renders full-width, single column, at its true size
+(measured 501×90px SVG, no scaling, no overlap). No code change needed here —
+confirmed already fixed, just not yet re-verified by the user against the
+current build.
+
+**Locations: real, previously-unaddressed gap.** `LocationResource`'s table
+(both the standalone `/admin/locations` list and Customer 360's embedded
+"Locations" tab, which shares the same `table()`) never had the old system's
+Full Path / Barcode / breadcrumb Type / Active-icon columns — it showed
+`location_name`/`location_code`/leaf type/`parent.location_name`/box-capacity/
+status-badge instead. `ViewLocation` had no `infolist()` (fell back to a raw
+disabled `form()` embed) and no "Boxes on this Rack" tab. §16/§19's earlier
+"Locations brought to parity" passes covered permissions, actions and the
+print modal, not the list columns or the View page's content — commit
+`db20c07`'s own title was accurate but the table/infolist half of parity was
+never done.
+
+**Fixed:**
+- `Location::typePathMap()` — a new sibling of the existing `ancestryPathMap()`
+  (same one-query-per-scope caching, same cycle-bounded parent walk), labeling
+  each ancestor by its Location Type instead of its name, for the "Area >
+  Building > Floor > Room > Rack > Shelf" breadcrumb column. Both now share a
+  `buildPathMap()` helper (dedup, not a new abstraction — two concrete
+  call sites already existed). `getTypePathAttribute()` added alongside the
+  existing `getAncestryPathAttribute()`.
+- `LocationResource::table()`: columns are now Location ID, Type (breadcrumb),
+  Full Path (`ancestry_path` + ` [barcode]`), Barcode, Boxes (kept the richer
+  used/capacity/% badge from the prior column, relabeled), Active (boolean
+  icon column on `status === 'active'`). No action/permission changes.
+- `LocationResource::infolist()` — new, mirroring `BoxResource::infolist()`'s
+  already-established "read-only Section/TextEntry cards" exception to this
+  app's no-infolist convention: "Location Details" (Type, Name, Barcode, Full
+  Path, Active, Created at) + "Box Capacity" (Boxes Stored / Active / In
+  Transit, the last one mapped to `status = 'moved_out'` — the closest
+  existing Box status to the old screenshot's "In Transit", since this app has
+  no separate in-transit box state).
+- New `Pages\BoxesOnRack` sub-navigation page (`Location::boxes()`, already
+  existed) — Barcode / Label (`remarks`) / Exact Placement (`"Directly on
+  {type}"`) / Status / Files-count, added to `getRecordSubNavigation()`
+  between Overview and Audit Log, matching the old system's tab order. Kept
+  the existing separate `Pages\AuditLog` sub-nav page as-is rather than
+  converting Location to Box's inline-RelationManager-tabs pattern —
+  `DemoCorrectionPassTest` exercises `LocationResource\Pages\AuditLog` directly
+  by class, so replacing it would have broken passing tenant-isolation tests
+  for no visible gain (the sub-nav tab strip already renders like the old
+  system's two toggle buttons).
+- Caught one bug while wiring `BoxesOnRack` up: a bare `Page implements
+  HasTable` needs an explicit `content()` returning `EmbeddedTable::make()`
+  (`AuditLog.php`'s existing pattern) — without it, Filament mounts the
+  Livewire component but renders no table at all (no headers, no empty
+  state), a silent blank tab rather than an error.
+
+**Verified live** on `dmims.test`: standalone Locations list, Customer 360's
+embedded Locations tab (confirmed it inherits the same table), View Location's
+new Overview cards, Boxes on this Rack (empty state and populated), and bulk
+Print Barcode at Large size (single column, correct size, no overlap) — for
+both Document Files (already-fixed code, re-confirmed) and Locations (new
+columns, confirmed the barcode action itself is unaffected).
+
+**Regression tests:** none added (no new business logic — table columns and
+an infolist are presentation only, and the existing `BoxesOnRack` page has no
+branching logic beyond the query already covered by `Location::boxes()`'s own
+tests). Full suite: 342/342 passing, including all `LocationBatchGenerateTest`/
+`LocationChainBuilderTest`/`LocationHierarchyTest`/`BarcodePrintActionsTest`/
+`CustomerProfileTest`/`GlobalSearchTest` cases, confirming the column/infolist
+changes didn't disturb any covered behavior.
+
+## 37. "Show Name" Toggle Was a No-Op for Locations, Products, and Barcode Center — 17 September 2026
+
+User asked to "check and fix the Show Name toggle button function in all
+Barcode Printing everywhere" after confirming Label Size (§35) worked.
+Reproduced live: on a Location's Print Barcode modal, no name line rendered
+above the barcode at all, on or off — toggling did nothing because there was
+nothing to toggle. Confirmed the same on Barcode Center's own Preview/Print
+and Batch Print for every record type (Box, Location, Document File alike).
+Document Files' own Print Barcode modal, by contrast, correctly showed/hid
+"Faizal Legal Files" — proving the live-reactivity mechanism itself (§35's
+`liveActionData()`/`getSchema('mountedActionSchema0')` fix) was not the
+problem this time.
+
+**Root cause, two distinct bugs sharing one symptom:**
+- `HasBarcodeAction::barcodeLabelTitle()` (shared by `BoxResource`,
+  `DocumentFileResource`, `LocationResource`, `ProductResource`) computed the
+  label's title as `$record->title ?? $record->box_number ?? null`. `Box`
+  has `box_number`; `DocumentFile` has `title`. `Location` and `Product` have
+  neither attribute — accessing them returns `null` — so `$title` was always
+  `null` for those two, regardless of "Show Name". Fixed by extending the
+  chain: `?? $record->location_name ?? $record->product_name`.
+- `BarcodeRegistryResource`'s `preview` and `batchPrint` actions don't go
+  through `HasBarcodeAction` at all (they predate it, per this resource's own
+  `barcodeLabelTitle()`-less `modalContent()` closures) and never passed a
+  `title` key to `filament.barcode-label`/`filament.batch-barcode-labels` in
+  the first place — not even for a Box or Document File barcode, where the
+  Location bug above doesn't apply. `BarcodeRegistry` only stores
+  `reference_table`/`reference_id` (a plain string+id pointer, not an
+  Eloquent `morphTo`), so there was no existing one-line fix available.
+  Added `BarcodeService::resolveTitle(BarcodeRegistry $registry): ?string` —
+  resolves the pointed-to record via the service's own existing
+  `TABLE_MODELS` map (already used by `replace()`) and reads the same
+  `title`/`box_number`/`location_name`/`product_name` chain — and passed its
+  result as `'title'` from both actions' `modalContent()` (batchPrint maps
+  each `BarcodeRegistry` to `['registry' => ..., 'title' => ...]`, the same
+  per-item shape `HasBarcodeAction::bulkBarcodeAction()` already produces,
+  which `batch-barcode-labels.blade.php` already knew how to read).
+
+**Verified live** on `dmims.test`: Location's single Print Barcode (LOC-MA-
+000011 "Datamation HQ" — name now shows, toggles off/on correctly); Barcode
+Center's Preview/Print on a Box registry (shows the box's own `box_number`,
+e.g. "1"); Barcode Center's Batch Print across three Box registries at once
+(each shows its own name — "1", "wahbox 2", "SMOKE-BOX-1" — and all three
+disappear together on toggle-off). Document Files' and Boxes' own Print
+Barcode modals were already correct and are unaffected (same null-coalescing
+chain, their fields just come first).
+
+**Regression tests:** none added — this is a pure data-mapping fix (which
+field feeds an existing, already-tested reactive title slot), no new branch
+logic. Full suite: 342/342 passing, including all `BarcodePrintActionsTest`
+cases (which exercise the label-size reactivity this title fix sits right
+next to).
+
+## 38. My Company "Locations" Tab (View-Only) + Barcode Fixes Confirmed Across Tenant Roles — 17 September 2026
+
+User asked to "ensure the locations shows in the Customer 360 for the
+Customer to view only", clarified (via clarifying question) to mean: add a
+Locations tab to the tenant-facing **My Company** cluster — the customer's
+own equivalent of Platform's Customer 360 (Security & Access Control Matrix
+§6) — read-only, alongside the tenant's existing full-featured standalone
+Locations menu (unaffected). Separately asked to confirm §37's barcode
+printing fixes (Label Size, Show Name) actually work for a genuine tenant
+"Customer" role, not just the Datamation Super Admin every existing
+`BarcodePrintActionsTest` case runs as.
+
+**Locations tab, view-only by construction, not by permission.** Every
+existing My Company tab (`HasEmbeddedResourceTable`) embeds its resource's
+`table()` verbatim, actions included — deliberately, so Company Admin can
+still manage Users/Enabled Modules from there. Locations needed the opposite:
+even a Company Admin who *can* manage locations (via the standalone menu)
+sees no Add/Edit/Delete/Batch Generate/bulk action on this specific tab. New
+`App\Filament\Clusters\MyCompany\Pages\Locations` calls
+`LocationResource::table($table)` for its columns (kept in sync with the
+resource automatically, per this doc's own §36 change) but immediately
+overrides `->recordActions([])->headerActions([])->bulkActions([])`, and adds
+its own `->recordUrl()` pointing only at the existing read-only View Location
+page (never Edit) gated on `LocationResource::can('view', $record)`.
+`canAccess()` delegates to `LocationResource::can('viewAny')`, matching every
+sibling tab's convention (Security & Access Control Matrix's read permission
+— `view inventory` OR `manage inventory` — either grants access; the tab's
+own UI is what stays read-only regardless of which one the viewer holds).
+
+**Verified live** on `dmims.test` as an actual tenant Company Admin (not
+platform admin): My Company → Locations shows the full column set (Location
+ID/Type/Full Path/Barcode/Boxes/Active) with no Add/Edit/Delete/Batch
+Generate buttons anywhere on the page; clicking a row opens View Location
+(Location Details/Box Capacity cards, Boxes on this Rack, Audit Log — the
+Edit button itself absent too, because this tenant's trial subscription has
+no active license, an unrelated pre-existing access-mode restriction that
+incidentally reinforces read-only here). The standalone "Locations" menu for
+the same user still shows Add Location/Batch Generate/Edit/Print Barcode/
+Delete, confirming the new tab is additive, not a replacement.
+
+**Barcode printing re-verified as a tenant role.** Logged in as the same
+tenant Company Admin, opened Locations' own Print Barcode (Label size,
+Copies, Show Name, Show Barcode) — toggling Show Name off/on correctly
+hid/showed "Main Warehouse - Rack A" exactly as it does for a platform user,
+confirming §37's fix isn't platform-user-specific. Added regression coverage
+non-visually: `BarcodePrintActionsTest::
+test_barcode_printing_works_for_a_tenant_customer_role()` runs the same
+Location/Box print-with-live-data-change flow as a Company Admin (with
+`stock_inventory`/`document_tracking` modules enabled — the platform-user
+tests skip that requirement entirely via `BaseResource::can()`'s platform
+shortcut, a genuinely different code path worth its own coverage) and
+asserts `BarcodeService::resolveTitle()` resolves the box's own name. New
+`tests/Feature/BarcodeServiceResolveTitleTest.php` covers `resolveTitle()`
+directly (Location, Product, Box, and the null case for a reserved-but-
+unclaimed label) — the core of §37's fix, previously only exercised
+indirectly.
+
+**Regression tests:** `tests/Feature/MyCompanyClusterTest.php` gained four
+cases (`enableStockInventory()`/`viewer()` test helpers): the tab renders and
+hides every mutating action for a Company Admin; a genuine `view inventory`-
+only "Viewer" role can access it; and it's tenant-scoped (doesn't leak
+another customer's locations). Full suite: 342 pre-existing + 4 (My Company)
++ 1 (tenant-role barcode) + 4 (`resolveTitle()`) = confirmed all passing.
+
+## 39. View Location Converted to Inline RelationManager Tabs (Boxes Inside, Location Audit Log) — 17 September 2026
+
+User reviewed §36-38's work against real View Box screenshots and asked for
+one more alignment: View Location's "Boxes on this Rack" and "Audit Log"
+tabs were separate sub-navigation *pages* (own URL, top tab-strip via
+`getRecordSubNavigation()`/`generateNavigationItems()`) — View Box instead
+renders its tabs inline, below the Identification/Current Location cards, on
+the *same* page/URL, via Filament's RelationManager mechanism
+(`getRelations()`). Asked to rename them "Boxes Inside" and "Location Audit
+Log" respectively and match Box's arrangement exactly.
+
+**Converted, not just renamed.** New `LocationResource\RelationManagers\
+BoxesInsideRelationManager` (relationship `boxes`, same Barcode/Label/Exact
+Placement/Status/Files columns the old `Pages\BoxesOnRack` page had) and
+`LocationAuditLogRelationManager` (relationship `auditLogs` — a new
+`Location::auditLogs()` model relation, added mirroring the existing
+`Box::auditLogs()` one line-for-line; same Date & Time/Action/Performed
+By/Field Name/Old Value/New Value columns as `BoxResource\RelationManagers\
+AuditLogRelationManager`, including its `canViewForRecord()` gate on
+`AuditLogResource::can('view', ...)` per Security & Access Control Matrix
+§14). `LocationResource::getRelations()` replaces
+`getRecordSubNavigation()`; `Pages\BoxesOnRack.php` and `Pages\AuditLog.php`
+(and their `'boxes'`/`'audit-log'` routes) are deleted — Filament renders a
+resource's `getRelations()` tabs automatically inline on its `ViewRecord`
+page, no separate page class needed, same as Box already relies on.
+
+**Test fallout, expected and fixed.** `DemoCorrectionPassTest` had two tests
+mounting `LocationResource\Pages\AuditLog` directly by class (audit tab
+render + cross-tenant 404). Rewrote the first against
+`LocationAuditLogRelationManager` (`Livewire::test(..., ['ownerRecord' =>
+$location, 'pageClass' => ViewLocation::class])`, the exact pattern
+`test_box_audit_log_identifies_the_linked_file` already used for Box's own
+relation manager two tests above it) and the second against `ViewLocation`
+itself (a tenant can't view another tenant's location at all — the
+underlying tenant-scoping guarantee is unchanged, just enforced by the page
+that now owns both tabs instead of a since-deleted dedicated audit-log page).
+
+**Verified live** on `dmims.test`: View Location now renders identically in
+shape to View Box — Location Details + Box Capacity cards, then an inline
+"Boxes Inside | Location Audit Log" tab strip on the same page (URL stays
+`/admin/locations/{id}`, no `/boxes` or `/audit-log` suffix), both tabs
+populated (2 boxes; 5 audit rows for a location edited a few times). My
+Company's read-only Locations tab (§38) needed no change — its `recordUrl()`
+already points at this same View Location page, so it automatically shows
+the new tab layout.
+
+**Regression tests:** `Location::auditLogs()` has no dedicated test of its
+own (mirrors `Box::auditLogs()`, which likewise has none — exercised
+indirectly through the relation manager tests). Full suite re-run after this
+change: 79 targeted (`Location*`, `DemoCorrectionPassTest`,
+`MyCompanyClusterTest`) passing; full suite passing.
+
+## 40. My Company's Locations Tab Was Hidden for a Real Customer Without `stock_inventory` Enabled — 17 September 2026
+
+User reported, with a screenshot logged into their own real "Madhan Inc"
+account, that §38's My Company Locations tab still didn't appear — only
+Audit Logs, Billing, Users, Enabled Modules, License Status, Profile,
+Subscription. Root-caused (without touching the real account's password —
+verified via `php artisan tinker` + `auth()->login()` against the actual
+user, then confirmed live with a separate throwaway QA user pointed at the
+same customer) to `MyCompanyLocations::canAccess()` calling
+`LocationResource::can('viewAny')`, which — same as the standalone
+Locations nav item — requires `stock_inventory` enabled for the customer
+(`BaseResource::can()`'s `moduleEnabledForUser()` gate). Madhan Inc
+genuinely doesn't have that module on (confirmed: `CustomerModule` row
+either absent or `is_enabled = false`), so the tab was correctly-by-that-
+logic hidden — but that logic was wrong for this specific tab: a read-only
+list of what locations exist is not the operational stock-management
+feature the module gates, and the user's explicit instruction was "ensure
+it can show on all customer logins."
+
+**Fixed:** `canAccess()` now checks the underlying permission directly
+(`manage inventory` OR `view inventory` on the acting user) instead of
+delegating to `LocationResource::can('viewAny')`, skipping the module check
+entirely for tab visibility. A row's own link to the full View Location page
+is unaffected — `recordUrl()` already gates on `LocationResource::can('view',
+$record)`, which still applies the module gate per-record, so a customer
+without `stock_inventory` sees the list but can't drill into a location's
+full detail/Boxes Inside/Location Audit Log view (that page's Boxes Inside
+tab is legitimately part of the gated stock-inventory feature).
+
+**Test fallout:** `test_cluster_is_hidden_from_a_role_with_no_accessible_tab`
+used "Stock Inventory User" (holds `manage inventory`) as its "nothing
+accessible" example — that role now legitimately has one accessible tab
+(Locations), so the premise broke. Switched the test to "Document Tracking
+User" (no inventory permission at all, still genuinely zero accessible
+tabs) and added a companion test locking in the new behavior: Stock
+Inventory User sees the cluster with only Locations accessible. New
+`test_locations_tab_shows_even_when_stock_inventory_module_is_disabled`
+directly covers the fix (asserts `LocationResource::can('viewAny')` is
+false as a sanity check, `MyCompanyLocations::canAccess()` is true, the
+list renders, and the row's own View Location link is absent).
+
+**Verified live** on `dmims.test` against the real "Madhan Inc" customer
+(via a throwaway QA user pointed at the same `customer_id`, not the real
+account): Locations tab now appears in My Company's sub-navigation and
+renders the full column set, matching the reported screenshot's exact
+scenario.
+
+**Regression tests:** `tests/Feature/MyCompanyClusterTest.php` — 1 new test
+for the fix, 1 rewritten (role swap) plus 1 new companion test to keep the
+"cluster hidden when nothing is accessible" guarantee accurate. Full suite:
+352/352 passing.
