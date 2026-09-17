@@ -10,7 +10,8 @@ use App\Filament\Resources\DocumentFileResource;
 use App\Filament\Resources\DocumentFileResource\Pages\CreateDocumentFile;
 use App\Filament\Resources\DocumentFileResource\Pages\EditDocumentFile;
 use App\Filament\Resources\DocumentFileResource\Pages\ViewDocumentFile;
-use App\Filament\Resources\LocationResource\Pages\AuditLog as LocationAuditLog;
+use App\Filament\Resources\LocationResource\Pages\ViewLocation;
+use App\Filament\Resources\LocationResource\RelationManagers\LocationAuditLogRelationManager;
 use App\Models\BarcodeRegistry;
 use App\Models\Box;
 use App\Models\Customer;
@@ -314,14 +315,22 @@ class DemoCorrectionPassTest extends TestCase
         $otherCustomer = Customer::create(['company_name' => 'Globex', 'company_code' => 'GLX', 'status' => 'active']);
         $otherLocation = Location::create(['customer_id' => $otherCustomer->id, 'location_code' => 'GL1', 'location_name' => 'GL1', 'status' => 'active']);
 
-        Livewire::test(LocationAuditLog::class, ['record' => $location->id])->assertOk();
+        Livewire::test(LocationAuditLogRelationManager::class, ['ownerRecord' => $location, 'pageClass' => ViewLocation::class])
+            ->assertOk();
 
         // A location's own audit log must never leak another customer's
         // location's audit rows even if ids happen to be adjacent.
         $this->assertNotSame($location->id, $otherLocation->id);
     }
 
-    public function test_a_tenant_user_of_another_customer_cannot_open_this_locations_audit_log(): void
+    /**
+     * Location Audit Log is now an inline tab on ViewLocation (matching
+     * ViewBox's Documents Inside/Box Movement Log/Box Audit Log pattern)
+     * rather than its own sub-navigation page/URL — tenant isolation is
+     * therefore enforced by ViewLocation's own tenant-scoped record
+     * resolution, not a separate audit-log-page route.
+     */
+    public function test_a_tenant_user_of_another_customer_cannot_view_this_location(): void
     {
         $location = $this->location('L1');
 
@@ -334,7 +343,7 @@ class DemoCorrectionPassTest extends TestCase
         // the stronger of the two (it never confirms the record exists).
         $this->expectException(ModelNotFoundException::class);
 
-        Livewire::test(LocationAuditLog::class, ['record' => $location->id]);
+        Livewire::test(ViewLocation::class, ['record' => $location->id]);
     }
 
     public function test_viewer_cannot_execute_transfer_from_the_box_view_page(): void

@@ -18,8 +18,14 @@ class Location extends Model
         // ancestryPathMap()'s cache must not outlive the data it describes —
         // invalidate on any write so a renamed/reparented/deleted location
         // is never served a stale path from an earlier snapshot.
-        static::saved(fn () => static::$ancestryPathCache = []);
-        static::deleted(fn () => static::$ancestryPathCache = []);
+        static::saved(function (): void {
+            static::$ancestryPathCache = [];
+            static::$typePathCache = [];
+        });
+        static::deleted(function (): void {
+            static::$ancestryPathCache = [];
+            static::$typePathCache = [];
+        });
 
         // children()/boxes() and getAncestryPathAttribute()'s parent walk
         // assume a well-formed, single-tenant tree — nothing before this
@@ -97,6 +103,15 @@ class Location extends Model
         return $this->hasMany(Box::class, 'current_location_id');
     }
 
+    /**
+     * Same reasoning as Box::auditLogs() — auditable_type stores the
+     * model's FQCN, not a morph map.
+     */
+    public function auditLogs()
+    {
+        return $this->hasMany(AuditLog::class, 'auditable_id')->where('auditable_type', self::class);
+    }
+
     public function productLocationStock()
     {
         return $this->hasMany(ProductLocationStock::class, 'location_id');
@@ -152,6 +167,18 @@ class Location extends Model
     }
 
     /**
+     * Breadcrumb of this location's own ancestor TYPES (e.g. "Area >
+     * Building > Floor > Room > Rack > Shelf"), not names — the Locations
+     * list's "Type" column in the old system. Same one-query-per-scope
+     * caching as ancestryPathMap(), just labeling each node by its type
+     * instead of its name.
+     */
+    public function getTypePathAttribute(): string
+    {
+        return static::typePathMap()[$this->id] ?? ($this->locationType?->type_name ?? '—');
+    }
+
+    /**
      * Matches location_name OR barcode so a handheld scanner's input (which
      * types the shelf/rack barcode, not its name) resolves a location — same
      * reasoning as Box::searchByNumberOrBarcode(). Used by Box Transfer/
@@ -188,6 +215,9 @@ class Location extends Model
      */
     protected static array $ancestryPathCache = [];
 
+    /** @var array<string, array<int, string>> */
+    protected static array $typePathCache = [];
+
     /**
      * All of this tenant's locations' ancestry paths, computed with one
      * query regardless of row count or hierarchy depth. Cached for the
@@ -200,6 +230,37 @@ class Location extends Model
      */
     public static function ancestryPathMap(): array
     {
+        return static::buildPathMap(
+            static::$ancestryPathCache,
+            ['id', 'parent_id', 'location_name'],
+            fn (self $location): string => $location->location_name,
+        );
+    }
+
+    /** @see getTypePathAttribute() */
+    public static function typePathMap(): array
+    {
+        return static::buildPathMap(
+            static::$typePathCache,
+            ['id', 'parent_id', 'location_type_id'],
+            fn (self $location): string => $location->locationType?->type_name ?? '—',
+            with: ['locationType'],
+        );
+    }
+
+    /**
+     * Shared "walk every location's ancestor chain, one query total"
+     * engine behind ancestryPathMap() and typePathMap() — identical tree
+     * walk, only the per-node label differs.
+     *
+     * @param  array<string, array<int, string>>  $cache
+     * @param  list<string>  $columns
+     * @param  Closure(self): string  $label
+     * @param  list<string>  $with
+     * @return array<int, string>
+     */
+    protected static function buildPathMap(array &$cache, array $columns, \Closure $label, array $with = []): array
+    {
         $user = auth()->user();
         $scopeKey = match (true) {
             $user === null => 'guest',
@@ -207,14 +268,14 @@ class Location extends Model
             default => 'customer:'.$user->customer_id,
         };
 
-        if (isset(static::$ancestryPathCache[$scopeKey])) {
-            return static::$ancestryPathCache[$scopeKey];
+        if (isset($cache[$scopeKey])) {
+            return $cache[$scopeKey];
         }
 
-        $locations = static::query()->get(['id', 'parent_id', 'location_name'])->keyBy('id');
+        $locations = static::query()->with($with)->get($columns)->keyBy('id');
 
-        return static::$ancestryPathCache[$scopeKey] = $locations->map(function (self $location) use ($locations): string {
-            $names = [];
+        return $cache[$scopeKey] = $locations->map(function (self $location) use ($locations, $label): string {
+            $parts = [];
             $node = $location;
             $depth = 0;
 
@@ -223,12 +284,12 @@ class Location extends Model
             // row cap) hits it, only a genuinely corrupted/cyclic tree that
             // somehow bypassed that guard.
             while ($node && $depth < 50) {
-                array_unshift($names, $node->location_name);
+                array_unshift($parts, $label($node));
                 $node = $node->parent_id ? $locations->get($node->parent_id) : null;
                 $depth++;
             }
 
-            return implode(' > ', $names);
+            return implode(' > ', $parts);
         })->all();
     }
 }

@@ -8,6 +8,7 @@ use App\Filament\Clusters\MyCompany\Pages\Billing;
 use App\Filament\Clusters\MyCompany\Pages\CompanyUsers;
 use App\Filament\Clusters\MyCompany\Pages\EnabledModules;
 use App\Filament\Clusters\MyCompany\Pages\LicenseStatus;
+use App\Filament\Clusters\MyCompany\Pages\Locations as MyCompanyLocations;
 use App\Filament\Clusters\MyCompany\Pages\Overview;
 use App\Filament\Clusters\MyCompany\Pages\Subscription;
 use App\Filament\Resources\AuditLogResource;
@@ -23,6 +24,7 @@ use App\Models\Customer;
 use App\Models\CustomerModule;
 use App\Models\CustomerSubscription;
 use App\Models\License;
+use App\Models\Location;
 use App\Models\Module;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
@@ -107,15 +109,157 @@ class MyCompanyClusterTest extends TestCase
         return $user;
     }
 
+    /** Holds only `view inventory` (RolesAndPermissionsSeeder.php) — the genuine "view, not manage" role. */
+    private function viewer(Customer $customer): User
+    {
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $this->activeSubscription($customer);
+
+        $user = User::factory()->create([
+            'customer_id' => $customer->id,
+            'is_platform_user' => false,
+            'status' => 'active',
+        ]);
+        $user->assignRole('Viewer');
+
+        return $user;
+    }
+
+    private function enableStockInventory(Customer $customer): void
+    {
+        $module = Module::firstOrCreate(['module_code' => 'stock_inventory'], ['module_name' => 'Stock Inventory', 'status' => 'active']);
+        CustomerModule::create(['customer_id' => $customer->id, 'module_id' => $module->id, 'is_enabled' => true, 'enabled_at' => now()]);
+    }
+
     /**
-     * Real-browser regression (24 August 2026): a Stock Inventory User
-     * could see the "My Company" nav item at all, because
+     * My Company's "Locations" tab is a pure view surface — unlike every
+     * other tab (HasEmbeddedResourceTable embeds its resource's table
+     * verbatim, actions included), this one strips Add/Edit/Delete/Batch
+     * Generate/bulk actions regardless of the viewer's own permission level.
+     * Tenant users keep full management via the standalone Locations menu
+     * (test_location_navigation_stays_for_tenant_users_but_hides_for_platform_users
+     * above) — this tab is a read-only convenience alongside it, not a
+     * replacement.
+     */
+    public function test_locations_tab_is_read_only_even_for_a_role_that_can_manage_locations(): void
+    {
+        $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACM', 'status' => 'active']);
+        $admin = $this->companyAdmin($customer);
+        $this->enableStockInventory($customer);
+        Location::create(['customer_id' => $customer->id, 'location_code' => 'L1', 'location_name' => 'Warehouse One', 'status' => 'active']);
+
+        $this->actingAs($admin);
+
+        $this->assertTrue(MyCompanyLocations::canAccess());
+
+        $response = $this->get(MyCompanyLocations::getUrl());
+        $response->assertOk();
+        $response->assertSee('Warehouse One');
+        $response->assertDontSee('Add Location');
+        $response->assertDontSee('Batch Generate');
+        $response->assertDontSee('Print Barcode');
+    }
+
+    public function test_locations_tab_is_accessible_to_a_genuine_view_only_role(): void
+    {
+        $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACM', 'status' => 'active']);
+        $viewer = $this->viewer($customer);
+        $this->enableStockInventory($customer);
+        Location::create(['customer_id' => $customer->id, 'location_code' => 'L1', 'location_name' => 'Warehouse One', 'status' => 'active']);
+
+        $this->actingAs($viewer);
+
+        $this->assertFalse(LocationResource::can('create'), 'Viewer must not be able to manage locations');
+        $this->assertTrue(MyCompanyLocations::canAccess());
+        $this->get(MyCompanyLocations::getUrl())->assertOk()->assertSee('Warehouse One');
+    }
+
+    /**
+     * Real-world regression (17 September 2026): "Madhan Inc" — a real
+     * customer with `stock_inventory` NOT enabled — saw no Locations tab in
+     * My Company at all. `LocationResource::can('viewAny')` (used by every
+     * other tab's canAccess() via HasEmbeddedResourceTable) also requires
+     * the module enabled; this tab must not, since it's a passive view, not
+     * the operational feature the module gates.
+     */
+    public function test_locations_tab_shows_even_when_stock_inventory_module_is_disabled(): void
+    {
+        $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACM', 'status' => 'active']);
+        $admin = $this->companyAdmin($customer);
+        // Deliberately no enableStockInventory() call here.
+        $location = Location::create(['customer_id' => $customer->id, 'location_code' => 'L1', 'location_name' => 'Warehouse One', 'status' => 'active']);
+
+        $this->actingAs($admin);
+
+        $this->assertFalse(LocationResource::can('viewAny'), 'sanity check: the module really is disabled');
+        $this->assertTrue(MyCompanyLocations::canAccess());
+
+        $response = $this->get(MyCompanyLocations::getUrl());
+        $response->assertOk();
+        $response->assertSee('Warehouse One');
+
+        // The module still gates the row's own View Location link — a
+        // customer without the module sees the list but can't drill in.
+        $response->assertDontSee(LocationResource::getUrl('view', ['record' => $location]), false);
+    }
+
+    public function test_locations_tab_shows_only_own_customer_locations(): void
+    {
+        $customerA = Customer::create(['company_name' => 'Alpha', 'company_code' => 'A', 'status' => 'active']);
+        $customerB = Customer::create(['company_name' => 'Beta', 'company_code' => 'B', 'status' => 'active']);
+        $admin = $this->companyAdmin($customerA);
+        $this->enableStockInventory($customerA);
+        Location::create(['customer_id' => $customerA->id, 'location_code' => 'L1', 'location_name' => 'Own Warehouse', 'status' => 'active']);
+        Location::create(['customer_id' => $customerB->id, 'location_code' => 'L2', 'location_name' => 'Other Warehouse', 'status' => 'active']);
+
+        $this->actingAs($admin);
+
+        $response = $this->get(MyCompanyLocations::getUrl());
+        $response->assertOk();
+        $response->assertSee('Own Warehouse');
+        $response->assertDontSee('Other Warehouse');
+    }
+
+    /**
+     * Real-browser regression (24 August 2026): a role with no accessible
+     * tab could still see the "My Company" nav item, because
      * MyLicenseStatusWidget::canView() had no permission check — any
      * non-platform user with a customer_id passed, so
      * canAccessClusteredComponents() found License Status accessible even
-     * though every other tab correctly denied a Stock Inventory User.
+     * though every other tab correctly denied the role.
+     *
+     * Uses Document Tracking User, not Stock Inventory User — since the
+     * Locations tab's `canAccess()` intentionally checks `manage
+     * inventory`/`view inventory` directly (see MyCompanyLocations's own
+     * doc-comment: it must show regardless of the `stock_inventory` module),
+     * Stock Inventory User now legitimately has one accessible tab
+     * (Locations) and would fail this "nothing is accessible" premise.
+     * Document Tracking User holds no inventory/users/billing/customers
+     * permission at all, so every tab — Locations included — stays hidden.
      */
     public function test_cluster_is_hidden_from_a_role_with_no_accessible_tab(): void
+    {
+        $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACM', 'status' => 'active']);
+        $this->seed(RolesAndPermissionsSeeder::class);
+        $this->activeSubscription($customer);
+
+        $user = User::factory()->create(['customer_id' => $customer->id, 'is_platform_user' => false, 'status' => 'active']);
+        $user->assignRole('Document Tracking User');
+        $this->actingAs($user);
+
+        $this->assertFalse(MyCompany::shouldRegisterNavigation());
+        $this->assertFalse(LicenseStatus::canAccess());
+        $this->assertFalse(MyCompanyLocations::canAccess());
+    }
+
+    /**
+     * Companion to the above: a Stock Inventory User (holds `manage
+     * inventory`) now legitimately sees the Locations tab even with no
+     * other My Company tab accessible — the cluster itself must therefore
+     * become visible for them too (canAccessClusteredComponents() finds one
+     * accessible child).
+     */
+    public function test_stock_inventory_user_sees_only_the_locations_tab(): void
     {
         $customer = Customer::create(['company_name' => 'Acme', 'company_code' => 'ACM', 'status' => 'active']);
         $this->seed(RolesAndPermissionsSeeder::class);
@@ -125,8 +269,10 @@ class MyCompanyClusterTest extends TestCase
         $user->assignRole('Stock Inventory User');
         $this->actingAs($user);
 
-        $this->assertFalse(MyCompany::shouldRegisterNavigation());
+        $this->assertTrue(MyCompany::shouldRegisterNavigation());
+        $this->assertTrue(MyCompanyLocations::canAccess());
         $this->assertFalse(LicenseStatus::canAccess());
+        $this->assertFalse(CompanyUsers::canAccess());
     }
 
     public function test_cluster_is_hidden_from_platform_users(): void

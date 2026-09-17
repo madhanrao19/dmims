@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Concerns\HasBarcodeAction;
 use App\Filament\Resources\LocationResource\Pages;
+use App\Filament\Resources\LocationResource\RelationManagers;
 use App\Http\Middleware\EnsureModuleEnabled;
 use App\Models\Location;
 use App\Models\LocationType;
@@ -13,8 +14,9 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Forms;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
-use Filament\Resources\Pages\Page;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Tables;
@@ -119,19 +121,71 @@ class LocationResource extends BaseResource
             ]);
     }
 
+    /**
+     * Read-only "Location Details" + "Box Capacity" cards for ViewLocation's
+     * Overview tab — same deliberate, scoped exception to this app's "no
+     * infolist() override" convention as BoxResource::infolist() (see that
+     * method's own doc-comment): the old system's screenshots need
+     * TextEntry-shaped badge/count rendering a disabled form field can't
+     * produce without hand-rolled Blade.
+     */
+    public static function infolist(Schema $schema): Schema
+    {
+        return $schema->components([
+            Section::make('Location Details')
+                ->columns(2)
+                ->schema([
+                    TextEntry::make('locationType.type_name')->label('Type')->badge(),
+                    TextEntry::make('location_name')->label('Name'),
+                    TextEntry::make('barcode')->fontFamily('mono')->copyable()->placeholder('—'),
+                    TextEntry::make('ancestry_path')->label('Full Path'),
+                    TextEntry::make('status')
+                        ->label('Active')
+                        ->badge()
+                        ->formatStateUsing(fn (string $state): string => $state === 'active' ? 'Active' : 'Inactive')
+                        ->color(fn (string $state): string => $state === 'active' ? 'success' : 'gray'),
+                    TextEntry::make('created_at')->dateTime(),
+                ]),
+            Section::make('Box Capacity')
+                ->columns(3)
+                ->schema([
+                    TextEntry::make('boxes_stored')
+                        ->label('Boxes Stored')
+                        ->state(fn (Location $record): int => $record->boxes_used_count)
+                        ->badge(),
+                    TextEntry::make('boxes_active')
+                        ->label('Active')
+                        ->state(fn (Location $record): int => $record->boxes()->where('status', 'active')->count())
+                        ->badge()
+                        ->color('success'),
+                    TextEntry::make('boxes_in_transit')
+                        ->label('In Transit')
+                        ->state(fn (Location $record): int => $record->boxes()->where('status', 'moved_out')->count())
+                        ->badge()
+                        ->color('warning'),
+                ]),
+        ]);
+    }
+
     public static function table(Table $table): Table
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('location_name')->sortable()->searchable(),
-                Tables\Columns\TextColumn::make('location_code')->sortable()->searchable(),
-                Tables\Columns\TextColumn::make('locationType.type_name')->label('Type')->sortable(),
-                Tables\Columns\TextColumn::make('parent.location_name')->label('Parent')->sortable(),
+                Tables\Columns\TextColumn::make('id')->label('Location ID')->sortable(),
+                Tables\Columns\TextColumn::make('type_path')->label('Type')->badge(),
+                Tables\Columns\TextColumn::make('ancestry_path')
+                    ->label('Full Path')
+                    ->formatStateUsing(fn (Location $record): string => $record->barcode
+                        ? "{$record->ancestry_path} [{$record->barcode}]"
+                        : $record->ancestry_path)
+                    ->wrap()
+                    ->searchable(['location_name']),
+                Tables\Columns\TextColumn::make('barcode')->fontFamily('mono')->placeholder('—')->searchable(),
                 Tables\Columns\TextColumn::make('box_capacity')
-                    ->label('Box capacity')
+                    ->label('Boxes')
                     ->state(fn (Location $record): string => $record->box_capacity
-                        ? "{$record->boxes_used_count}/{$record->box_capacity} boxes ({$record->box_capacity_percent}%)"
-                        : "{$record->boxes_used_count} boxes")
+                        ? "{$record->boxes_used_count}/{$record->box_capacity} ({$record->box_capacity_percent}%)"
+                        : (string) $record->boxes_used_count)
                     ->badge()
                     ->color(fn (Location $record): string => match (true) {
                         $record->box_capacity_percent === null => 'gray',
@@ -139,9 +193,10 @@ class LocationResource extends BaseResource
                         $record->box_capacity_percent >= 80 => 'warning',
                         default => 'success',
                     }),
-                Tables\Columns\TextColumn::make('status')
-                    ->badge()
-                    ->color(fn (string $state): string => $state === 'active' ? 'success' : 'gray'),
+                Tables\Columns\IconColumn::make('status')
+                    ->label('Active')
+                    ->boolean()
+                    ->getStateUsing(fn (Location $record): bool => $record->status === 'active'),
             ])
             ->recordActions([
                 // A flat list of inline link-styled actions (Edit / Print
@@ -421,16 +476,17 @@ class LocationResource extends BaseResource
     }
 
     /**
-     * Location detail page tab bar — Overview / Audit Log, so "review a
-     * shelf's audit history" (the final step of the original demo script)
-     * has a page to land on, matching the Box/Document File pattern.
+     * View Location tabs — Boxes Inside / Location Audit Log render inline
+     * on the same page (Filament's standard RelationManager tab strip),
+     * not as separate sub-navigation pages — matches ViewBox's own
+     * Documents Inside / Box Movement Log / Box Audit Log pattern.
      */
-    public static function getRecordSubNavigation(Page $page): array
+    public static function getRelations(): array
     {
-        return $page->generateNavigationItems([
-            Pages\ViewLocation::class,
-            Pages\AuditLog::class,
-        ]);
+        return [
+            RelationManagers\BoxesInsideRelationManager::class,
+            RelationManagers\LocationAuditLogRelationManager::class,
+        ];
     }
 
     public static function getPages(): array
@@ -440,7 +496,6 @@ class LocationResource extends BaseResource
             'create' => Pages\CreateLocation::route('/create'),
             'view' => Pages\ViewLocation::route('/{record}'),
             'edit' => Pages\EditLocation::route('/{record}/edit'),
-            'audit-log' => Pages\AuditLog::route('/{record}/audit-log'),
         ];
     }
 }
