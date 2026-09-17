@@ -310,6 +310,7 @@ class BarcodeRegistryResource extends BaseResource
                         $records->each(fn (BarcodeRegistry $record) => app(BarcodeService::class)->incrementPrinted($record, $copies));
                     })
                     ->modalContent(function (Collection $records, LivewireComponent&HasSchemas $livewire) {
+                        /** @var Collection<int, BarcodeRegistry> $records */
                         $data = static::liveActionData($livewire);
                         $barcodeService = app(BarcodeService::class);
 

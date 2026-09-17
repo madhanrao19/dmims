@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\Auditable;
 use App\Models\Concerns\BelongsToCustomer;
+use Closure;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -211,11 +212,11 @@ class Location extends Model
     }
 
     /**
-     * @var array<string, array<int, string>>
+     * @var array<string, array<int|string, string>>
      */
     protected static array $ancestryPathCache = [];
 
-    /** @var array<string, array<int, string>> */
+    /** @var array<string, array<int|string, string>> */
     protected static array $typePathCache = [];
 
     /**
@@ -253,13 +254,13 @@ class Location extends Model
      * engine behind ancestryPathMap() and typePathMap() — identical tree
      * walk, only the per-node label differs.
      *
-     * @param  array<string, array<int, string>>  $cache
+     * @param  array<string, array<int|string, string>>  $cache
      * @param  list<string>  $columns
-     * @param  Closure(self): string  $label
+     * @param  Closure(static): string  $label
      * @param  list<string>  $with
-     * @return array<int, string>
+     * @return array<int|string, string>
      */
-    protected static function buildPathMap(array &$cache, array $columns, \Closure $label, array $with = []): array
+    protected static function buildPathMap(array &$cache, array $columns, Closure $label, array $with = []): array
     {
         $user = auth()->user();
         $scopeKey = match (true) {
